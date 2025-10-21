@@ -5,7 +5,6 @@
  * - If not authenticated: redirect to login
  */
 
-import { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '../store/authStore';

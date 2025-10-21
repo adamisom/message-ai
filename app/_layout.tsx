@@ -15,7 +15,7 @@ export default function RootLayout() {
   // Restore session on app launch
   useEffect(() => {
     restoreSession();
-  }, []);
+  }, [restoreSession]);
 
   return (
     <Stack

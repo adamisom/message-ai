@@ -14,15 +14,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { Link, router } from 'expo-router';
 import { registerUser } from '../../services/authService';
 import { useAuthStore } from '../../store/authStore';
 import {
-  validateEmail,
-  validatePassword,
-  validateDisplayName,
   getEmailError,
   getPasswordError,
   getDisplayNameError,
