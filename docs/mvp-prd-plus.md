@@ -1320,10 +1320,610 @@ Use this before submitting MVP:
 
 # APPENDICES
 
-(Appendices A-E remain the same as previous version, with updates to reflect Expo Router usage)
+---
+
+# Appendix A: Environment Setup & Version Requirements
+
+## Recommended Versions (October 2025)
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| **Node.js** | 20.19.4+ (LTS 22.20.0 recommended) | Expo SDK 54 requires 20.19.x minimum |
+| **npm or Yarn** | Latest | Yarn 1.x recommended for RN |
+| **Expo CLI** | Latest (global install) | `npm install -g expo@latest` |
+| **React Native** | 0.81 (via Expo SDK 54) - PINNED | Hermes JS engine (default) |
+| **React** | 19.1.0 - PINNED | Included with Expo SDK 54 |
+| **Android SDK** | Platform 35 (API 34+) | Install via Android Studio SDK Manager |
+| **Android Build-Tools** | 35.0.0+ | Install via Android Studio |
+| **JDK** | 17 (OpenJDK recommended) | Required for Android builds |
+| **Xcode** | Latest (macOS only) | For iOS simulator; Command Line Tools required |
+| **Watchman** | Latest | Recommended for hot reload performance |
+
+**IMPORTANT:** All versions are frozen/pinned. Do not upgrade during MVP development.
+
+## Installation Steps
+
+### 1. Node.js & npm
+
+```bash
+# macOS (via Homebrew)
+brew install node@20
+
+# Or use nvm (recommended for version management)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+nvm install 20.19.4
+nvm use 20.19.4
+
+# Verify installation
+node --version  # v20.19.4+
+npm --version   # 10.x+
+```
+
+### 2. Expo CLI (Global)
+
+```bash
+npm install -g expo@latest
+expo --version
+```
+
+### 3. Watchman (Recommended for File Watching)
+
+```bash
+# macOS
+brew install watchman
+
+# Linux (compile from source)
+git clone https://github.com/facebook/watchman.git
+cd watchman
+./build/fbcode_builder/getdeps.py build
+
+# Windows: Not typically needed; skip if not on macOS/Linux
+```
+
+### 4. Android Setup (For Emulator)
+
+**Option A: Android Studio (Recommended)**
+
+```bash
+# 1. Download Android Studio from developer.android.com
+# 2. Install and launch
+# 3. Go to SDK Manager (⚙️ icon in bottom right)
+#    - Install Platform 35 (Android 15)
+#    - Install Build-Tools 35.0.0
+#    - Install System Image (Pixel 5 API 34 or API 35)
+# 4. Create Virtual Device (AVD)
+#    - Device: Pixel 5 or Pixel 6 (good performance balance)
+#    - API Level: 34 or 35
+#    - RAM: 4GB minimum
+
+# 5. Set ANDROID_HOME environment variable
+export ANDROID_HOME=$HOME/Library/Android/sdk  # macOS
+export ANDROID_HOME=$HOME/Android/Sdk          # Linux
+# Add to ~/.bash_profile or ~/.zshrc for persistence
+```
+
+### 5. iOS Setup (macOS Only)
+
+```bash
+# Install Xcode Command Line Tools
+xcode-select --install
+
+# Or install Xcode from App Store (full IDE)
+
+# Verify installation
+xcrun --version
+```
+
+### 6. Set Environment Variables
+
+Add to `~/.bash_profile`, `~/.zshrc`, or `~/.env`:
+
+```bash
+# Android
+export ANDROID_HOME=$HOME/Library/Android/sdk
+export PATH=$ANDROID_HOME/emulator:$PATH
+export PATH=$ANDROID_HOME/platform-tools:$PATH
+export PATH=$ANDROID_HOME/tools:$PATH
+
+# Java (if needed)
+export JAVA_HOME=$(/usr/libexec/java_home)  # macOS
+```
+
+Then reload:
+
+```bash
+source ~/.zshrc  # or ~/.bash_profile
+```
+
+### 7. Verify Setup
+
+```bash
+# Check all tools
+node --version          # v20.19.4+
+npm --version           # 10.x+
+expo --version          # latest
+watchman --version      # latest
+adb version             # Android Debug Bridge
+xcode-select -p         # /Applications/Xcode.app/Contents/Developer (macOS)
+
+# Try creating a test Expo project
+npx create-expo-app TestApp
+cd TestApp
+npx expo start --android
+```
+
+---
+
+# Appendix B: Expo Go & Emulator Testing
+
+## What is Expo Go?
+
+**Expo Go** is a free mobile app (iOS/Android) that runs your React Native Expo project without needing to build a native binary. It's the fastest way to develop and test.
+
+### Download Expo Go
+
+- **iOS:** [App Store](https://apps.apple.com/us/app/expo-go/id982107779)
+- **Android:** [Google Play](https://play.google.com/store/apps/details?id=host.exp.exponent)
+
+### Using Expo Go
+
+```bash
+# Start Expo development server
+npx expo start
+
+# Output will show:
+# ✅ Expo server running
+# 📱 Scan this QR code with your phone:
+# [QR CODE]
+
+# Option 1: Scan QR code on physical device
+# - Open Expo Go app
+# - Tap "Scan QR Code"
+# - App will load in Expo Go
+
+# Option 2: Press 'a' for Android emulator
+# Option 3: Press 'i' for iOS simulator (macOS only)
+```
+
+### Expo Go Limitations
+
+- ✅ Works for most apps (99% of use cases)
+- ❌ **Does NOT support:**
+  - Push notifications (background)
+  - Custom native modules
+  - Custom C++ code
+  - Some advanced native features
+
+**For MessageAI MVP:** Expo Go is perfect. We'll use local notifications instead of FCM (works in Expo Go).
+
+---
+
+## Android Emulator Setup (Detailed)
+
+### Step 1: Create Virtual Device (AVD)
+
+```bash
+# Option A: Via Android Studio GUI
+# 1. Open Android Studio
+# 2. Click "Virtual Device Manager" (phone icon)
+# 3. Click "Create device"
+# 4. Choose "Pixel 5" (good balance of speed/realism)
+# 5. Select API Level 34 or 35
+# 6. Configure:
+#    - Name: Pixel_5_API_34
+#    - RAM: 4GB (minimum 2GB)
+#    - Internal Storage: 2GB
+#    - SD Card: 512MB
+# 7. Click "Create"
+
+# Option B: Via Command Line
+$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "system-images;android-34;default;x86_64"
+
+avdmanager create avd \
+  -n Pixel_5_API_34 \
+  -k "system-images;android-34;default;x86_64" \
+  -d "Pixel 5"
+```
+
+### Step 2: Launch Android Emulator
+
+```bash
+# Using full path
+$ANDROID_HOME/emulator/emulator -avd Pixel_5_API_34 -netdelay none -netspeed full
+
+# Or add to PATH and use:
+emulator -avd Pixel_5_API_34 -netdelay none -netspeed full
+
+# Options explained:
+# -netdelay none  → No simulated network latency
+# -netspeed full  → Simulated full network speed (not throttled)
+
+# To list available AVDs:
+emulator -list-avds
+```
+
+### Step 3: Connect Expo
+
+```bash
+# Once emulator is running, in another terminal:
+npx expo start --android
+
+# Expo will detect the running emulator and install the app
+```
+
+### Android Emulator Performance Tips
+
+- **Use x86_64 or arm64-v8a** system image (faster than armeabi-v7a)
+- **Allocate 4GB+ RAM** to the emulator in AVD settings
+- **Use SSD** for better performance (not HDD)
+- **Close other apps** while emulator runs
+- **Enable GPU acceleration** (AVD settings → Graphics: "Automatic" or "Hardware")
+- **Restart every 2-3 hours** if sluggish (memory leak in emulator)
+
+### Troubleshooting Android Emulator
+
+| Issue | Solution |
+|-------|----------|
+| Emulator won't launch | Check ANDROID_HOME is set; reinstall Android SDK via Android Studio |
+| App crashes on hot reload | Full restart: kill emulator, relaunch |
+| Slow performance | Allocate more RAM; use x86_64 image; enable GPU |
+| Can't connect to localhost Firebase | Use `10.0.2.2` instead of `localhost` in Firebase config (emulator can't access host directly) |
+
+---
+
+## iOS Simulator Setup (macOS Only)
+
+### Step 1: Ensure Xcode is Installed
+
+```bash
+# Check if Xcode is installed
+xcode-select -p
+# Output: /Applications/Xcode.app/Contents/Developer
+
+# If not, install Command Line Tools
+xcode-select --install
+
+# Or full Xcode from App Store (larger download)
+```
+
+### Step 2: Launch iOS Simulator
+
+```bash
+# Open simulator
+open -a Simulator
+
+# Or use xcrun to launch specific device
+xcrun simctl list devices
+xcrun simctl boot "iPhone 15"  # Device name
+
+# View available simulators
+xcrun simctl list devices
+```
+
+### Step 3: Connect Expo
+
+```bash
+npx expo start --ios
+
+# Or press 'i' after running 'npx expo start'
+```
+
+### iOS Simulator Notes
+
+- **Much slower** than Android emulator (uses macOS virtualization)
+- Use **iPhone 14/15** simulator (newer = faster)
+- Avoid older iPhone models (they're slower)
+- **First launch takes time** (first build is slow; subsequent reloads are fast)
+
+---
+
+## Running on Physical Devices
+
+### Best Option for Accurate Testing
+
+```bash
+# 1. Install Expo Go on physical device (App Store / Google Play)
+
+# 2. Ensure device and dev machine are on same WiFi network
+
+# 3. Start Expo dev server
+npx expo start
+
+# 4. On physical device:
+#    - Open Expo Go app
+#    - Tap "Scan QR Code"
+#    - Point camera at terminal QR code
+#    - App will load on device
+
+# Benefits:
+# - Real performance (no emulator overhead)
+# - Real network conditions
+# - Real notifications (local notifications work)
+# - Real app lifecycle (background, foreground)
+```
+
+### Tunnel Mode (If Local Network Not Available)
+
+```bash
+# Use Expo's tunnel mode (internet-based, slower)
+npx expo start --tunnel
+
+# Useful for:
+# - Testing from remote locations
+# - Unreliable WiFi networks
+# - Shared testing with teammates
+```
+
+---
+
+# Appendix C: Recommended Expo Modules for MessageAI
+
+All of these are pre-installed with Expo SDK 54 or can be installed via:
+
+```bash
+npx expo install <module-name>
+```
+
+## Core Modules Used in MessageAI
+
+| Module | Purpose | Already Included? | Quick Setup |
+|--------|---------|-------------------|------------|
+| **expo-notifications** | Local & push notifications | ✅ Yes | `import * as Notifications from 'expo-notifications'` |
+| **expo-vector-icons** | 3,000+ icons (Ionicons, MaterialCommunityIcons) | ✅ Yes | `import { Ionicons } from '@expo/vector-icons'` |
+| **expo-status-bar** | Control device status bar (time, battery, etc.) | ✅ Yes | `import { StatusBar } from 'expo-status-bar'` |
+| **expo-linking** | Deep linking & URL handling | ✅ Yes | `import * as Linking from 'expo-linking'` |
+| **expo-router** | File-based routing (PRIMARY NAVIGATION) | ✅ Yes | Already configured |
+| **@react-native-community/netinfo** | Network status detection | ❌ No | `npx expo install @react-native-community/netinfo` |
+
+## UI Component Libraries
+
+| Library | Purpose | Install | Why |
+|---------|---------|---------|-----|
+| **React Native Paper** | Material Design UI components | `npm install react-native-paper` | Pre-made buttons, inputs, dialogs; looks professional |
+
+## State Management
+
+| Library | Purpose | Install | Why |
+|---------|---------|---------|-----|
+| **zustand** | Lightweight state management | `npm install zustand` | Minimal boilerplate; great for simple apps |
+| **async-storage** | Key-value persistent storage | `npx expo install @react-native-async-storage/async-storage` | Store auth tokens, UI state |
+
+## Useful for Later Phases
+
+| Module | Purpose | Use Case | Install |
+|--------|---------|----------|---------|
+| **expo-image-picker** | Pick images from gallery/camera | Media sharing (Phase 2) | `npx expo install expo-image-picker` |
+| **expo-camera** | Camera access for photos/QR codes | Video calls or QR scanning (Phase 2) | `npx expo install expo-camera` |
+| **expo-location** | GPS/geolocation | Location-based messaging (Phase 2) | `npx expo install expo-location` |
+| **expo-av** | Audio/video playback | Voice messages (Phase 2) | `npx expo install expo-av` |
+| **expo-contacts** | Access device contacts | Contact sync (Phase 2) | `npx expo install expo-contacts` |
+
+---
+
+# Appendix D: Push Notifications Deep Dive
+
+## MVP Approach: Local Notifications (Expo Go Compatible)
+
+Local notifications work in Expo Go without any backend setup. Perfect for MVP.
+
+```javascript
+// app.json
+{
+  "expo": {
+    "name": "MessageAI",
+    "slug": "messageai",
+    "plugins": ["expo-notifications"]  // Important!
+  }
+}
+```
+
+```javascript
+// services/notificationService.js
+import * as Notifications from 'expo-notifications';
+
+// Request notification permissions
+export const requestNotificationPermissions = async () => {
+  const { status } = await Notifications.requestPermissionsAsync();
+  return status === 'granted';
+};
+
+// Schedule local notification
+export const scheduleNotification = async (title, body, data = {}) => {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title,
+      body,
+      sound: 'default',
+      data
+    },
+    trigger: { seconds: 0 } // Immediate
+  });
+};
+
+// Listen for user interaction with notification
+export const setupNotificationListener = (onNotificationPress) => {
+  const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+    const { conversationId } = response.notification.request.content.data;
+    onNotificationPress(conversationId);
+  });
+  return subscription;
+};
+```
+
+Usage in ChatScreen:
+
+```javascript
+import { scheduleNotification, setupNotificationListener } from '../services/notificationService';
+
+useEffect(() => {
+  // Listen for incoming messages
+  const unsubscribe = db.collection('conversations')
+    .doc(conversationId)
+    .collection('messages')
+    .orderBy('createdAt', 'desc')
+    .limit(1)
+    .onSnapshot((snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added' && change.doc.data().senderId !== currentUser.uid) {
+          // New message from someone else - notify!
+          scheduleNotification(
+            change.doc.data().senderName,
+            change.doc.data().text,
+            { conversationId }
+          );
+        }
+      });
+    });
+  
+  return unsubscribe;
+}, [conversationId]);
+```
+
+---
+
+## Production Approach: Firebase Cloud Messaging (FCM) + EAS Build
+
+For background notifications (Phase 2), you'll need:
+
+### Step 1: Create Development Build (Not Expo Go)
+
+```bash
+# Requires EAS account (free tier available)
+npm install -g eas-cli
+eas login
+
+# Create development build
+eas build --profile development --platform android
+
+# Or for iOS (macOS only)
+eas build --profile development --platform ios
+```
+
+### Step 2: Configure Firebase Credentials
+
+```bash
+# Install expo-notifications if not already
+npx expo install expo-notifications
+
+# Configure Firebase credentials
+eas credentials
+# Follow prompts to:
+# - Select Android platform
+# - Choose "Firebase Cloud Messaging" (FCM)
+# - Paste your Firebase server key from Firebase Console
+```
+
+### Step 3: Get Firebase Server Key
+
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Select your project
+3. Settings ⚙️ → Project Settings
+4. Cloud Messaging tab
+5. Copy "Server API Key"
+6. Paste into `eas credentials` prompt
+
+### Important Limitations for MVP
+
+| Feature | Expo Go | Development Build | Full Build |
+|---------|---------|------------------|-----------|
+| Local notifications | ✅ Works | ✅ Works | ✅ Works |
+| Foreground FCM | ❌ No | ✅ Works | ✅ Works |
+| Background notifications | ❌ No | ✅ Works | ✅ Works |
+| Production ready | ❌ No | ❌ Development only | ✅ Yes |
+
+**For MVP:** Use local notifications only (works in Expo Go, no backend needed).
+
+---
+
+# Appendix E: Expo Router Quick Reference
+
+## File Structure & Routes
+
+Expo Router uses file-based routing. Files in the `app/` directory automatically become routes.
+
+```
+app/
+├── _layout.tsx              → Root layout (wraps all screens)
+├── index.tsx                → "/" route (home/landing)
+├── (auth)/                  → Route group (doesn't add URL segment)
+│   ├── _layout.tsx          → Layout for auth screens
+│   ├── login.tsx            → "/login" route
+│   └── register.tsx         → "/register" route
+├── (tabs)/                  → Tab navigator group
+│   ├── _layout.tsx          → Tabs layout
+│   ├── index.tsx            → "/tabs" route (conversations list)
+│   └── new-chat.tsx         → "/tabs/new-chat" route
+└── chat/
+    └── [id].tsx             → "/chat/:id" dynamic route
+```
+
+## Navigation
+
+```typescript
+import { useRouter, useLocalSearchParams, Link } from 'expo-router';
+
+// Programmatic navigation
+const router = useRouter();
+router.push('/login');
+router.push('/chat/123');
+router.back();
+
+// Get dynamic params
+const { id } = useLocalSearchParams(); // In chat/[id].tsx
+
+// Declarative navigation
+<Link href="/login">Go to Login</Link>
+<Link href={`/chat/${conversationId}`}>Open Chat</Link>
+```
+
+## Layouts
+
+```typescript
+// app/_layout.tsx (Root layout)
+import { Stack } from 'expo-router';
+
+export default function RootLayout() {
+  return (
+    <Stack>
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
+    </Stack>
+  );
+}
+
+// app/(tabs)/_layout.tsx (Tabs layout)
+import { Tabs } from 'expo-router';
+
+export default function TabsLayout() {
+  return (
+    <Tabs>
+      <Tabs.Screen name="index" options={{ title: 'Chats' }} />
+      <Tabs.Screen name="new-chat" options={{ title: 'New Chat' }} />
+    </Tabs>
+  );
+}
+```
+
+## Route Groups
+
+Folders wrapped in `()` are route groups - they organize files without affecting URLs:
+
+```
+app/(auth)/login.tsx    → URL: /login (not /auth/login)
+app/(tabs)/index.tsx    → URL: /tabs (or /)
+```
+
+## Benefits for MessageAI
+
+- ✅ No manual navigation setup
+- ✅ Type-safe routes with TypeScript
+- ✅ Automatic deep linking
+- ✅ Cleaner than React Navigation boilerplate
+- ✅ Already configured in project
 
 ---
 
 **End of Document**
 
-This PRD is comprehensive, updated with your decisions, and ready for development. Good luck with MessageAI MVP! 🚀
+This PRD is comprehensive, updated with all appendices, and ready for development. Good luck with MessageAI MVP! 🚀
