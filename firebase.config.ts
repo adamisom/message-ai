@@ -1,7 +1,7 @@
-import { initializeApp } from 'firebase/app';
-import { initializeAuth, getAuth, Auth } from 'firebase/auth';
-import { initializeFirestore, getFirestore, Firestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initializeApp } from 'firebase/app';
+import { Auth, getAuth, initializeAuth } from 'firebase/auth';
+import { Firestore, getFirestore, initializeFirestore } from 'firebase/firestore';
 
 // Import getReactNativePersistence dynamically to avoid TS issues
 // eslint-disable-next-line @typescript-eslint/no-var-requires
