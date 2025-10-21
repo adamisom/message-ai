@@ -11,9 +11,14 @@ firebase.config.js
 
 # Dependencies
 node_modules/
+package-lock.json
 
 # Build outputs
 .expo/
 dist/
 web-build/
+
+# Expo generated
+.expo-shared/
+expo-env.d.ts
 

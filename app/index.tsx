@@ -1,40 +1,41 @@
-// app/index.tsx - TEMPORARY TEST CODE (will be replaced in Phase 1)
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { db } from '../firebase.config';
+/**
+ * Index Screen (Landing/Redirect)
+ * Redirects based on authentication state:
+ * - If authenticated: redirect to main app (will be /(tabs) in Phase 2)
+ * - If not authenticated: redirect to login
+ */
+
+import { useEffect } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { Redirect } from 'expo-router';
+import { useAuthStore } from '../store/authStore';
 
 export default function Index() {
-  const [status, setStatus] = useState('Testing Firebase...');
-  const [error, setError] = useState('');
+  const user = useAuthStore((state) => state.user);
+  const loading = useAuthStore((state) => state.loading);
 
-  useEffect(() => {
-    testFirebase();
-  }, []);
+  // Show loading spinner while checking session
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
-  const testFirebase = async () => {
-    try {
-      const docRef = await addDoc(collection(db, 'test'), {
-        message: 'Hello from MessageAI',
-        timestamp: serverTimestamp(),
-      });
-      
-      setStatus(`✅ SUCCESS! Firebase is working.\nDoc ID: ${docRef.id}`);
-      console.log('✅ Firebase test passed');
-    } catch (err: any) {
-      setError(`❌ ERROR: ${err.message}`);
-      console.error('Firebase test failed:', err);
-    }
-  };
+  // Redirect based on auth state
+  if (user) {
+    // TODO: In Phase 2, change this to redirect to /(tabs)
+    // For now, just show a placeholder
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Phase 0 Setup Test</Text>
-      <Text style={styles.status}>{status}</Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {!error && status.includes('Testing') && <ActivityIndicator size="large" />}
-    </View>
-  );
+  // Not authenticated, redirect to login
+  return <Redirect href="/(auth)/login" />;
 }
 
 const styles = StyleSheet.create({
@@ -42,23 +43,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
     backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  status: {
-    fontSize: 16,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  error: {
-    fontSize: 14,
-    color: 'red',
-    marginTop: 10,
-    textAlign: 'center',
   },
 });
