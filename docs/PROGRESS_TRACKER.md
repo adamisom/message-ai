@@ -123,56 +123,56 @@
 
 ---
 
-## PHASE 2: User Discovery & Conversation Creation ⏱️ 2-3 hours
+## PHASE 2: User Discovery & Conversation Creation ⏱️ 2-3 hours ✅ COMPLETE
 
 ### Firestore Service
 
-- [ ] `services/firestoreService.ts` created
+- [x] `services/firestoreService.ts` created
 
-  - [ ] `findUserByEmail()` function
-  - [ ] `createOrOpenConversation()` function (1-on-1)
-  - [ ] `createGroupConversation()` function
+  - [x] `findUserByEmail()` function
+  - [x] `createOrOpenConversation()` function (1-on-1)
+  - [x] `createGroupConversation()` function
 
 ### Chat Store
 
-- [ ] `store/chatStore.ts` created
-  - [ ] Conversations state
-  - [ ] Online statuses state
-  - [ ] Actions for updating conversations
+- [x] `store/chatStore.ts` created
+  - [x] Conversations state
+  - [x] Online statuses state
+  - [x] Actions for updating conversations
 
 ### Tabs Layout
 
-- [ ] `app/(tabs)/_layout.tsx` created
-  - [ ] "Chats" tab
-  - [ ] "New Chat" tab
-  - [ ] Tab icons configured
+- [x] `app/(tabs)/_layout.tsx` created
+  - [x] "Chats" tab
+  - [x] "New Chat" tab
+  - [x] Tab icons configured
 
 ### New Chat Screen
 
-- [ ] `app/(tabs)/new-chat.tsx` created
-  - [ ] Email input field
-  - [ ] Toggle for direct/group mode
-  - [ ] "Find User" / "Add User" button
-  - [ ] List of validated users
-  - [ ] "Create Chat" / "Create Group" button
-  - [ ] Email validation
-  - [ ] User lookup logic
-  - [ ] Error handling (user not found)
-  - [ ] Navigation to chat after creation
+- [x] `app/(tabs)/new-chat.tsx` created
+  - [x] Email input field
+  - [x] Toggle for direct/group mode
+  - [x] "Find User" / "Add User" button
+  - [x] List of validated users
+  - [x] "Create Chat" / "Create Group" button
+  - [x] Email validation
+  - [x] User lookup logic
+  - [x] Error handling (user not found)
+  - [x] Navigation to chat after creation
 
 ### Conversations List
 
-- [ ] `components/ConversationItem.tsx` created
-  - [ ] Conversation name display
-  - [ ] Last message preview
-  - [ ] Timestamp
-  - [ ] Tap to navigate
-- [ ] `app/(tabs)/index.tsx` created
-  - [ ] FlatList of conversations
-  - [ ] Real-time Firestore listener
-  - [ ] Logout button
-  - [ ] Sort by lastMessageAt
-  - [ ] Empty state (optional)
+- [x] `components/ConversationItem.tsx` created
+  - [x] Conversation name display
+  - [x] Last message preview
+  - [x] Timestamp
+  - [x] Tap to navigate
+- [x] `app/(tabs)/index.tsx` created
+  - [x] FlatList of conversations
+  - [x] Real-time Firestore listener
+  - [x] Logout button
+  - [x] Sort by lastMessageAt
+  - [x] Empty state
 
 ### Testing Phase 2
 
