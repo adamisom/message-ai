@@ -414,8 +414,10 @@ const styles = StyleSheet.create({
 **Test it:**
 
 1. Save the file
-2. Run `npx expo start --android` (if not already running)
-3. Wait for app to reload on emulator
+2. Run `npx expo start --tunnel` (or `--android` if emulator ready)
+3. Wait for app to load
+   - **Note:** Initial bundle with `--clear --tunnel` takes 30-60 seconds (this is normal)
+   - Firebase SDK is ~1-2MB and needs to be bundled first time
 4. **Expected:** See "✅ SUCCESS! Firebase is working" message on screen
 
 **Verify in Firebase Console:**
@@ -434,6 +436,8 @@ const styles = StyleSheet.create({
 - Restart Expo: `npx expo start --clear`
 
 **After success:**
+
+**✅ VERIFIED:** This testing approach worked perfectly in implementation.
 
 - Leave this code in `app/index.tsx` for now
 - It will be replaced in Phase 1 with the landing/redirect screen
