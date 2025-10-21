@@ -15,7 +15,7 @@
 
 - Commit during substantial PR implementation work, before user review
 - Do NOT commit during user's PR review/approval phase unless they ask me to
-- Before each commit: lint, build, and test
+- Before each commit: run `npm run validate` (lint + type-check), build, and test
 - Review changes and assess if high-value unit tests should be added
 - Write succinct, clear commit messages
 - Only commit when code is working and tests pass
