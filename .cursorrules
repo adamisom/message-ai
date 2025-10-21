@@ -15,7 +15,8 @@
 
 - Commit during substantial PR implementation work, before user review
 - Do NOT commit during user's PR review/approval phase unless they ask me to
-- Before each commit: run `npm run validate` (lint + type-check), build, and test
+- Before each commit: run `npm run validate` (lint + type-check + test)
+- If validation fails: fix issues, validate again, then commit fixes
 - Review changes and assess if high-value unit tests should be added
 - Write succinct, clear commit messages
 - Only commit when code is working and tests pass
@@ -24,6 +25,7 @@
 
 - After completing a phase (or significant tasks within a phase), update and check off items in `/docs/PROGRESS_TRACKER.md`
 - Mark tasks as complete with checkboxes: `- [x] Task completed`
+- Progress tracker updates should be committed AFTER code commits (separate commit)
 - This helps track overall project progress and ensures nothing is missed
 
 ### Deployment
