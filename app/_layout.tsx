@@ -5,8 +5,8 @@
  * - Will add presence tracking in Phase 5
  */
 
-import { useEffect } from 'react';
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 
 export default function RootLayout() {

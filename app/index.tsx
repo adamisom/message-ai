@@ -5,8 +5,8 @@
  * - If not authenticated: redirect to login
  */
 
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 
 export default function Index() {
@@ -25,10 +25,17 @@ export default function Index() {
   // Redirect based on auth state
   if (user) {
     // TODO: In Phase 2, change this to redirect to /(tabs)
-    // For now, just show a placeholder
+    // For now, just show a placeholder with success message
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.successText}>✅ Authentication Successful!</Text>
+        <Text style={styles.infoText}>Logged in as: {user.displayName}</Text>
+        <Text style={styles.infoText}>Email: {user.email}</Text>
+        <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 20 }} />
+        <Text style={styles.placeholderText}>
+          Phase 1 Complete{'\n'}
+          Conversations list will appear in Phase 2
+        </Text>
       </View>
     );
   }
@@ -43,5 +50,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
+    padding: 20,
+  },
+  successText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginBottom: 20,
+  },
+  infoText: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 8,
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 20,
+    textAlign: 'center',
   },
 });

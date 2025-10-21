@@ -39,6 +39,10 @@ export default function RegisterScreen() {
   const setUser = useAuthStore((state) => state.setUser);
 
   const handleRegister = async () => {
+    console.log('=== REGISTER START ===');
+    console.log('Email:', email);
+    console.log('Display Name:', displayName);
+    
     // Clear previous errors
     setErrors({ email: '', password: '', displayName: '', general: '' });
 
@@ -47,7 +51,10 @@ export default function RegisterScreen() {
     const passwordError = getPasswordError(password);
     const displayNameError = getDisplayNameError(displayName);
 
+    console.log('Validation errors:', { emailError, passwordError, displayNameError });
+
     if (emailError || passwordError || displayNameError) {
+      console.log('Validation failed, stopping');
       setErrors({
         email: emailError || '',
         password: passwordError || '',
@@ -57,15 +64,25 @@ export default function RegisterScreen() {
       return;
     }
 
+    console.log('Starting registration...');
     setLoading(true);
 
     try {
+      console.log('Calling registerUser...');
       const userProfile = await registerUser(email, password, displayName);
+      console.log('Registration successful:', userProfile);
+      
+      console.log('Saving user to store...');
       await setUser(userProfile);
+      console.log('User saved');
       
       // Navigate to main app (will be redirected by index.tsx)
+      console.log('Navigating to /');
       router.replace('/');
     } catch (error: any) {
+      console.error('Registration error:', error);
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
       setErrors({
         email: '',
         password: '',
@@ -73,6 +90,7 @@ export default function RegisterScreen() {
         general: error.message || 'Registration failed. Please try again.',
       });
     } finally {
+      console.log('Setting loading false');
       setLoading(false);
     }
   };
