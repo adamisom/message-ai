@@ -40,7 +40,9 @@
 
 ### Document Generation
 
-- Check in before creating a markdown document — explain the purpose to me first
+- Check in before creating a markdown document — explain the purpose to me first
+- NEVER directly update `/docs/memory.md` — instead, suggest changes in chat when updating lots of documentation
+- The user maintains direct control over memory.md
 
 ### Accuracy
 
