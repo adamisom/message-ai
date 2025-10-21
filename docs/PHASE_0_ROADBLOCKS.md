@@ -13,11 +13,13 @@ This document identifies potential issues that could block Phase 0 completion an
 
 **Problem:**  
 The test script in `PHASE_0_SETUP.md` uses ES6 imports:
+
 ```javascript
 import { db } from './firebase.config.js';
 ```
 
 But `package.json` doesn't have `"type": "module"`, so Node.js will fail with:
+
 ```
 SyntaxError: Cannot use import statement outside a module
 ```
@@ -96,6 +98,7 @@ const styles = StyleSheet.create({
 ```
 
 **Testing Steps:**
+
 1. Save `app/index.tsx` with this code
 2. Run `npx expo start --tunnel` (or `--android` if emulator ready)
 3. Wait for app to load (initial bundle with `--clear --tunnel` takes 30-60 seconds - this is normal)
@@ -117,11 +120,13 @@ The project has an `app-example/` folder with sample code that might confuse dur
 Decide whether to keep or remove it.
 
 **Option A: Remove it (Recommended for focus)**
+
 ```bash
 rm -rf app-example/
 ```
 
 **Option B: Ignore it (Keep as reference)**
+
 ```bash
 # Do nothing, just be aware it exists
 # Don't import from it or reference it
@@ -146,6 +151,7 @@ cat tsconfig.json
 ```
 
 **Should include:**
+
 ```json
 {
   "compilerOptions": {
@@ -171,6 +177,7 @@ cat tsconfig.json
 ```
 
 **If `include` is missing or limited:**
+
 ```json
 {
   "include": [
@@ -187,6 +194,7 @@ cat tsconfig.json
 ```
 
 **Test TypeScript config:**
+
 ```bash
 npx tsc --noEmit
 ```
@@ -206,11 +214,13 @@ Test mode allows anyone to read/write. This is INSECURE but necessary for MVP de
 Anyone with your Firebase project URL can read/write data.
 
 **Mitigation:**
+
 - Don't share your Firebase credentials publicly
 - Don't commit `.env` to git (already enforced)
 - We'll add proper security rules in Phase 7
 
 **Temporary Protection:**
+
 ```javascript
 // In Firebase Console → Firestore → Rules
 // Add slight protection while still allowing development:
@@ -255,6 +265,7 @@ npx expo start --clear
 
 **Problem:**  
 Some features won't work in Expo Go:
+
 - Background push notifications (Phase 6 limitation)
 - Some native modules
 
@@ -274,6 +285,7 @@ For production, we'll need EAS Build, but NOT for MVP.
 `.env` file might be hidden in some editors.
 
 **Solution:**  
+
 ```bash
 # Verify it exists
 ls -la | grep .env
@@ -307,6 +319,7 @@ Acknowledge the warning but don't change rules yet (we'll fix in Phase 7).
 Emulator might be slow on some machines.
 
 **Solutions:**
+
 1. **Allocate more RAM:**
    - Android Studio → AVD Manager → Edit device → Advanced → RAM: 4GB minimum
 
@@ -327,6 +340,7 @@ Emulator might be slow on some machines.
 
 **Problem:**  
 If you open Firebase Console in multiple tabs, you might see:
+
 ```
 Multiple tabs open, persistence can only be enabled in one tab at a time
 ```
@@ -347,18 +361,21 @@ Close extra tabs, or ignore warning (doesn't affect functionality).
 Before starting Phase 1, verify these are all resolved:
 
 ### Critical (Must Fix)
+
 - [ ] Firebase test works using updated method (in `app/index.tsx`)
 - [ ] No TypeScript errors when running `npx tsc --noEmit`
 - [ ] App runs on emulator successfully
 - [ ] Hot reload works (tested with a text change)
 
 ### Recommended (Should Fix)
+
 - [ ] `app-example/` folder removed or explicitly ignored
 - [ ] TypeScript config includes all necessary paths
 - [ ] `.env` file is visible and correct
 - [ ] Firebase Console shows test document (then deleted)
 
 ### Optional (Nice to Have)
+
 - [ ] Emulator performance is acceptable
 - [ ] No warnings in Expo terminal (other than React Native expected warnings)
 - [ ] Git commit made with Phase 0 changes
@@ -393,6 +410,7 @@ npx expo start --clear
 ### Still Stuck?
 
 **Check these in order:**
+
 1. Node.js version: `node --version` (should be 20.19.4+)
 2. Firebase Console: Verify project exists and is active
 3. `.env` file: Print it (without committing): `cat .env` - verify all values
@@ -413,17 +431,20 @@ npx expo start --clear
 
 ## Summary of Changes to Phase 0 Approach
 
-### Original Plan Issues:
+### Original Plan Issues
+
 1. ❌ Firebase test script used ES6 imports (won't work)
 2. ❌ Didn't address app-example folder confusion
 3. ❌ Didn't verify TypeScript config
 
-### Updated Plan:
+### Updated Plan
+
 1. ✅ Test Firebase directly in `app/index.tsx` (works in Expo)
 2. ✅ Recommend removing app-example folder
 3. ✅ Verify TypeScript config explicitly
 
-### No Changes Needed To:
+### No Changes Needed To
+
 - Dependency installation (all correct)
 - Firebase setup steps (all valid)
 - File structure creation (all good)
@@ -434,4 +455,3 @@ npx expo start --clear
 **Phase 0 is still 1.5-2 hours with these fixes applied.**
 
 **Next Step:** Apply these fixes while going through PHASE_0_SETUP.md, then proceed to Phase 1.
-
