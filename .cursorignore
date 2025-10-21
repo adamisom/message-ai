@@ -1,0 +1,19 @@
+# Cursor-specific ignore file
+# Prevents sensitive files from being indexed by Cursor AI
+
+# Environment variables with secrets
+.env
+.env.local
+.env*.local
+
+# Firebase credentials
+firebase.config.js
+
+# Dependencies
+node_modules/
+
+# Build outputs
+.expo/
+dist/
+web-build/
+
