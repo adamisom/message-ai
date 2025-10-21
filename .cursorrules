@@ -2,12 +2,32 @@
 
 ## Critical Constraints
 
+### Commit Workflow
+
+- Commit during substantial PR implementation work, before user review
+- Do NOT commit during user's PR review/approval phase unless they ask me to
+- Before each commit: lint, build, and test
+- Review changes and assess if high-value unit tests should be added
+- Write succinct, clear commit messages
+- Only commit when code is working and tests pass
+
+### Deployment
+
+- Always prefix deploy commands with `time` to measure deployment duration
+- Example: `time firebase deploy` instead of `firebase deploy`
+
+### Git History
+
+- NEVER rewrite git history (no force push, no rebase on shared branches, no --amend on pushed commits)
+- Use `git revert` instead of rewriting history to undo changes
+
 ### Accuracy
+
 - **NEVER** claim "this is how WhatsApp does it" or "this is the approach [app] takes" unless you have verified information
 - Don't make up implementation details about how other apps work
-- Use phrases like "a common pattern" or "similar to what messaging apps typically do" instead
 
 ### Version Control
+
 - All dependency versions are **PINNED** (Expo SDK 54, React 19.1.0, React Native 0.81)
 - Do NOT upgrade dependencies without explicit approval
 - Check package.json before installing new packages
@@ -15,20 +35,24 @@
 ## Architecture Guidelines
 
 ### Navigation
+
 - Use **Expo Router** (file-based routing) - it's already set up
 - Don't install React Navigation separately
 
 ### State Management
+
 - **Hybrid approach**: Zustand for global state (auth, conversations list), component state for screen-specific data (messages, forms, UI)
 - Don't put everything in Zustand
 
 ### Firebase
+
 - Always use `firebase.firestore.FieldValue.serverTimestamp()` for timestamps (never client-side `new Date()`)
 - Always unsubscribe from Firestore listeners in cleanup functions (common source of memory leaks)
 
 ## Documentation
 
 Refer to `/docs/mvp-prd-plus.md` for:
+
 - Complete feature requirements
 - Firestore schema
 - Implementation details
