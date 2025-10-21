@@ -36,7 +36,7 @@ useEffect(() => {
 ## File Creation Order (Critical Path)
 
 ```
-1. Config:    firebase.config.js, .env
+1. Config:    firebase.config.ts, .env
 2. Utils:     validators.ts, constants.ts, timeFormat.ts
 3. Services:  authService.ts, firestoreService.ts
 4. Stores:    authStore.ts, chatStore.ts
@@ -45,6 +45,8 @@ useEffect(() => {
 7. Main:      _layout.tsx (update), index.tsx (conversations list)
 8. Chat:      chat/[id].tsx
 ```
+
+**Note:** Use TypeScript for firebase.config (`firebase.config.ts` not `.js`) for proper type safety.
 
 ---
 
