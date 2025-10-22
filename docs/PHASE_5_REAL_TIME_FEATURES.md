@@ -667,35 +667,198 @@ useEffect(() => {
 
 **Note:** This enhancement is **completely optional**. The main online/offline status feature is already complete in Step 4.
 
+This adds a green dot next to each contact's name in the conversation list, showing their real-time online status.
+
+---
+
+#### Part A: Update ConversationItem Component
+
 **File:** `components/ConversationItem.tsx`
 
-**Add online indicator next to name:**
+**Add import and prop:**
 
 ```typescript
 import UserStatusBadge from './UserStatusBadge';
 
-// Add prop
 interface ConversationItemProps {
   conversation: Conversation;
   currentUserId: string;
   userStatuses?: Record<string, { isOnline: boolean; lastSeenAt: any }>;  // NEW
   onPress: () => void;
 }
-
-// Inside component, for direct chats
-{conversation.type === 'direct' && (() => {
-  const otherUserId = conversation.participants.find(id => id !== currentUserId);
-  const status = otherUserId && userStatuses?.[otherUserId];
-  
-  return status ? (
-    <UserStatusBadge isOnline={status.isOnline} lastSeenAt={status.lastSeenAt} />
-  ) : null;
-})()}
 ```
 
-**Note:** You'll need to pass `userStatuses` from the conversations list screen.
+**Update the component to display status badge:**
 
-**✅ Checkpoint:** Status shows in conversation list (if you chose to add this)
+```typescript
+export default function ConversationItem({ 
+  conversation, 
+  currentUserId, 
+  userStatuses,  // NEW
+  onPress 
+}: ConversationItemProps) {
+  // Get online status for direct chats
+  const getDirectChatStatus = () => {
+    if (conversation.type !== 'direct' || !userStatuses) return null;
+    
+    const otherUserId = conversation.participants.find(id => id !== currentUserId);
+    if (!otherUserId) return null;
+    
+    const status = userStatuses[otherUserId];
+    return status || null;
+  };
+
+  const directChatStatus = getDirectChatStatus();
+
+  return (
+    <TouchableOpacity style={styles.container} onPress={onPress}>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <View style={styles.nameContainer}>
+            {conversation.type === 'group' && (
+              <Ionicons name="people" size={16} color="#666" style={styles.groupIcon} />
+            )}
+            <Text style={styles.name} numberOfLines={1}>
+              {getConversationName(conversation, currentUserId)}
+            </Text>
+            {/* NEW: Show online status badge for direct chats */}
+            {directChatStatus && (
+              <UserStatusBadge 
+                isOnline={directChatStatus.isOnline} 
+                lastSeenAt={directChatStatus.lastSeenAt}
+                showText={false}  // Only show dot, not text
+              />
+            )}
+          </View>
+          {conversation.lastMessageAt && (
+            <Text style={styles.time}>
+              {formatConversationTime(conversation.lastMessageAt.toDate())}
+            </Text>
+          )}
+        </View>
+        <Text style={styles.lastMessage} numberOfLines={1}>
+          {conversation.lastMessage || 'No messages yet'}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+```
+
+**Update styles to accommodate status badge:**
+
+```typescript
+const styles = StyleSheet.create({
+  // ... existing styles ...
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 6,  // Add gap between name and status badge
+  },
+  // ... rest of styles ...
+});
+```
+
+---
+
+#### Part B: Set Up Status Listeners in Conversation List
+
+**File:** `app/(tabs)/index.tsx`
+
+**Add state for user statuses:**
+
+```typescript
+import { useState } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+
+export default function ConversationsList() {
+  const { user, logout } = useAuthStore();
+  const { conversations, setConversations } = useChatStore();
+  const router = useRouter();
+  
+  // NEW: Track online statuses for all conversation participants
+  const [userStatuses, setUserStatuses] = useState<Record<string, { isOnline: boolean; lastSeenAt: any }>>({});
+
+  // ... existing conversations listener ...
+
+  // NEW: Listen to participant statuses
+  useEffect(() => {
+    if (!user || conversations.length === 0) return;
+
+    console.log('👂 [ConversationsList] Setting up status listeners');
+
+    // Collect all unique participant IDs (excluding current user)
+    const participantIds = new Set<string>();
+    conversations.forEach(convo => {
+      convo.participants.forEach(participantId => {
+        if (participantId !== user.uid) {
+          participantIds.add(participantId);
+        }
+      });
+    });
+
+    console.log('👥 [ConversationsList] Listening to statuses for', participantIds.size, 'users');
+
+    // Set up listener for each participant
+    const unsubscribes = Array.from(participantIds).map(participantId => {
+      return onSnapshot(doc(db, 'users', participantId), (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          setUserStatuses(prev => ({
+            ...prev,
+            [participantId]: {
+              isOnline: docSnapshot.data().isOnline || false,
+              lastSeenAt: docSnapshot.data().lastSeenAt,
+            },
+          }));
+        }
+      });
+    });
+
+    // Cleanup all listeners
+    return () => {
+      console.log('🔌 [ConversationsList] Cleaning up status listeners');
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [user, conversations]);  // Re-run when conversations change
+
+  // ... rest of component ...
+
+  return (
+    <View style={styles.container}>
+      {/* ... header ... */}
+      
+      {conversations.length === 0 ? (
+        // ... empty state ...
+      ) : (
+        <FlatList
+          data={conversations}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ConversationItem
+              conversation={item}
+              currentUserId={user?.uid || ''}
+              userStatuses={userStatuses}  // NEW: Pass statuses
+              onPress={() => {
+                router.push(`/chat/${item.id}` as any);
+              }}
+            />
+          )}
+        />
+      )}
+    </View>
+  );
+}
+```
+
+**Performance Note:**
+- With 10 conversations, this creates ~10 listeners (one per unique participant)
+- Firestore listeners are efficient and this is acceptable for MVP
+- For 100+ conversations, consider pagination or caching strategies
+
+---
+
+**✅ Checkpoint:** Green dot shows next to online contacts in conversation list
 
 ---
 

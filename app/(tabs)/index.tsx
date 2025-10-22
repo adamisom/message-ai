@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { useEffect } from 'react';
+import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
 import { Button, FlatList, StyleSheet, Text, View } from 'react-native';
 import ConversationItem from '../../components/ConversationItem';
 import { db } from '../../firebase.config';
@@ -12,6 +12,9 @@ export default function ConversationsList() {
   const { user, logout } = useAuthStore();
   const { conversations, setConversations } = useChatStore();
   const router = useRouter();
+  
+  // Phase 5: Track online statuses for all conversation participants
+  const [userStatuses, setUserStatuses] = useState<Record<string, { isOnline: boolean; lastSeenAt: any }>>({});
 
   console.log('📋 [ConversationsList] Rendering with', conversations.length, 'conversations');
 
@@ -67,6 +70,46 @@ export default function ConversationsList() {
     };
   }, [user, setConversations]);
 
+  // Phase 5: Listen to participant statuses
+  useEffect(() => {
+    if (!user || conversations.length === 0) return;
+
+    console.log('👂 [ConversationsList] Setting up status listeners');
+
+    // Collect all unique participant IDs (excluding current user)
+    const participantIds = new Set<string>();
+    conversations.forEach(convo => {
+      convo.participants.forEach(participantId => {
+        if (participantId !== user.uid) {
+          participantIds.add(participantId);
+        }
+      });
+    });
+
+    console.log('👥 [ConversationsList] Listening to statuses for', participantIds.size, 'users');
+
+    // Set up listener for each participant
+    const unsubscribes = Array.from(participantIds).map(participantId => {
+      return onSnapshot(doc(db, 'users', participantId), (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          setUserStatuses(prev => ({
+            ...prev,
+            [participantId]: {
+              isOnline: docSnapshot.data().isOnline || false,
+              lastSeenAt: docSnapshot.data().lastSeenAt,
+            },
+          }));
+        }
+      });
+    });
+
+    // Cleanup all listeners
+    return () => {
+      console.log('🔌 [ConversationsList] Cleaning up status listeners');
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [user, conversations]);
+
   const handleLogout = async () => {
     console.log('👋 [ConversationsList] Logging out');
     await logoutUser();
@@ -95,6 +138,7 @@ export default function ConversationsList() {
             <ConversationItem
               conversation={item}
               currentUserId={user?.uid || ''}
+              userStatuses={userStatuses}
               onPress={() => {
                 console.log('🔗 [ConversationsList] Navigating to chat:', item.id);
                 router.push(`/chat/${item.id}` as any);

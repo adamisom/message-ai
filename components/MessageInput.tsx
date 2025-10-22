@@ -1,31 +1,47 @@
-import { useState } from 'react';
-import { 
-  View, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform 
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
 
 interface MessageInputProps {
   onSend: (text: string) => void;
   onTyping: () => void;
+  onStopTyping: () => void;
   disabled?: boolean;
 }
 
 export default function MessageInput({ 
   onSend, 
-  onTyping, 
+  onTyping,
+  onStopTyping, 
   disabled = false 
 }: MessageInputProps) {
   const [text, setText] = useState('');
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Memoize to prevent effect from re-running on every render
+  const memoizedStopTyping = useCallback(() => {
+    onStopTyping();
+  }, [onStopTyping]);
 
   const handleSend = () => {
     const trimmed = text.trim();
     if (trimmed) {
       console.log('📤 [MessageInput] Sending message:', trimmed.substring(0, 50));
+      
+      // Clear typing indicator before sending
+      memoizedStopTyping();
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      
       onSend(trimmed);
       setText('');
     }
@@ -33,8 +49,31 @@ export default function MessageInput({
 
   const handleTextChange = (value: string) => {
     setText(value);
-    onTyping(); // Notify parent component (will be used in Phase 5 for typing indicators)
+    
+    // Trigger typing indicator
+    onTyping();
+    
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Set new timeout to clear typing after 500ms of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      memoizedStopTyping();
+      typingTimeoutRef.current = null;
+    }, 500);
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      memoizedStopTyping();
+    };
+  }, [memoizedStopTyping]);
 
   return (
     <KeyboardAvoidingView

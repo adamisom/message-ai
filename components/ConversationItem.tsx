@@ -1,7 +1,8 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { formatConversationTime } from '../utils/timeFormat';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getConversationName } from '../utils/conversationHelpers';
+import { formatConversationTime } from '../utils/timeFormat';
+import UserStatusBadge from './UserStatusBadge';
 
 interface Conversation {
   id: string;
@@ -16,14 +17,29 @@ interface Conversation {
 interface ConversationItemProps {
   conversation: Conversation;
   currentUserId: string;
+  userStatuses?: Record<string, { isOnline: boolean; lastSeenAt: any }>;
   onPress: () => void;
 }
 
 export default function ConversationItem({ 
   conversation, 
-  currentUserId, 
+  currentUserId,
+  userStatuses,
   onPress 
 }: ConversationItemProps) {
+  // Get online status for direct chats
+  const getDirectChatStatus = () => {
+    if (conversation.type !== 'direct' || !userStatuses) return null;
+    
+    const otherUserId = conversation.participants.find(id => id !== currentUserId);
+    if (!otherUserId) return null;
+    
+    const status = userStatuses[otherUserId];
+    return status || null;
+  };
+
+  const directChatStatus = getDirectChatStatus();
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
       <View style={styles.content}>
@@ -35,6 +51,14 @@ export default function ConversationItem({
             <Text style={styles.name} numberOfLines={1}>
               {getConversationName(conversation, currentUserId)}
             </Text>
+            {/* Phase 5: Show online status badge for direct chats */}
+            {directChatStatus && (
+              <UserStatusBadge 
+                isOnline={directChatStatus.isOnline} 
+                lastSeenAt={directChatStatus.lastSeenAt}
+                showText={false}
+              />
+            )}
           </View>
           {conversation.lastMessageAt && (
             <Text style={styles.time}>
@@ -71,6 +95,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 6,
   },
   groupIcon: {
     marginRight: 4,

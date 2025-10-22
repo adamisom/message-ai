@@ -1,5 +1,5 @@
-import { FlatList, View, StyleSheet } from 'react-native';
-import { useRef, useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { FlatList, StyleSheet } from 'react-native';
 import MessageBubble from './MessageBubble';
 
 interface Message {
@@ -8,6 +8,7 @@ interface Message {
   senderId: string;
   senderName: string;
   createdAt: Date | { toDate: () => Date } | null;
+  participants: string[];
   status?: 'sending' | 'sent' | 'failed' | 'queued';
 }
 
@@ -15,12 +16,14 @@ interface MessageListProps {
   messages: Message[];
   currentUserId: string;
   conversationType: 'direct' | 'group';
+  getReadStatus?: (message: Message) => '✓' | '✓✓' | null;
 }
 
 export default function MessageList({ 
   messages, 
   currentUserId, 
-  conversationType 
+  conversationType,
+  getReadStatus
 }: MessageListProps) {
   const flatListRef = useRef<FlatList>(null);
 
@@ -45,6 +48,7 @@ export default function MessageList({
           message={item}
           isOwnMessage={item.senderId === currentUserId}
           showSenderName={conversationType === 'group'}
+          readStatus={getReadStatus ? getReadStatus(item) : null}
         />
       )}
       contentContainerStyle={styles.container}

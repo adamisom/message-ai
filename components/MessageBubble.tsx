@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { formatMessageTime } from '../utils/timeFormat';
 
 interface Message {
@@ -14,12 +14,14 @@ interface MessageBubbleProps {
   message: Message;
   isOwnMessage: boolean;
   showSenderName?: boolean; // For group chats
+  readStatus?: '✓' | '✓✓' | null; // For read receipts (Phase 5)
 }
 
 export default function MessageBubble({ 
   message, 
   isOwnMessage, 
-  showSenderName = false 
+  showSenderName = false,
+  readStatus
 }: MessageBubbleProps) {
   const getTimestamp = () => {
     if (!message.createdAt) return 'Sending...';
@@ -71,6 +73,11 @@ export default function MessageBubble({
               {message.status === 'queued' && '📤'}
               {message.status === 'failed' && '❌'}
             </Text>
+          )}
+          
+          {/* Show read status for own messages (Phase 5) */}
+          {isOwnMessage && !message.status && readStatus && (
+            <Text style={styles.readStatus}>{readStatus}</Text>
           )}
         </View>
       </View>
@@ -137,6 +144,11 @@ const styles = StyleSheet.create({
   },
   status: {
     fontSize: 11,
+  },
+  readStatus: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginLeft: 4,
   },
 });
 
