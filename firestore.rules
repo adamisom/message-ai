@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users collection - any authenticated user can read, users can only write their own doc
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Conversations - only participants can read/write
+    match /conversations/{conversationId} {
+      // For reading existing conversations
+      allow read: if request.auth != null && 
+        request.auth.uid in resource.data.participants;
+      
+      // For creating new conversations - just need to be authenticated
+      allow create: if request.auth != null;
+      
+      // For updating/deleting - must be a participant
+      allow update, delete: if request.auth != null && 
+        request.auth.uid in resource.data.participants;
+    }
+    
+    // Messages - only conversation participants can read/write
+    match /conversations/{conversationId}/messages/{messageId} {
+      allow read, write: if request.auth != null && 
+        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+    }
+    
+    // Typing indicators - only conversation participants (Phase 5)
+    match /conversations/{conversationId}/typingUsers/{userId} {
+      allow read, write: if request.auth != null && 
+        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+    }
+  }
+}

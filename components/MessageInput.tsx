@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { TYPING_CLEAR_DELAY_MS } from '../utils/constants';
 
 interface MessageInputProps {
   onSend: (text: string) => void;
@@ -50,19 +51,29 @@ export default function MessageInput({
   const handleTextChange = (value: string) => {
     setText(value);
     
-    // Trigger typing indicator
-    onTyping();
-    
-    // Clear previous timeout
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    
-    // Set new timeout to clear typing after 500ms of inactivity
-    typingTimeoutRef.current = setTimeout(() => {
+    // Only trigger typing if there's text
+    if (value.length > 0) {
+      // Trigger typing indicator
+      onTyping();
+      
+      // Clear previous timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Set new timeout to clear typing after inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        memoizedStopTyping();
+        typingTimeoutRef.current = null;
+      }, TYPING_CLEAR_DELAY_MS);
+    } else {
+      // If text is empty, immediately clear typing
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
       memoizedStopTyping();
-      typingTimeoutRef.current = null;
-    }, 500);
+    }
   };
 
   // Cleanup on unmount

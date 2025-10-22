@@ -6,6 +6,8 @@
 
 ### Tuesday 10/21
 
+11:14pm All MVP work done, see POST_MVP.md
+
 7:58pm Phase 2 and Phase 3 are completely done.
 
 5:40pm Phase 0 and Phase 1 is completely done. Key learning: add `--clear` flag when running dev server, and expect it to take 30-60 seconds before the Expo Go app initializes.
