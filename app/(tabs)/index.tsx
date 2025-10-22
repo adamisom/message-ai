@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, FlatList, StyleSheet, Text, View } from 'react-native';
 import ConversationItem from '../../components/ConversationItem';
 import { db } from '../../firebase.config';
 import { logoutUser } from '../../services/authService';
+import { scheduleMessageNotification } from '../../services/notificationService';
 import { useAuthStore } from '../../store/authStore';
 import { useChatStore } from '../../store/chatStore';
 import { UserStatusInfo } from '../../types';
@@ -16,6 +17,9 @@ export default function ConversationsList() {
   
   // Phase 5: Track online statuses for all conversation participants
   const [userStatuses, setUserStatuses] = useState<Record<string, UserStatusInfo>>({});
+  
+  // Phase 6: Track previous conversations to detect new messages
+  const previousConversationsRef = useRef<Record<string, string>>({});
 
   console.log('📋 [ConversationsList] Rendering with', conversations.length, 'conversations');
 
@@ -43,6 +47,38 @@ export default function ConversationsList() {
           id: doc.id,
           ...doc.data(),
         } as any));
+        
+        // Phase 6: Check for new messages and trigger notifications
+        convos.forEach((convo: any) => {
+          const previousLastMessage = previousConversationsRef.current[convo.id];
+          const currentLastMessage = convo.lastMessage;
+          
+          // Only notify if:
+          // 1. There's a current last message
+          // 2. It's different from the previous one (or first time seeing this convo)
+          // 3. The message is not from the current user
+          // 4. We have seen this conversation before (previousLastMessage !== undefined)
+          if (
+            currentLastMessage && 
+            previousLastMessage !== undefined &&
+            currentLastMessage !== previousLastMessage &&
+            convo.lastMessageSenderId !== user.uid
+          ) {
+            console.log('🔔 [ConversationsList] New message in conversation:', convo.id);
+            
+            // Get sender name
+            const senderName = convo.participantDetails[convo.lastMessageSenderId]?.displayName || 'Someone';
+            
+            scheduleMessageNotification(
+              senderName,
+              currentLastMessage,
+              convo.id
+            );
+          }
+          
+          // Update the reference
+          previousConversationsRef.current[convo.id] = currentLastMessage;
+        });
         
         // Sort: new conversations (null lastMessageAt) appear at top
         const sorted = convos.sort((a: any, b: any) => {

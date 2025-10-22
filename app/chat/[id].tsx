@@ -15,7 +15,7 @@ import {
     updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
 import MessageInput from '../../components/MessageInput';
 import MessageList from '../../components/MessageList';
@@ -23,7 +23,6 @@ import OfflineBanner from '../../components/OfflineBanner';
 import TypingIndicator from '../../components/TypingIndicator';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
-import { scheduleMessageNotification } from '../../services/notificationService';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
 import { MESSAGE_LIMIT, MESSAGE_TIMEOUT_MS, TYPING_DEBOUNCE_MS } from '../../utils/constants';
@@ -52,22 +51,7 @@ export default function ChatScreen() {
   // Track pending message timeouts
   const timeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  // Phase 6: Track app state for notifications (background vs foreground)
-  const [isAppForeground, setIsAppForeground] = useState(true);
-
   console.log('💬 [ChatScreen] Rendering, conversationId:', conversationId, 'messagesCount:', messages.length);
-
-  // Phase 6: Track app state
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
-      setIsAppForeground(nextAppState === 'active');
-      console.log('📱 [ChatScreen] App state changed:', nextAppState, 'isForeground:', nextAppState === 'active');
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
 
   // Phase 5: Listen to participant statuses
   useEffect(() => {
@@ -204,9 +188,6 @@ export default function ChatScreen() {
       limit(MESSAGE_LIMIT)
     );
 
-    // Track previous message count to detect new messages
-    let previousMessageCount = 0;
-
     const unsubscribe = onSnapshot(q, (snapshot) => {
       console.log('📬 [ChatScreen] Received', snapshot.docs.length, 'messages from Firestore');
       
@@ -215,25 +196,9 @@ export default function ChatScreen() {
         ...doc.data(),
       })) as Message[];
 
-      // Phase 6: Check if there's a new message from another user
-      if (msgs.length > previousMessageCount && previousMessageCount > 0) {
-        const latestMessage = msgs[msgs.length - 1];
-        
-        // Only notify if:
-        // 1. Message is not from me
-        // 2. App is in background
-        if (latestMessage.senderId !== user.uid && !isAppForeground) {
-          console.log('🔔 [ChatScreen] Triggering notification for new message from', latestMessage.senderName);
-          
-          scheduleMessageNotification(
-            latestMessage.senderName || 'New Message',
-            latestMessage.text,
-            conversationId
-          );
-        }
-      }
+      // Phase 6: No notification logic here - notifications happen in conversation list
+      // when a message arrives for a chat that's NOT currently open
 
-      previousMessageCount = msgs.length;
       setMessages(msgs);
       setLoading(false);
     }, (error) => {
@@ -249,7 +214,7 @@ export default function ChatScreen() {
       console.log('🔌 [ChatScreen] Cleaning up messages listener');
       unsubscribe();
     };
-  }, [conversationId, user, isAppForeground]);
+  }, [conversationId, user]);
 
   // Phase 5: Listen to typing indicators
   useEffect(() => {

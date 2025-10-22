@@ -60,7 +60,7 @@ export const scheduleMessageNotification = async (
       trigger: null, // Show immediately
     });
   } catch (error) {
-    console.error('Error scheduling notification:', error);
+    console.error('❌ [NotificationService] Error scheduling notification:', error);
   }
 };
 
