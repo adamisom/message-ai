@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import {
@@ -14,8 +15,7 @@ import {
     updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ActivityIndicator, AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
 import MessageInput from '../../components/MessageInput';
 import MessageList from '../../components/MessageList';
@@ -23,8 +23,9 @@ import OfflineBanner from '../../components/OfflineBanner';
 import TypingIndicator from '../../components/TypingIndicator';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
+import { scheduleMessageNotification } from '../../services/notificationService';
 import { useAuthStore } from '../../store/authStore';
-import { Message, Conversation, TypingUser, UserStatusInfo } from '../../types';
+import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
 import { MESSAGE_LIMIT, MESSAGE_TIMEOUT_MS, TYPING_DEBOUNCE_MS } from '../../utils/constants';
 
 export default function ChatScreen() {
@@ -51,7 +52,22 @@ export default function ChatScreen() {
   // Track pending message timeouts
   const timeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
+  // Phase 6: Track app state for notifications (background vs foreground)
+  const [isAppForeground, setIsAppForeground] = useState(true);
+
   console.log('💬 [ChatScreen] Rendering, conversationId:', conversationId, 'messagesCount:', messages.length);
+
+  // Phase 6: Track app state
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      setIsAppForeground(nextAppState === 'active');
+      console.log('📱 [ChatScreen] App state changed:', nextAppState, 'isForeground:', nextAppState === 'active');
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   // Phase 5: Listen to participant statuses
   useEffect(() => {
@@ -93,19 +109,22 @@ export default function ChatScreen() {
         if (otherUserId && conversation.participantDetails[otherUserId]) {
           title = conversation.participantDetails[otherUserId].displayName;
           
-          // Phase 5: Add status badge for direct chats
+          // Phase 5: Add status badge and info button for direct chats
           const status = userStatuses[otherUserId];
-          if (status) {
-            headerRight = () => (
-              <View style={{ marginRight: 16 }}>
+          headerRight = () => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, gap: 12 }}>
+              {status && (
                 <UserStatusBadge 
                   isOnline={status.isOnline} 
                   lastSeenAt={status.lastSeenAt}
                   showText={true}
                 />
-              </View>
-            );
-          }
+              )}
+              <TouchableOpacity onPress={() => setShowParticipantsModal(true)}>
+                <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
+              </TouchableOpacity>
+            </View>
+          );
         }
       } else {
         // Group chat with participant count (from Phase 4) + info button
@@ -173,9 +192,9 @@ export default function ChatScreen() {
     };
   }, [conversationId]);
 
-  // Listen to messages (last 100)
+  // Listen to messages (last 100) - Phase 6: Added notification triggering
   useEffect(() => {
-    if (!conversationId || typeof conversationId !== 'string') return;
+    if (!conversationId || typeof conversationId !== 'string' || !user) return;
 
     console.log('👂 [ChatScreen] Setting up messages listener');
 
@@ -185,6 +204,9 @@ export default function ChatScreen() {
       limit(MESSAGE_LIMIT)
     );
 
+    // Track previous message count to detect new messages
+    let previousMessageCount = 0;
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       console.log('📬 [ChatScreen] Received', snapshot.docs.length, 'messages from Firestore');
       
@@ -193,6 +215,25 @@ export default function ChatScreen() {
         ...doc.data(),
       })) as Message[];
 
+      // Phase 6: Check if there's a new message from another user
+      if (msgs.length > previousMessageCount && previousMessageCount > 0) {
+        const latestMessage = msgs[msgs.length - 1];
+        
+        // Only notify if:
+        // 1. Message is not from me
+        // 2. App is in background
+        if (latestMessage.senderId !== user.uid && !isAppForeground) {
+          console.log('🔔 [ChatScreen] Triggering notification for new message from', latestMessage.senderName);
+          
+          scheduleMessageNotification(
+            latestMessage.senderName || 'New Message',
+            latestMessage.text,
+            conversationId
+          );
+        }
+      }
+
+      previousMessageCount = msgs.length;
       setMessages(msgs);
       setLoading(false);
     }, (error) => {
@@ -208,7 +249,7 @@ export default function ChatScreen() {
       console.log('🔌 [ChatScreen] Cleaning up messages listener');
       unsubscribe();
     };
-  }, [conversationId]);
+  }, [conversationId, user, isAppForeground]);
 
   // Phase 5: Listen to typing indicators
   useEffect(() => {
@@ -480,18 +521,16 @@ export default function ChatScreen() {
         disabled={false} // Can send even when offline (will queue)
       />
       
-      {/* Group Participants Modal */}
-      {conversation.type === 'group' && (
-        <GroupParticipantsModal
-          visible={showParticipantsModal}
-          participants={Object.entries(conversation.participantDetails).map(([uid, details]) => ({
-            uid,
-            displayName: details.displayName,
-            email: details.email,
-          }))}
-          onClose={() => setShowParticipantsModal(false)}
-        />
-      )}
+      {/* Participants Modal (for both direct and group chats) */}
+      <GroupParticipantsModal
+        visible={showParticipantsModal}
+        participants={Object.entries(conversation.participantDetails).map(([uid, details]) => ({
+          uid,
+          displayName: details.displayName,
+          email: details.email,
+        }))}
+        onClose={() => setShowParticipantsModal(false)}
+      />
     </View>
   );
 }
