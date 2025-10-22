@@ -280,6 +280,7 @@ const styles = StyleSheet.create({
 ```
 
 **Key Features:**
+
 - Different styles for sent vs received messages
 - Sender name for group chats
 - Status indicators (sending, queued, failed)
@@ -411,6 +412,7 @@ const styles = StyleSheet.create({
 ```
 
 **Key Features:**
+
 - Auto-growing text input (multiline with maxHeight)
 - Keyboard avoidance for iOS
 - Disabled state when offline
@@ -495,6 +497,7 @@ const styles = StyleSheet.create({
 ```
 
 **Key Features:**
+
 - Optimized FlatList rendering
 - **Auto-scroll to bottom when new messages arrive**
 - Conditional sender names for group chats
@@ -561,6 +564,7 @@ const styles = StyleSheet.create({
 ```
 
 **Key Features:**
+
 - Real-time network detection
 - Auto-shows/hides based on connectivity
 - Non-intrusive warning banner
@@ -603,11 +607,13 @@ This screen uses multiple real-time listeners. Each **MUST** have a cleanup func
 The messages query uses `orderBy('createdAt', 'asc')` + `limit(100)`. Depending on your security rules, Firestore might require a composite index.
 
 **If you get an error like:**
+
 ```
 Error: The query requires an index
 ```
 
 **Solution:**
+
 1. Check the console error - it will include a link to auto-create the index
 2. Click the link (opens Firebase Console)
 3. Click "Create Index"
@@ -894,21 +900,25 @@ const styles = StyleSheet.create({
 ### Key Implementation Details
 
 **Dynamic Header Title:**
+
 - Shows participant name for direct chats
 - Shows group name (or "Group Chat") for groups
 - Updates automatically when conversation loads
 
 **Optimistic Updates:**
+
 - Message appears instantly with temp ID
 - Status: "sending" when online, "queued" when offline
 - Real message replaces temp via listener
 
 **Timeout Detection:**
+
 - 10-second timeout per message
 - If timeout expires, status → "failed"
 - Cleared on success or error
 
 **Multiple Listeners:**
+
 1. Network status (NetInfo)
 2. Conversation details (metadata)
 3. Messages (last 100)
@@ -916,11 +926,13 @@ const styles = StyleSheet.create({
 **All have cleanup functions!**
 
 **Type Safety:**
+
 - Proper interfaces for Message and Conversation
 - Timestamp types handle both Date and Firestore Timestamp
 - Fallback for missing displayName (uses email or "Unknown User")
 
 **Firestore Writes:**
+
 - Uses `serverTimestamp()` (CRITICAL)
 - Denormalizes `participants` array for security rules
 
@@ -952,11 +964,13 @@ Add the chat route to `app/_layout.tsx`:
 ### Test 3.1: Send Message (Online)
 
 **Steps:**
+
 1. Open a conversation
 2. Type a message
 3. Press send
 
 **Expected:**
+
 - ✅ Message appears instantly at bottom
 - ✅ Shows "sending" status briefly
 - ✅ Status icon disappears when sent
@@ -969,10 +983,12 @@ Add the chat route to `app/_layout.tsx`:
 **Setup:** 2 devices/emulators with different users
 
 **Steps:**
+
 1. User A opens conversation with User B
 2. User B sends a message
 
 **Expected:**
+
 - ✅ User A sees message appear within 1-2 seconds
 - ✅ No refresh needed
 - ✅ Message shows correct sender name
@@ -983,11 +999,13 @@ Add the chat route to `app/_layout.tsx`:
 ### Test 3.3: Offline Messaging
 
 **Steps:**
+
 1. Enable airplane mode
 2. Send a message
 3. Disable airplane mode
 
 **Expected:**
+
 - ✅ Offline banner appears
 - ✅ Message shows "queued" status (📤)
 - ✅ After reconnect, message sends automatically
@@ -1001,10 +1019,12 @@ Add the chat route to `app/_layout.tsx`:
 **Setup:** Simulate slow/stuck network
 
 **Steps:**
+
 1. Send a message
 2. Wait 10+ seconds without connection
 
 **Expected:**
+
 - ✅ Message shows "failed" status (❌)
 - ✅ User can see it failed (Phase 3 shows status, Phase 7 will add retry)
 
@@ -1013,10 +1033,12 @@ Add the chat route to `app/_layout.tsx`:
 ### Test 3.5: Multiple Messages
 
 **Steps:**
+
 1. Send 10+ messages rapidly
 2. Check order
 
 **Expected:**
+
 - ✅ All messages appear
 - ✅ Correct chronological order
 - ✅ No duplicates
@@ -1027,10 +1049,12 @@ Add the chat route to `app/_layout.tsx`:
 ### Test 3.6: Long Messages
 
 **Steps:**
+
 1. Type a message with 500+ characters
 2. Send
 
 **Expected:**
+
 - ✅ Message sends successfully
 - ✅ Bubble wraps text properly
 - ✅ Preview in conversation list truncated at 100 chars
@@ -1042,10 +1066,12 @@ Add the chat route to `app/_layout.tsx`:
 **Setup:** Group conversation with 3+ users
 
 **Steps:**
+
 1. Each user sends a message
 2. Check display
 
 **Expected:**
+
 - ✅ Sender names show for received messages
 - ✅ Own messages don't show sender name
 - ✅ All users receive all messages
@@ -1056,10 +1082,12 @@ Add the chat route to `app/_layout.tsx`:
 ### Test 3.8: Empty State
 
 **Steps:**
+
 1. Create new conversation
 2. Open chat screen
 
 **Expected:**
+
 - ✅ Empty messages list
 - ✅ Input works
 - ✅ First message sends correctly
@@ -1073,6 +1101,7 @@ Add the chat route to `app/_layout.tsx`:
 **Cause:** Using client timestamps instead of server timestamps
 
 **Solution:**
+
 - Verify `serverTimestamp()` is used in message creation
 - Check QUICK_REFERENCE.md lines 9-16
 
@@ -1120,6 +1149,7 @@ db = initializeFirestore(app, {
 **Cause:** Timeout too short or Firestore writes actually failing
 
 **Debug:**
+
 1. Check console for Firestore errors
 2. Verify Firestore rules allow message creation
 3. Try increasing timeout to 20 seconds for testing
@@ -1147,6 +1177,7 @@ useEffect(() => {
 **Cause:** NetInfo not detecting offline state
 
 **Debug:**
+
 ```typescript
 // Add to useEffect:
 NetInfo.addEventListener(state => {
@@ -1164,6 +1195,7 @@ NetInfo.addEventListener(state => {
 **Cause:** `KeyboardAvoidingView` offset may need adjustment for specific devices
 
 **Debug:**
+
 1. Test on various Android devices/emulators
 2. If input is covered, try adjusting `keyboardVerticalOffset`
 3. Or change `behavior` from `undefined` to `"height"` for Android:
@@ -1340,6 +1372,7 @@ Check off Phase 3 in `docs/PROGRESS_TRACKER.md`
 ### Prepare for Phase 4
 
 Phase 4 will enhance group chat features:
+
 - Ensure sender names display correctly
 - Group-specific UI adjustments
 - Testing with multiple participants
@@ -1351,7 +1384,9 @@ Phase 4 will enhance group chat features:
 ## 📋 Comprehensive Manual Testing Checklist - Phases 2 & 3
 
 ### 🔧 Test Setup
+
 **Prerequisites:**
+
 - [ ] Expo dev server running (`npx expo start --clear`)
 - [ ] App open in Expo Go on your phone
 - [ ] At least **2 test accounts** registered (note their emails)
@@ -1362,6 +1397,7 @@ Phase 4 will enhance group chat features:
 ## Phase 2: User Discovery & Conversations
 
 ### ✅ Test 2.1: Authentication & Navigation
+
 1. **Login** with User A
 2. **Verify** you're redirected to the Chats tab (empty state)
 3. **Check** bottom tabs show "Chats" and "New Chat"
@@ -1371,6 +1407,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 2.2: User Discovery - Valid Email
+
 1. On "New Chat" screen, **enter User B's email**
 2. **Tap** "Find User"
 3. **Expected:**
@@ -1381,6 +1418,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 2.3: User Discovery - Invalid Email
+
 1. **Enter** `notanemail` (no @ symbol)
 2. **Tap** "Find User"
 3. **Expected:**
@@ -1390,6 +1428,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 2.4: User Discovery - User Not Found
+
 1. **Enter** `nonexistent@example.com`
 2. **Tap** "Find User"
 3. **Expected:**
@@ -1399,6 +1438,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 2.5: Self-Add Prevention
+
 1. **Enter your own email** (User A's email)
 2. **Tap** "Find User"
 3. **Expected:**
@@ -1407,6 +1447,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 2.6: Create Direct Chat
+
 1. **Find User B** (valid email)
 2. **Tap** "Create Chat"
 3. **Expected:**
@@ -1420,6 +1461,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 2.7: Duplicate Conversation Prevention
+
 1. Go to "New Chat" again
 2. **Find User B** again
 3. **Tap** "Create Chat"
@@ -1430,6 +1472,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 2.8: Group Chat Creation
+
 1. Go to "New Chat"
 2. **Tap** "Switch to Group Chat"
 3. **Add User B** (email + "Add User")
@@ -1448,6 +1491,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 2.9: Group Chat - Minimum Users Validation
+
 1. Go to "New Chat"
 2. **Switch to Group Chat** mode
 3. **Add only 1 user**
@@ -1458,6 +1502,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 2.10: Mode Switch with Selected Users
+
 1. In "New Chat", add User B
 2. **Tap** "Switch to Group Chat"
 3. **Expected:**
@@ -1475,7 +1520,9 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 2.11: Conversations List - Real-Time Updates
+
 **Setup:** 2 devices/emulators
+
 1. **Device 1:** Login as User A
 2. **Device 2:** Login as User B
 3. **Device 1:** Create conversation with User B
@@ -1488,6 +1535,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 2.12: Logout
+
 1. On Chats tab, **tap "Logout"**
 2. **Expected:**
    - ✅ Redirected to login screen
@@ -1498,6 +1546,7 @@ Phase 4 will enhance group chat features:
 ## Phase 3: Core Messaging
 
 ### ✅ Test 3.1: Send Message (Online)
+
 1. **Login** as User A
 2. **Open** conversation with User B
 3. **Type** "Hello from User A"
@@ -1512,7 +1561,9 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 3.2: Receive Message (Real-Time)
+
 **Setup:** 2 devices
+
 1. **Device 1:** User A in conversation with User B
 2. **Device 2:** User B opens same conversation
 3. **Device 2:** Send message "Hello from User B"
@@ -1525,6 +1576,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 3.3: Message Persistence
+
 1. Send 3-5 messages in a conversation
 2. **Close app** completely (swipe away from task manager)
 3. **Reopen app** and login
@@ -1537,6 +1589,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 3.4: Optimistic Updates
+
 1. **Turn on airplane mode** (Settings → Airplane Mode)
 2. **Type** "Offline message"
 3. **Tap** send
@@ -1553,6 +1606,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 3.5: Multiple Messages Rapidly
+
 1. **Type and send** 10 messages very quickly
 2. **Expected:**
    - ✅ All messages appear
@@ -1563,6 +1617,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 3.6: Long Messages
+
 1. **Type** a message with 500+ characters
 2. **Send**
 3. **Expected:**
@@ -1576,6 +1631,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 3.7: Empty Message Prevention
+
 1. **Leave input empty**
 2. **Expected:**
    - ✅ Send button is disabled (grayed out)
@@ -1586,7 +1642,9 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 3.8: Group Chat Messages
+
 **Setup:** Group with 3+ users
+
 1. **User A:** Send "Message from A"
 2. **User B:** Send "Message from B"
 3. **User C:** Send "Message from C"
@@ -1599,6 +1657,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 3.9: Conversations List Updates with Messages
+
 1. Have 2+ conversations in list
 2. **Open** Conversation A
 3. **Send** a message
@@ -1611,6 +1670,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 3.10: Auto-Scroll to Latest Message
+
 1. Open conversation with 50+ messages (send many for testing)
 2. **Expected:**
    - ✅ Automatically scrolls to bottom
@@ -1622,7 +1682,9 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 3.11: Message Timeout (Advanced)
+
 **Setup:** Simulate poor network
+
 1. **Enable airplane mode**
 2. **Send** a message
 3. **Keep airplane mode on** for 10+ seconds
@@ -1635,6 +1697,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 3.12: Keyboard Behavior
+
 1. **Tap** message input
 2. **Expected:**
    - ✅ Keyboard appears
@@ -1651,6 +1714,7 @@ Phase 4 will enhance group chat features:
 ---
 
 ### ✅ Test 3.13: Header Title Display
+
 1. **Open direct chat** with User B
 2. **Expected:** Header shows "User B's Display Name"
 3. **Open group chat**
@@ -1660,12 +1724,14 @@ Phase 4 will enhance group chat features:
 
 ## 🐛 Common Issues to Watch For
 
-### Phase 2 Issues:
+### Phase 2 Issues
+
 - ❌ **Firestore Index Error:** First time loading conversations, you'll see "The query requires an index" - click the link in the error to create it
 - ❌ **Conversations not appearing:** Check Firebase Console → Firestore → conversations collection
 - ❌ **Email case sensitivity:** Emails are normalized to lowercase automatically
 
-### Phase 3 Issues:
+### Phase 3 Issues
+
 - ❌ **Messages Index Error:** First time sending messages, might need another Firestore index for messages collection
 - ❌ **Messages not syncing:** Check both users are in the `participants` array
 - ❌ **Offline banner stuck:** Force close and reopen app
@@ -1676,6 +1742,7 @@ Phase 4 will enhance group chat features:
 ## ✅ Success Criteria
 
 **Phase 2 Complete When:**
+
 - ✅ Can find users by email
 - ✅ Can create direct chats
 - ✅ Can create group chats
@@ -1683,6 +1750,7 @@ Phase 4 will enhance group chat features:
 - ✅ Real-time updates work
 
 **Phase 3 Complete When:**
+
 - ✅ Can send/receive messages
 - ✅ Messages persist after restart
 - ✅ Optimistic updates work
@@ -1708,4 +1776,3 @@ If you just want to verify basics work:
 ---
 
 **Ready to proceed? Ensure ALL verification checklist items are complete before moving to Phase 4.**
-
