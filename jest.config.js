@@ -2,7 +2,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: [
-    '**/utils/__tests__/**/*.test.ts',
+    '**/__tests__/**/*.test.ts',
   ],
   testPathIgnorePatterns: [
     '/node_modules/',
@@ -11,6 +11,8 @@ module.exports = {
   ],
   collectCoverageFrom: [
     'utils/**/*.ts',
+    'store/**/*.ts',
+    'services/**/*.ts',
     '!**/*.d.ts',
     '!**/node_modules/**',
     '!**/__tests__/**',

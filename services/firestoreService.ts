@@ -12,6 +12,7 @@ import {
     where
 } from 'firebase/firestore';
 import { db } from '../firebase.config';
+import { generateConversationId } from '../utils/conversationHelpers';
 
 // Type definitions
 interface User {
@@ -74,7 +75,7 @@ export const createOrOpenConversation = async (
   currentUser: User
 ): Promise<string> => {
   // Sort UIDs to ensure consistent conversation ID
-  const conversationId = [currentUser.uid, otherUser.uid].sort().join('_');
+  const conversationId = generateConversationId(currentUser.uid, otherUser.uid);
   const conversationRef = doc(db, 'conversations', conversationId);
   
   console.log('💬 [firestoreService] Creating/opening conversation:', conversationId);

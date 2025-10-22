@@ -1,5 +1,6 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { formatConversationTime } from '../utils/timeFormat';
+import { getConversationName } from '../utils/conversationHelpers';
 
 interface Conversation {
   id: string;
@@ -22,28 +23,12 @@ export default function ConversationItem({
   currentUserId, 
   onPress 
 }: ConversationItemProps) {
-  const getConversationName = (): string => {
-    if (conversation.type === 'group') {
-      return conversation.name || 'Unnamed Group';
-    }
-    
-    // For direct chat, get other user's name
-    const otherUserId = conversation.participants.find(
-      (id: string) => id !== currentUserId
-    );
-    
-    if (!otherUserId) return 'Unknown';
-    
-    const otherUser = conversation.participantDetails[otherUserId];
-    return otherUser?.displayName || 'Unknown User';
-  };
-
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.name} numberOfLines={1}>
-            {getConversationName()}
+            {getConversationName(conversation, currentUserId)}
           </Text>
           {conversation.lastMessageAt && (
             <Text style={styles.time}>
