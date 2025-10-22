@@ -53,7 +53,7 @@ export const registerUser = async (
 
     return userProfile;
   } catch (error: any) {
-    console.error('Registration error:', error);
+    console.error('Registration error code:', error.code);
     throw new Error(getAuthErrorMessage(error.code));
   }
 };
@@ -87,7 +87,7 @@ export const loginUser = async (
 
     return userProfile;
   } catch (error: any) {
-    console.error('Login error:', error);
+    console.error('Login error code:', error.code);
     throw new Error(getAuthErrorMessage(error.code));
   }
 };
