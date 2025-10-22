@@ -1348,5 +1348,364 @@ Phase 4 will enhance group chat features:
 
 ---
 
+## 📋 Comprehensive Manual Testing Checklist - Phases 2 & 3
+
+### 🔧 Test Setup
+**Prerequisites:**
+- [ ] Expo dev server running (`npx expo start --clear`)
+- [ ] App open in Expo Go on your phone
+- [ ] At least **2 test accounts** registered (note their emails)
+- [ ] Ideally: **2 physical devices or 1 device + 1 emulator** for real-time testing
+
+---
+
+## Phase 2: User Discovery & Conversations
+
+### ✅ Test 2.1: Authentication & Navigation
+1. **Login** with User A
+2. **Verify** you're redirected to the Chats tab (empty state)
+3. **Check** bottom tabs show "Chats" and "New Chat"
+4. **Tap** "New Chat" tab
+5. **Expected:** New chat screen appears with email input
+
+---
+
+### ✅ Test 2.2: User Discovery - Valid Email
+1. On "New Chat" screen, **enter User B's email**
+2. **Tap** "Find User"
+3. **Expected:**
+   - ✅ User B appears in list with display name and email
+   - ✅ "Create Chat" button appears
+   - ✅ No error messages
+
+---
+
+### ✅ Test 2.3: User Discovery - Invalid Email
+1. **Enter** `notanemail` (no @ symbol)
+2. **Tap** "Find User"
+3. **Expected:**
+   - ❌ Error: "Invalid email format"
+   - ❌ No user added to list
+
+---
+
+### ✅ Test 2.4: User Discovery - User Not Found
+1. **Enter** `nonexistent@example.com`
+2. **Tap** "Find User"
+3. **Expected:**
+   - ❌ Error: "No user found with that email"
+   - ❌ No user added to list
+
+---
+
+### ✅ Test 2.5: Self-Add Prevention
+1. **Enter your own email** (User A's email)
+2. **Tap** "Find User"
+3. **Expected:**
+   - ❌ Error: "You can't add yourself"
+
+---
+
+### ✅ Test 2.6: Create Direct Chat
+1. **Find User B** (valid email)
+2. **Tap** "Create Chat"
+3. **Expected:**
+   - ✅ Navigate to chat screen (shows "Chat" or User B's name in header)
+   - ✅ Empty message area with input at bottom
+4. **Go back** to Chats tab
+5. **Expected:**
+   - ✅ Conversation with User B appears in list
+   - ✅ Shows "No messages yet" as last message
+
+---
+
+### ✅ Test 2.7: Duplicate Conversation Prevention
+1. Go to "New Chat" again
+2. **Find User B** again
+3. **Tap** "Create Chat"
+4. **Expected:**
+   - ✅ Opens the **same** conversation (not a new one)
+   - ✅ Same conversation ID in the chat screen
+
+---
+
+### ✅ Test 2.8: Group Chat Creation
+1. Go to "New Chat"
+2. **Tap** "Switch to Group Chat"
+3. **Add User B** (email + "Add User")
+4. **Add User C** (email + "Add User")
+5. **Expected:**
+   - ✅ Both users appear in list
+   - ✅ Button shows "Create Group (3 members)"
+6. **Tap** "Create Group"
+7. **Expected:**
+   - ✅ Navigate to group chat screen
+   - ✅ Header shows "Group with 3 members"
+8. **Go back** to Chats tab
+9. **Expected:**
+   - ✅ Group conversation appears in list
+
+---
+
+### ✅ Test 2.9: Group Chat - Minimum Users Validation
+1. Go to "New Chat"
+2. **Switch to Group Chat** mode
+3. **Add only 1 user**
+4. **Tap** "Create Group"
+5. **Expected:**
+   - ❌ Error: "Need at least 2 users for a group chat"
+
+---
+
+### ✅ Test 2.10: Mode Switch with Selected Users
+1. In "New Chat", add User B
+2. **Tap** "Switch to Group Chat"
+3. **Expected:**
+   - ⚠️ Confirmation dialog appears
+   - Dialog text: "Switching modes will clear your selected users. Continue?"
+4. **Tap** "Cancel"
+5. **Expected:**
+   - ✅ User B still in list
+   - ✅ Still in direct chat mode
+6. **Tap switch again** → **Tap "Switch"**
+7. **Expected:**
+   - ✅ User list cleared
+   - ✅ Now in group mode
+
+---
+
+### ✅ Test 2.11: Conversations List - Real-Time Updates
+**Setup:** 2 devices/emulators
+1. **Device 1:** Login as User A
+2. **Device 2:** Login as User B
+3. **Device 1:** Create conversation with User B
+4. **Expected on Device 1:**
+   - ✅ Conversation appears immediately
+5. **Expected on Device 2:**
+   - ✅ Conversation appears within 1-2 seconds (no refresh needed)
+   - ✅ Shows User A's name
+
+---
+
+### ✅ Test 2.12: Logout
+1. On Chats tab, **tap "Logout"**
+2. **Expected:**
+   - ✅ Redirected to login screen
+   - ✅ Conversations list cleared
+
+---
+
+## Phase 3: Core Messaging
+
+### ✅ Test 3.1: Send Message (Online)
+1. **Login** as User A
+2. **Open** conversation with User B
+3. **Type** "Hello from User A"
+4. **Tap** send button (airplane icon)
+5. **Expected:**
+   - ✅ Message appears **instantly** at bottom
+   - ✅ Shows timestamp
+   - ✅ Blue bubble on the right
+   - ✅ Briefly shows ⏳ "sending" status
+   - ✅ Status disappears after ~1 second (sent)
+
+---
+
+### ✅ Test 3.2: Receive Message (Real-Time)
+**Setup:** 2 devices
+1. **Device 1:** User A in conversation with User B
+2. **Device 2:** User B opens same conversation
+3. **Device 2:** Send message "Hello from User B"
+4. **Expected on Device 1:**
+   - ✅ Message appears within 1-2 seconds
+   - ✅ Gray bubble on the left
+   - ✅ Shows User B's name (if group) or no name (if direct)
+   - ✅ Shows timestamp
+
+---
+
+### ✅ Test 3.3: Message Persistence
+1. Send 3-5 messages in a conversation
+2. **Close app** completely (swipe away from task manager)
+3. **Reopen app** and login
+4. **Open same conversation**
+5. **Expected:**
+   - ✅ All messages still visible
+   - ✅ Correct order (oldest to newest)
+   - ✅ Timestamps preserved
+
+---
+
+### ✅ Test 3.4: Optimistic Updates
+1. **Turn on airplane mode** (Settings → Airplane Mode)
+2. **Type** "Offline message"
+3. **Tap** send
+4. **Expected:**
+   - ✅ Orange offline banner appears at top
+   - ✅ Message appears immediately in list
+   - ✅ Shows 📤 "queued" status
+5. **Turn off airplane mode**
+6. **Expected (within 2-5 seconds):**
+   - ✅ Offline banner disappears
+   - ✅ Message status changes from 📤 to sent (icon disappears)
+   - ✅ Message has real timestamp
+
+---
+
+### ✅ Test 3.5: Multiple Messages Rapidly
+1. **Type and send** 10 messages very quickly
+2. **Expected:**
+   - ✅ All messages appear
+   - ✅ In correct chronological order
+   - ✅ No duplicates
+   - ✅ All show proper status indicators
+
+---
+
+### ✅ Test 3.6: Long Messages
+1. **Type** a message with 500+ characters
+2. **Send**
+3. **Expected:**
+   - ✅ Message sends successfully
+   - ✅ Bubble wraps text (doesn't overflow)
+   - ✅ Readable on screen
+4. **Go back** to Chats list
+5. **Expected:**
+   - ✅ Preview truncated at ~100 characters with "..."
+
+---
+
+### ✅ Test 3.7: Empty Message Prevention
+1. **Leave input empty**
+2. **Expected:**
+   - ✅ Send button is disabled (grayed out)
+3. **Type spaces only**
+4. **Expected:**
+   - ✅ Send button still disabled
+
+---
+
+### ✅ Test 3.8: Group Chat Messages
+**Setup:** Group with 3+ users
+1. **User A:** Send "Message from A"
+2. **User B:** Send "Message from B"
+3. **User C:** Send "Message from C"
+4. **Expected (on each device):**
+   - ✅ All messages visible
+   - ✅ Own messages: Blue bubbles, right-aligned, no sender name
+   - ✅ Others' messages: Gray bubbles, left-aligned, **sender name shown**
+   - ✅ Correct chronological order
+
+---
+
+### ✅ Test 3.9: Conversations List Updates with Messages
+1. Have 2+ conversations in list
+2. **Open** Conversation A
+3. **Send** a message
+4. **Go back** to Chats tab
+5. **Expected:**
+   - ✅ Conversation A moves to top of list
+   - ✅ Shows last message preview
+   - ✅ Shows timestamp (e.g., "Just now", "2m ago")
+
+---
+
+### ✅ Test 3.10: Auto-Scroll to Latest Message
+1. Open conversation with 50+ messages (send many for testing)
+2. **Expected:**
+   - ✅ Automatically scrolls to bottom
+   - ✅ Latest message visible
+3. **Send new message**
+4. **Expected:**
+   - ✅ Auto-scrolls to show new message
+
+---
+
+### ✅ Test 3.11: Message Timeout (Advanced)
+**Setup:** Simulate poor network
+1. **Enable airplane mode**
+2. **Send** a message
+3. **Keep airplane mode on** for 10+ seconds
+4. **Expected:**
+   - ✅ Message shows 📤 initially
+   - ✅ After 10 seconds: Changes to ❌ "failed"
+5. **Turn off airplane mode**
+6. **Note:** Failed message stays failed (retry in Phase 7)
+
+---
+
+### ✅ Test 3.12: Keyboard Behavior
+1. **Tap** message input
+2. **Expected:**
+   - ✅ Keyboard appears
+   - ✅ Input field moves up (not covered by keyboard)
+3. **Type** multiple lines
+4. **Expected:**
+   - ✅ Input expands vertically
+   - ✅ Max height reached (~100px), then scrolls
+5. **Send** message
+6. **Expected:**
+   - ✅ Input clears
+   - ✅ Input height resets to single line
+
+---
+
+### ✅ Test 3.13: Header Title Display
+1. **Open direct chat** with User B
+2. **Expected:** Header shows "User B's Display Name"
+3. **Open group chat**
+4. **Expected:** Header shows "Group with X members" or group name
+
+---
+
+## 🐛 Common Issues to Watch For
+
+### Phase 2 Issues:
+- ❌ **Firestore Index Error:** First time loading conversations, you'll see "The query requires an index" - click the link in the error to create it
+- ❌ **Conversations not appearing:** Check Firebase Console → Firestore → conversations collection
+- ❌ **Email case sensitivity:** Emails are normalized to lowercase automatically
+
+### Phase 3 Issues:
+- ❌ **Messages Index Error:** First time sending messages, might need another Firestore index for messages collection
+- ❌ **Messages not syncing:** Check both users are in the `participants` array
+- ❌ **Offline banner stuck:** Force close and reopen app
+- ❌ **Duplicate messages:** Usually means temp message wasn't removed - check console logs
+
+---
+
+## ✅ Success Criteria
+
+**Phase 2 Complete When:**
+- ✅ Can find users by email
+- ✅ Can create direct chats
+- ✅ Can create group chats
+- ✅ Conversations appear in list
+- ✅ Real-time updates work
+
+**Phase 3 Complete When:**
+- ✅ Can send/receive messages
+- ✅ Messages persist after restart
+- ✅ Optimistic updates work
+- ✅ Offline queueing works
+- ✅ Group messages show sender names
+- ✅ Everything is fast and responsive
+
+---
+
+## 🎯 Quick Smoke Test (5 minutes)
+
+If you just want to verify basics work:
+
+1. ✅ Login → See tabs
+2. ✅ New Chat → Find user → Create chat
+3. ✅ Send message → Appears instantly
+4. ✅ Second device: See message in real-time
+5. ✅ Airplane mode → Send message → Shows queued
+6. ✅ Turn off airplane → Message sends
+
+**All working? ✅ You're good to go!**
+
+---
+
 **Ready to proceed? Ensure ALL verification checklist items are complete before moving to Phase 4.**
 
