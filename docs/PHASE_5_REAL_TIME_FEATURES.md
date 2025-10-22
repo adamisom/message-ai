@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
 **Add typing logic with debounce:**
 
 ```typescript
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   View, 
   TextInput, 
@@ -227,11 +227,16 @@ export default function MessageInput({
   const [text, setText] = useState('');
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Memoize to prevent effect from re-running on every render
+  const memoizedStopTyping = useCallback(() => {
+    onStopTyping();
+  }, [onStopTyping]);
+
   const handleSend = () => {
     const trimmed = text.trim();
     if (trimmed) {
       // Clear typing indicator before sending
-      onStopTyping();
+      memoizedStopTyping();
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = null;
@@ -255,7 +260,7 @@ export default function MessageInput({
     
     // Set new timeout to clear typing after 500ms of inactivity
     typingTimeoutRef.current = setTimeout(() => {
-      onStopTyping();
+      memoizedStopTyping();
       typingTimeoutRef.current = null;
     }, 500);
   };
@@ -266,9 +271,9 @@ export default function MessageInput({
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-      onStopTyping();
+      memoizedStopTyping();
     };
-  }, []);
+  }, [memoizedStopTyping]);  // Added dependency
 
   return (
     <KeyboardAvoidingView
@@ -305,47 +310,12 @@ export default function MessageInput({
   );
 }
 
-// Styles remain the same as Phase 3
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 8,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  input: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 100,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 16,
-    marginRight: 8,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
-});
-```
-
 **Key Changes:**
 - Added `onStopTyping` prop
 - Added `typingTimeoutRef` for debouncing
+- **Added `useCallback` to memoize `onStopTyping`** to prevent unnecessary re-renders
 - Clear typing on send
-- Cleanup on unmount
+- Cleanup on unmount with proper dependency array
 
 **✅ Checkpoint:** MessageInput compiles, typing detection works
 
@@ -358,12 +328,13 @@ const styles = StyleSheet.create({
 **Add typing state and Firestore operations:**
 
 ```typescript
-// Add these imports
+// Add these imports at the top
 import { collection, doc, onSnapshot, query, orderBy, limit, addDoc, updateDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import TypingIndicator from '../../components/TypingIndicator';
 
 // Inside ChatScreen component, add typing state
 const [typingUsers, setTypingUsers] = useState<Array<{ uid: string; displayName: string; at: any }>>([]);
+const lastTypingWriteRef = useRef<number>(0);  // Track last write time for debounce
 
 // Add listener for typing users
 useEffect(() => {
@@ -382,9 +353,17 @@ useEffect(() => {
   return unsubscribe;
 }, [conversationId, user.uid]);
 
-// Handle typing indicator writes
+// Handle typing indicator writes with debounce
 const handleTyping = async () => {
   if (!conversationId || typeof conversationId !== 'string' || !user) return;
+  
+  // Debounce: only write if 500ms has passed since last write
+  const now = Date.now();
+  if (lastTypingWriteRef.current && now - lastTypingWriteRef.current < 500) {
+    return;  // Skip write, too soon since last write
+  }
+  
+  lastTypingWriteRef.current = now;
   
   try {
     await setDoc(
@@ -412,14 +391,6 @@ const handleStopTyping = async () => {
   }
 };
 
-// Update MessageInput component
-<MessageInput
-  onSend={sendMessage}
-  onTyping={handleTyping}
-  onStopTyping={handleStopTyping}  // NEW
-  disabled={false}
-/>
-
 // Add TypingIndicator before MessageInput
 <TypingIndicator typingUsers={typingUsers} />
 <MessageInput
@@ -429,6 +400,11 @@ const handleStopTyping = async () => {
   disabled={false}
 />
 ```
+
+**Why debounce in `handleTyping`?**
+- Without debounce: 20 characters = 20 Firestore writes (expensive)
+- With 500ms debounce: First keystroke writes immediately, then max 1 write per 500ms
+- Reduces Firestore writes by ~90% while keeping UX responsive
 
 **✅ Checkpoint:** Typing indicators work in both direct and group chats
 
@@ -449,15 +425,15 @@ touch services/presenceService.ts
 **Implementation:**
 
 ```typescript
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase.config';
 
 export const setUserOnline = async (uid: string) => {
   try {
-    await updateDoc(doc(db, 'users', uid), {
+    await setDoc(doc(db, 'users', uid), {
       isOnline: true,
       lastSeenAt: serverTimestamp(),
-    });
+    }, { merge: true });  // CRITICAL: merge to avoid overwriting existing fields
   } catch (error) {
     console.error('Error setting user online:', error);
   }
@@ -465,15 +441,20 @@ export const setUserOnline = async (uid: string) => {
 
 export const setUserOffline = async (uid: string) => {
   try {
-    await updateDoc(doc(db, 'users', uid), {
+    await setDoc(doc(db, 'users', uid), {
       isOnline: false,
       lastSeenAt: serverTimestamp(),
-    });
+    }, { merge: true });  // CRITICAL: merge to avoid overwriting existing fields
   } catch (error) {
     console.error('Error setting user offline:', error);
   }
 };
 ```
+
+**Why `merge: true`?**
+- Phase 1 user documents don't have `isOnline` or `lastSeenAt` fields
+- Using `setDoc` with `merge` safely adds these fields without overwriting existing data
+- Using `updateDoc` would fail if the fields don't exist
 
 **✅ Checkpoint:** Service functions compile correctly
 
@@ -601,6 +582,14 @@ const styles = StyleSheet.create({
 
 **File:** `app/chat/[id].tsx`
 
+**IMPORTANT:** This step **replaces** the header update logic from Phase 3, not adds alongside it. You should have ONE `useEffect` for header updates.
+
+**Add explicit imports at the top:**
+
+```typescript
+import UserStatusBadge from '../../components/UserStatusBadge';
+```
+
 **Add status listener and display:**
 
 ```typescript
@@ -632,7 +621,7 @@ useEffect(() => {
   };
 }, [conversation, user]);
 
-// Update header with status (for direct chats)
+// REPLACE the existing Phase 3 header update useEffect with this merged version
 useEffect(() => {
   if (conversation && user) {
     let title = 'Chat';
@@ -643,7 +632,7 @@ useEffect(() => {
       if (otherUserId && conversation.participantDetails[otherUserId]) {
         title = conversation.participantDetails[otherUserId].displayName;
         
-        // Add status badge for direct chats
+        // Phase 5 addition: Add status badge for direct chats
         const status = userStatuses[otherUserId];
         if (status) {
           headerRight = () => (
@@ -658,22 +647,25 @@ useEffect(() => {
         }
       }
     } else {
+      // Group chat with participant count (from Phase 4)
       const participantCount = conversation.participants.length;
       title = conversation.name || `Group (${participantCount} members)`;
     }
     
     navigation.setOptions({ title, headerRight });
   }
-}, [conversation, user, userStatuses, navigation]);
+}, [conversation, user, userStatuses, navigation]);  // Added userStatuses dependency
 ```
 
-**Note:** Import UserStatusBadge at the top of the file.
+**⚠️ CRITICAL:** Do NOT have two separate `useEffect` hooks for header updates. Merge the Phase 3 logic with this Phase 5 addition as shown above.
 
 **✅ Checkpoint:** Online status shows in chat header for direct chats
 
 ---
 
-### Step 5: Add Status to Conversation List (Optional)
+### Step 5: Add Status to Conversation List (Optional Enhancement)
+
+**Note:** This enhancement is **completely optional**. The main online/offline status feature is already complete in Step 4.
 
 **File:** `components/ConversationItem.tsx`
 
@@ -703,7 +695,7 @@ interface ConversationItemProps {
 
 **Note:** You'll need to pass `userStatuses` from the conversations list screen.
 
-**✅ Checkpoint:** Status shows in conversation list
+**✅ Checkpoint:** Status shows in conversation list (if you chose to add this)
 
 ---
 
@@ -727,9 +719,12 @@ Show checkmarks (✓ sent, ✓✓ read) to indicate when messages have been read
 
 **File:** `app/chat/[id].tsx`
 
-**Add read tracking:**
+**Add read tracking with duplicate write prevention:**
 
 ```typescript
+// Track the last message we marked as read to prevent duplicate writes
+const lastMarkedReadRef = useRef<string | null>(null);
+
 // Mark messages as read when they load
 useEffect(() => {
   if (messages.length === 0 || !user || typeof conversationId !== 'string') return;
@@ -737,8 +732,12 @@ useEffect(() => {
   // Get the last message
   const lastMessage = messages[messages.length - 1];
   
-  // Only mark as read if it's not from me
-  if (lastMessage.senderId !== user.uid) {
+  // Only mark as read if:
+  // 1. It's not from me
+  // 2. It's a different message than what we last marked
+  if (lastMessage.senderId !== user.uid && lastMessage.id !== lastMarkedReadRef.current) {
+    lastMarkedReadRef.current = lastMessage.id;
+    
     updateDoc(doc(db, 'conversations', conversationId), {
       [`lastRead.${user.uid}`]: lastMessage.id,
     }).catch(error => {
@@ -747,6 +746,11 @@ useEffect(() => {
   }
 }, [messages, user, conversationId]);
 ```
+
+**Why use `lastMarkedReadRef`?**
+- Without it: Every message update triggers a Firestore write (status changes, optimistic updates, etc.)
+- With it: Only writes when a new message from another user appears
+- Prevents dozens of unnecessary writes per conversation
 
 **✅ Checkpoint:** lastRead updates in Firestore when viewing messages
 
@@ -759,6 +763,14 @@ useEffect(() => {
 **Add function to calculate read status:**
 
 ```typescript
+// Helper function to safely extract timestamp from message
+const getMessageTime = (msg: Message): number | undefined => {
+  if (!msg.createdAt) return undefined;
+  if (msg.createdAt instanceof Date) return msg.createdAt.getTime();
+  if (typeof msg.createdAt.toDate === 'function') return msg.createdAt.toDate().getTime();
+  return undefined;
+};
+
 const getReadStatus = (message: Message): '✓' | '✓✓' | null => {
   // Only show status for own messages
   if (message.senderId !== user.uid || !conversation) return null;
@@ -775,13 +787,9 @@ const getReadStatus = (message: Message): '✓' | '✓✓' | null => {
     const lastReadMsg = messages.find(m => m.id === lastRead);
     if (!lastReadMsg) return '✓';
 
-    // Compare timestamps
-    const messageTime = message.createdAt instanceof Date 
-      ? message.createdAt.getTime() 
-      : message.createdAt?.toDate().getTime();
-    const lastReadTime = lastReadMsg.createdAt instanceof Date 
-      ? lastReadMsg.createdAt.getTime() 
-      : lastReadMsg.createdAt?.toDate().getTime();
+    // Compare timestamps using normalized extraction
+    const messageTime = getMessageTime(message);
+    const lastReadTime = getMessageTime(lastReadMsg);
 
     return messageTime && lastReadTime && messageTime <= lastReadTime ? '✓✓' : '✓';
   } else {
@@ -794,12 +802,8 @@ const getReadStatus = (message: Message): '✓' | '✓✓' | null => {
       if (lastRead) {
         const lastReadMsg = messages.find(m => m.id === lastRead);
         if (lastReadMsg) {
-          const messageTime = message.createdAt instanceof Date 
-            ? message.createdAt.getTime() 
-            : message.createdAt?.toDate().getTime();
-          const lastReadTime = lastReadMsg.createdAt instanceof Date 
-            ? lastReadMsg.createdAt.getTime() 
-            : lastReadMsg.createdAt?.toDate().getTime();
+          const messageTime = getMessageTime(message);
+          const lastReadTime = getMessageTime(lastReadMsg);
 
           if (messageTime && lastReadTime && messageTime <= lastReadTime) {
             readCount++;
@@ -823,6 +827,12 @@ interface Conversation {
   lastRead?: Record<string, string>;  // NEW: uid -> messageId
 }
 ```
+
+**Why `getMessageTime` helper?**
+- Temp messages from Phase 3 use `new Date()` (JavaScript Date)
+- Real messages from Firestore use Firestore Timestamp (with `.toDate()` method)
+- Without normalization: timestamp comparison fails, causing incorrect ✓/✓✓ display
+- Helper function safely handles both types
 
 **✅ Checkpoint:** Read status calculation logic works
 
