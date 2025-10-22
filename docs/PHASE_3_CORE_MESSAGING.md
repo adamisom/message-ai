@@ -1,154 +1,42 @@
 # Phase 3: Core Messaging
 
-**Estimated Time:** 3-4 hours  
-**Goal:** Users can send and receive text messages in real-time with optimistic updates, offline support, and message persistence
+**Time:** 3-4 hours | **Goal:** Real-time messaging with optimistic updates, offline support, and persistence
 
-**Prerequisites:** Phase 0, 1, and 2 must be complete (Firebase configured, authentication working, conversations can be created)
+**Prerequisites:** Phase 0, 1, 2 complete (auth + conversations working)
 
 ---
 
 ## Objectives
 
-By the end of Phase 3, you will have:
+- ✅ Chat screen (replace Phase 2 placeholder)
+- ✅ Message components (Bubble, List, Input)
+- ✅ Real-time listener (last 100 messages)
+- ✅ Optimistic updates (instant feedback)
+- ✅ Offline detection + queuing
+- ✅ Message timeout (10s)
+- ✅ Persistence across sessions
 
-- ✅ Chat screen with dynamic routing
-- ✅ Message display components (MessageBubble, MessageList)
-- ✅ Message input component with send functionality
-- ✅ Real-time message listening (last 100 messages)
-- ✅ Optimistic UI updates (messages appear instantly)
-- ✅ Offline detection and queueing
-- ✅ Network status banner
-- ✅ Message timeout detection (10 seconds)
-- ✅ Failed message handling
-- ✅ Message persistence across sessions
+**Reference:** mvp-prd-plus.md Section 3.3 for complete messaging schema
 
 ---
 
-## Architecture Overview
-
-### Data Flow
+## Files to Create
 
 ```
-User types message → Press send
-    ↓
-1. Add temp message to UI (optimistic update)
-    ↓
-2. Write to Firestore with serverTimestamp()
-    ↓
-3. Firestore real-time listener receives new message
-    ↓
-4. Remove temp message, display real message
-    ↓
-5. Update conversation lastMessage & lastMessageAt
-```
-
-### Offline Flow
-
-```
-User is offline (airplane mode)
-    ↓
-NetInfo detects → Show offline banner
-    ↓
-User sends message → Status: "queued"
-    ↓
-Firestore SDK caches write locally
-    ↓
-User comes online
-    ↓
-Firestore auto-syncs → Message sent
-    ↓
-Status updates to "sent"
-```
-
-### Files You'll Create
-
-```
-app/chat/
-  └── [id].tsx                    # Chat screen (replace Phase 2 placeholder)
-
-components/
-  ├── MessageBubble.tsx           # Individual message display
-  ├── MessageList.tsx             # FlatList of messages
-  ├── MessageInput.tsx            # Text input + send button
-  └── OfflineBanner.tsx           # Network status indicator
-```
-
-### Firestore Collections Used
-
-Refer to **mvp-prd-plus.md Section 3.3** for complete messaging schema.
-
-```
-/conversations/{conversationId}/messages/{messageId}  # Create/read messages
-/conversations/{conversationId}                       # Update lastMessage
+app/chat/[id].tsx          # Chat screen (REPLACE placeholder)
+components/MessageBubble.tsx    # Single message display
+components/MessageList.tsx      # FlatList of messages
+components/MessageInput.tsx     # Input + send button
+components/OfflineBanner.tsx    # Network status
 ```
 
 ---
 
-## Before Starting Phase 3
+## Task 3.1: Message Components
 
-Verify Phase 2 is complete and working:
+### MessageBubble.tsx
 
-### Required from Phase 2
-
-- [ ] Can find users by email
-- [ ] Can create one-on-one conversations
-- [ ] Can create group conversations
-- [ ] Conversations appear in list
-- [ ] Can navigate to chat screen (even if it's the placeholder)
-- [ ] `firestoreService.ts` exists with conversation creation functions
-- [ ] `chatStore.ts` exists and manages conversations
-
-### Verify Firestore Security Rules
-
-**CRITICAL:** Ensure your Firestore rules allow reading/writing messages in subcollections.
-
-Open Firebase Console → Firestore → Rules and verify you have:
-
-```javascript
-match /conversations/{conversationId}/messages/{messageId} {
-  allow read, write: if request.auth != null && 
-    request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
-}
-```
-
-If this rule is missing, add it before starting Phase 3. Otherwise, you'll get "Missing or insufficient permissions" errors when sending messages.
-
-### Delete Phase 2 Temporary Files
-
-🚨 **CRITICAL:** Delete the temporary chat screen placeholder:
-
-```bash
-rm app/chat/\[id\].tsx
-```
-
-Also remove its route from `app/_layout.tsx` (we'll add it back properly):
-
-```typescript
-// Remove this line temporarily:
-<Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
-```
-
-We'll recreate the proper chat screen in this phase.
-
----
-
-## Task 3.1: Create Message Components
-
-### Purpose
-
-Build reusable UI components for displaying and inputting messages.
-
-### Step 1: Create MessageBubble Component
-
-**Purpose:** Display individual messages with sender info, timestamp, and status.
-
-```bash
-touch components/MessageBubble.tsx
-```
-
-**Implementation:**
-
-**Reference:** See FILE_STRUCTURE_GUIDE.md lines 548-590
+**Create:** `touch components/MessageBubble.tsx`
 
 ```typescript
 import { View, Text, StyleSheet } from 'react-native';
@@ -158,57 +46,36 @@ interface Message {
   id: string;
   text: string;
   senderId: string;
-  senderName: string;
+  senderName?: string;
   createdAt: Date | { toDate: () => Date } | null;
   status?: 'sending' | 'sent' | 'failed' | 'queued';
 }
 
 interface MessageBubbleProps {
   message: Message;
-  isOwnMessage: boolean;
-  showSenderName?: boolean; // For group chats
+  isOwn: boolean;
+  showSenderName?: boolean;
 }
 
-export default function MessageBubble({ 
-  message, 
-  isOwnMessage, 
-  showSenderName = false 
-}: MessageBubbleProps) {
+export default function MessageBubble({ message, isOwn, showSenderName }: MessageBubbleProps) {
+  const time = message.createdAt
+    ? message.createdAt instanceof Date
+      ? message.createdAt
+      : message.createdAt.toDate()
+    : null;
+
   return (
-    <View style={[
-      styles.container, 
-      isOwnMessage ? styles.ownMessage : styles.otherMessage
-    ]}>
-      {/* Show sender name for group chats (received messages only) */}
-      {showSenderName && !isOwnMessage && (
-        <Text style={styles.senderName}>{message.senderName}</Text>
+    <View style={[styles.container, isOwn ? styles.ownContainer : styles.otherContainer]}>
+      {showSenderName && !isOwn && (
+        <Text style={styles.senderName}>{message.senderName || 'Unknown'}</Text>
       )}
-      
-      <View style={[
-        styles.bubble,
-        isOwnMessage ? styles.ownBubble : styles.otherBubble
-      ]}>
-        <Text style={[
-          styles.text,
-          isOwnMessage ? styles.ownText : styles.otherText
-        ]}>
-          {message.text}
-        </Text>
-        
+      <View style={[styles.bubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
+        <Text style={[styles.text, isOwn ? styles.ownText : styles.otherText]}>{message.text}</Text>
         <View style={styles.footer}>
-          <Text style={[
-            styles.time,
-            isOwnMessage ? styles.ownTime : styles.otherTime
-          ]}>
-            {message.createdAt ? formatMessageTime(message.createdAt.toDate()) : 'Sending...'}
-          </Text>
-          
-          {/* Show status for own messages */}
-          {isOwnMessage && message.status && (
+          {time && <Text style={styles.time}>{formatMessageTime(time)}</Text>}
+          {message.status && (
             <Text style={styles.status}>
-              {message.status === 'sending' && '⏳'}
-              {message.status === 'queued' && '📤'}
-              {message.status === 'failed' && '❌'}
+              {message.status === 'sending' ? '⏳' : message.status === 'failed' ? '❌' : message.status === 'queued' ? '📤' : ''}
             </Text>
           )}
         </View>
@@ -218,101 +85,31 @@ export default function MessageBubble({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: 4,
-    marginHorizontal: 12,
-  },
-  ownMessage: {
-    alignItems: 'flex-end',
-  },
-  otherMessage: {
-    alignItems: 'flex-start',
-  },
-  senderName: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 2,
-    marginLeft: 12,
-  },
-  bubble: {
-    maxWidth: '75%',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  ownBubble: {
-    backgroundColor: '#007AFF',
-    borderBottomRightRadius: 4,
-  },
-  otherBubble: {
-    backgroundColor: '#E5E5EA',
-    borderBottomLeftRadius: 4,
-  },
-  text: {
-    fontSize: 16,
-    lineHeight: 20,
-  },
-  ownText: {
-    color: '#fff',
-  },
-  otherText: {
-    color: '#000',
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-    gap: 4,
-  },
-  time: {
-    fontSize: 11,
-  },
-  ownTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  otherTime: {
-    color: '#8E8E93',
-  },
-  status: {
-    fontSize: 11,
-  },
+  container: { marginVertical: 4, marginHorizontal: 12 },
+  ownContainer: { alignItems: 'flex-end' },
+  otherContainer: { alignItems: 'flex-start' },
+  senderName: { fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 4, marginLeft: 12 },
+  bubble: { maxWidth: '75%', padding: 12, borderRadius: 16 },
+  ownBubble: { backgroundColor: '#007AFF', borderBottomRightRadius: 4 },
+  otherBubble: { backgroundColor: '#E5E5EA', borderBottomLeftRadius: 4 },
+  text: { fontSize: 16 },
+  ownText: { color: '#fff' },
+  otherText: { color: '#000' },
+  footer: { flexDirection: 'row', marginTop: 4, gap: 4, alignItems: 'center' },
+  time: { fontSize: 11, opacity: 0.7 },
+  status: { fontSize: 11 },
 });
 ```
 
-**Key Features:**
-
-- Different styles for sent vs received messages
-- Sender name for group chats
-- Status indicators (sending, queued, failed)
-- Timestamp formatting
-- WhatsApp-inspired design
-
-**✅ Checkpoint:** Component compiles with no errors
-
 ---
 
-### Step 2: Create MessageInput Component
+### MessageInput.tsx
 
-**Purpose:** Text input with send button, typing detection, and auto-grow.
-
-```bash
-touch components/MessageInput.tsx
-```
-
-**Implementation:**
-
-**Reference:** See FILE_STRUCTURE_GUIDE.md lines 636-688
+**Create:** `touch components/MessageInput.tsx`
 
 ```typescript
+import { View, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState } from 'react';
-import { 
-  View, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform 
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface MessageInputProps {
@@ -321,11 +118,7 @@ interface MessageInputProps {
   disabled?: boolean;
 }
 
-export default function MessageInput({ 
-  onSend, 
-  onTyping, 
-  disabled = false 
-}: MessageInputProps) {
+export default function MessageInput({ onSend, onTyping, disabled = false }: MessageInputProps) {
   const [text, setText] = useState('');
 
   const handleSend = () => {
@@ -334,11 +127,6 @@ export default function MessageInput({
       onSend(trimmed);
       setText('');
     }
-  };
-
-  const handleTextChange = (value: string) => {
-    setText(value);
-    onTyping(); // Notify parent component
   };
 
   return (
@@ -350,7 +138,7 @@ export default function MessageInput({
         <TextInput
           style={styles.input}
           value={text}
-          onChangeText={handleTextChange}
+          onChangeText={(value) => { setText(value); onTyping(); }}
           placeholder="Type a message..."
           placeholderTextColor="#999"
           multiline
@@ -358,18 +146,11 @@ export default function MessageInput({
           editable={!disabled}
         />
         <TouchableOpacity
-          style={[
-            styles.sendButton,
-            (!text.trim() || disabled) && styles.sendButtonDisabled
-          ]}
+          style={[styles.sendButton, (!text.trim() || disabled) && styles.sendButtonDisabled]}
           onPress={handleSend}
           disabled={!text.trim() || disabled}
         >
-          <Ionicons 
-            name="send" 
-            size={20} 
-            color={text.trim() && !disabled ? '#007AFF' : '#999'} 
-          />
+          <Ionicons name="send" size={20} color={text.trim() && !disabled ? '#007AFF' : '#999'} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -377,66 +158,21 @@ export default function MessageInput({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: 8,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  input: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 100,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 16,
-    marginRight: 8,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
+  container: { flexDirection: 'row', padding: 8, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e0e0e0', alignItems: 'flex-end', gap: 8 },
+  input: { flex: 1, minHeight: 40, maxHeight: 100, borderWidth: 1, borderColor: '#ddd', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 16 },
+  sendButton: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f0f0' },
+  sendButtonDisabled: { opacity: 0.5 },
 });
 ```
 
-**Key Features:**
-
-- Auto-growing text input (multiline with maxHeight)
-- Keyboard avoidance for iOS
-- Disabled state when offline
-- Send button enabled only when text present
-- Clears input after sending
-
-**✅ Checkpoint:** Component renders, typing works, send button responds
-
 ---
 
-### Step 3: Create MessageList Component
+### MessageList.tsx
 
-**Purpose:** FlatList optimized for message display with auto-scroll.
-
-```bash
-touch components/MessageList.tsx
-```
-
-**Implementation:**
-
-**Reference:** See FILE_STRUCTURE_GUIDE.md lines 598-632
+**Create:** `touch components/MessageList.tsx`
 
 ```typescript
-import { FlatList, View, StyleSheet } from 'react-native';
+import { FlatList, StyleSheet } from 'react-native';
 import { useRef, useEffect } from 'react';
 import MessageBubble from './MessageBubble';
 
@@ -444,31 +180,24 @@ interface Message {
   id: string;
   text: string;
   senderId: string;
-  senderName: string;
-  createdAt: Date | { toDate: () => Date } | null;
+  senderName?: string;
+  createdAt: any;
   status?: 'sending' | 'sent' | 'failed' | 'queued';
 }
 
 interface MessageListProps {
   messages: Message[];
   currentUserId: string;
-  conversationType: 'direct' | 'group';
+  conversationType?: 'direct' | 'group';
 }
 
-export default function MessageList({ 
-  messages, 
-  currentUserId, 
-  conversationType 
-}: MessageListProps) {
+export default function MessageList({ messages, currentUserId, conversationType }: MessageListProps) {
   const flatListRef = useRef<FlatList>(null);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (messages.length > 0) {
-      // Small delay to ensure FlatList has rendered
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      flatListRef.current?.scrollToEnd({ animated: true });
     }
   }, [messages.length]);
 
@@ -480,252 +209,137 @@ export default function MessageList({
       renderItem={({ item }) => (
         <MessageBubble
           message={item}
-          isOwnMessage={item.senderId === currentUserId}
+          isOwn={item.senderId === currentUserId}
           showSenderName={conversationType === 'group'}
         />
       )}
-      contentContainerStyle={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 8,
-  },
+  contentContainer: { paddingVertical: 8 },
 });
 ```
 
-**Key Features:**
-
-- Optimized FlatList rendering
-- **Auto-scroll to bottom when new messages arrive**
-- Conditional sender names for group chats
-- Proper key extraction for performance
-- Content container styling
-
-**✅ Checkpoint:** List renders messages correctly
-
 ---
 
-### Step 4: Create OfflineBanner Component
+### OfflineBanner.tsx
 
-**Purpose:** Show banner when device is offline.
-
-```bash
-touch components/OfflineBanner.tsx
-```
-
-**Implementation:**
-
-**Reference:** See FILE_STRUCTURE_GUIDE.md lines 839-876
+**Create:** `touch components/OfflineBanner.tsx`
 
 ```typescript
-import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useState, useEffect } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 
 export default function OfflineBanner() {
   const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
-    // Subscribe to network state changes
     const unsubscribe = NetInfo.addEventListener(state => {
-      setIsOffline(!state.isConnected);
+      setIsOffline(!(state.isConnected ?? true));
     });
 
-    // CRITICAL: Cleanup on unmount
     return unsubscribe;
   }, []);
 
   if (!isOffline) return null;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>
-        ⚠️ You're offline. Messages will send when reconnected.
-      </Text>
+    <View style={styles.banner}>
+      <Text style={styles.text}>⚠️ Offline - Messages will send when reconnected</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#FF9800',
-    padding: 8,
-    alignItems: 'center',
-  },
-  text: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '500',
-  },
+  banner: { backgroundColor: '#ff9800', padding: 8, alignItems: 'center' },
+  text: { color: '#fff', fontSize: 12, fontWeight: '600' },
 });
 ```
 
-**Key Features:**
-
-- Real-time network detection
-- Auto-shows/hides based on connectivity
-- Non-intrusive warning banner
-- Proper cleanup of NetInfo listener
-
-**✅ Checkpoint:** Banner shows in airplane mode, hides when connected
+✅ **Checkpoint:** All components compile with no errors
 
 ---
 
-## Task 3.2: Implement Chat Screen
+## Task 3.2: Chat Screen
 
-### Purpose
+**IMPORTANT:** This replaces the Phase 2 placeholder `app/chat/[id].tsx`
 
-The main chat interface where users send and receive messages.
-
-### Step 1: Create Chat Screen File
-
-Create the chat directory and screen file:
-
+**Create (if needed):**
 ```bash
-# Create the chat directory
 mkdir -p app/chat
-
-# Create the real chat screen
 touch app/chat/\[id\].tsx
 ```
 
-**Note:** If you didn't delete the Phase 2 placeholder yet, do it now before creating the new file.
-
-### Step 2: Implement the Chat Screen
-
-⚠️ **FIRESTORE LISTENERS - CRITICAL**
-
-This screen uses multiple real-time listeners. Each **MUST** have a cleanup function to prevent memory leaks. See QUICK_REFERENCE.md lines 18-25 for the pattern.
-
----
-
-⚠️ **FIRESTORE INDEX MAY BE REQUIRED**
-
-The messages query uses `orderBy('createdAt', 'asc')` + `limit(100)`. Depending on your security rules, Firestore might require a composite index.
-
-**If you get an error like:**
-
-```
-Error: The query requires an index
-```
-
-**Solution:**
-
-1. Check the console error - it will include a link to auto-create the index
-2. Click the link (opens Firebase Console)
-3. Click "Create Index"
-4. Wait 1-2 minutes for the index to build
-5. Reload your app
-
-The code below includes error handling that will log a clear message if this happens.
-
----
-
+**Implementation:**
 ```typescript
-import { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
-import { 
-  collection, 
-  doc, 
-  onSnapshot, 
-  query, 
-  orderBy, 
-  limit,
-  addDoc,
-  updateDoc,
-  serverTimestamp
-} from 'firebase/firestore';
-import NetInfo from '@react-native-community/netinfo';
+import { collection, doc, query, orderBy, limit, onSnapshot, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase.config';
 import { useAuthStore } from '../../store/authStore';
+import { MESSAGE_LIMIT } from '../../utils/constants';
 import MessageList from '../../components/MessageList';
 import MessageInput from '../../components/MessageInput';
 import OfflineBanner from '../../components/OfflineBanner';
-import { MESSAGE_LIMIT, MESSAGE_TIMEOUT_MS } from '../../utils/constants';
 
 interface Message {
   id: string;
   text: string;
   senderId: string;
   senderName: string;
-  createdAt: Date | { toDate: () => Date } | null;
-  participants: string[];
+  createdAt: any;
   status?: 'sending' | 'sent' | 'failed' | 'queued';
-}
-
-interface Conversation {
-  id: string;
-  type: 'direct' | 'group';
-  name?: string;
   participants: string[];
-  participantDetails: Record<string, { displayName: string; email: string }>;
 }
 
 export default function ChatScreen() {
   const { id: conversationId } = useLocalSearchParams();
   const { user } = useAuthStore();
   const navigation = useNavigation();
-
-  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [conversation, setConversation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isOnline, setIsOnline] = useState(true);
 
-  // Track pending message timeouts
-  const timeoutRefs = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  // Fetch conversation details
+  useEffect(() => {
+    if (!conversationId || typeof conversationId !== 'string' || !user) return;
 
-  // Update header title when conversation loads
+    const unsubscribe = onSnapshot(doc(db, 'conversations', conversationId), (docSnap) => {
+      if (docSnap.exists()) {
+        setConversation({ id: docSnap.id, ...docSnap.data() });
+      }
+    });
+
+    return unsubscribe;
+  }, [conversationId, user]);
+
+  // Update header title dynamically
   useEffect(() => {
     if (conversation && user) {
       let title = 'Chat';
       
       if (conversation.type === 'direct') {
-        // Find the other user's name
-        const otherUserId = conversation.participants.find(id => id !== user.uid);
+        const otherUserId = conversation.participants.find((id: string) => id !== user.uid);
         if (otherUserId && conversation.participantDetails[otherUserId]) {
           title = conversation.participantDetails[otherUserId].displayName;
         }
       } else {
         // Group chat
-        title = conversation.name || 'Group Chat';
+        const participantCount = conversation.participants.length;
+        title = conversation.name || `Group (${participantCount} members)`;
       }
       
       navigation.setOptions({ title });
     }
   }, [conversation, user, navigation]);
 
-  // Listen to network status
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsOnline(state.isConnected ?? true);
-    });
-    return unsubscribe;
-  }, []);
-
-  // Listen to conversation details
-  useEffect(() => {
-    if (!conversationId || typeof conversationId !== 'string') return;
-
-    const unsubscribe = onSnapshot(
-      doc(db, 'conversations', conversationId),
-      (docSnapshot) => {
-        if (docSnapshot.exists()) {
-          setConversation({
-            id: docSnapshot.id,
-            ...docSnapshot.data(),
-          } as Conversation);
-        }
-      }
-    );
-
-    return unsubscribe;
-  }, [conversationId]);
-
-  // Listen to messages (last 100)
+  // Listen to messages
   useEffect(() => {
     if (!conversationId || typeof conversationId !== 'string') return;
 
@@ -745,9 +359,8 @@ export default function ChatScreen() {
       setLoading(false);
     }, (error) => {
       console.error('Messages listener error:', error);
-      // If index is required, error will contain a link to create it
       if (error.message.includes('index')) {
-        console.error('⚠️ Firestore index required. Check the error above for a link to create it.');
+        console.error('⚠️ FIRESTORE INDEX REQUIRED. Click the link above to create it.');
       }
       setLoading(false);
     });
@@ -756,54 +369,33 @@ export default function ChatScreen() {
   }, [conversationId]);
 
   const sendMessage = async (text: string) => {
-    if (!conversation || !user || typeof conversationId !== 'string') return;
+    if (!conversationId || typeof conversationId !== 'string' || !user || !conversation) return;
 
-    // Generate temp ID for optimistic update
-    const tempId = `temp_${Date.now()}_${Math.random()}`;
-    const senderName = user.displayName || user.email || 'Unknown User';
-    
+    const tempId = `temp_${Date.now()}`;
     const tempMessage: Message = {
       id: tempId,
       text,
       senderId: user.uid,
-      senderName,
+      senderName: user.displayName || user.email || 'Unknown User',
       createdAt: new Date(),
+      status: 'sending',
       participants: conversation.participants,
-      status: isOnline ? 'sending' : 'queued',
     };
 
-    // Optimistic update: Add temp message immediately
+    // Optimistic update
     setMessages(prev => [...prev, tempMessage]);
-
-    // Set timeout for failure detection (10 seconds)
-    const timeout = setTimeout(() => {
-      updateMessageStatus(tempId, 'failed');
-      timeoutRefs.current.delete(tempId);
-    }, MESSAGE_TIMEOUT_MS);
-
-    timeoutRefs.current.set(tempId, timeout);
 
     try {
       // Write to Firestore
-      const messageRef = await addDoc(
-        collection(db, 'conversations', conversationId, 'messages'),
-        {
-          text,
-          senderId: user.uid,
-          senderName,
-          participants: conversation.participants,
-          createdAt: serverTimestamp(),
-        }
-      );
+      await addDoc(collection(db, 'conversations', conversationId, 'messages'), {
+        text,
+        senderId: user.uid,
+        senderName: user.displayName || user.email || 'Unknown User',
+        participants: conversation.participants,
+        createdAt: serverTimestamp(),
+      });
 
-      // Clear timeout (message succeeded)
-      const existingTimeout = timeoutRefs.current.get(tempId);
-      if (existingTimeout) {
-        clearTimeout(existingTimeout);
-        timeoutRefs.current.delete(tempId);
-      }
-
-      // Update conversation's lastMessage
+      // Update conversation lastMessage
       await updateDoc(doc(db, 'conversations', conversationId), {
         lastMessage: text.substring(0, 100),
         lastMessageAt: serverTimestamp(),
@@ -811,53 +403,21 @@ export default function ChatScreen() {
 
       // Remove temp message (real one will appear via listener)
       setMessages(prev => prev.filter(m => m.id !== tempId));
-
     } catch (error) {
       console.error('Send message error:', error);
-      
-      // Clear timeout
-      const existingTimeout = timeoutRefs.current.get(tempId);
-      if (existingTimeout) {
-        clearTimeout(existingTimeout);
-        timeoutRefs.current.delete(tempId);
-      }
-
       // Mark as failed
-      updateMessageStatus(tempId, 'failed');
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' } : m));
     }
   };
 
-  const updateMessageStatus = (messageId: string, status: 'sending' | 'sent' | 'failed' | 'queued') => {
-    setMessages(prev => 
-      prev.map(m => m.id === messageId ? { ...m, status } : m)
-    );
-  };
-
   const handleTyping = () => {
-    // Typing indicator logic will be added in Phase 5
-    // For now, this is a no-op
+    // Phase 5 will add typing indicator logic here
   };
-
-  // Cleanup all timeouts on unmount
-  useEffect(() => {
-    return () => {
-      timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
-      timeoutRefs.current.clear();
-    };
-  }, []);
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.centered}>
         <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
-  }
-
-  if (!conversation) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text>Conversation not found</Text>
       </View>
     );
   }
@@ -867,912 +427,140 @@ export default function ChatScreen() {
       <OfflineBanner />
       <MessageList
         messages={messages}
-        currentUserId={user.uid}
-        conversationType={conversation.type}
+        currentUserId={user!.uid}
+        conversationType={conversation?.type}
       />
-      <MessageInput
-        onSend={sendMessage}
-        onTyping={handleTyping}
-        disabled={false} // Can send even when offline (will queue)
-      />
+      <MessageInput onSend={sendMessage} onTyping={handleTyping} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });
 ```
 
-### Key Implementation Details
+**⚠️ CRITICAL - Firestore Index Required:**
 
-**Dynamic Header Title:**
-
-- Shows participant name for direct chats
-- Shows group name (or "Group Chat") for groups
-- Updates automatically when conversation loads
-
-**Optimistic Updates:**
-
-- Message appears instantly with temp ID
-- Status: "sending" when online, "queued" when offline
-- Real message replaces temp via listener
-
-**Timeout Detection:**
-
-- 10-second timeout per message
-- If timeout expires, status → "failed"
-- Cleared on success or error
-
-**Multiple Listeners:**
-
-1. Network status (NetInfo)
-2. Conversation details (metadata)
-3. Messages (last 100)
-
-**All have cleanup functions!**
-
-**Type Safety:**
-
-- Proper interfaces for Message and Conversation
-- Timestamp types handle both Date and Firestore Timestamp
-- Fallback for missing displayName (uses email or "Unknown User")
-
-**Firestore Writes:**
-
-- Uses `serverTimestamp()` (CRITICAL)
-- Denormalizes `participants` array for security rules
-
-**✅ Checkpoint:** Chat screen loads, can send messages, they appear instantly
-
----
-
-### Step 3: Update Root Layout
-
-Add the chat route to `app/_layout.tsx`:
-
-```typescript
-// In your Stack component, add:
-<Stack.Screen 
-  name="chat/[id]" 
-  options={{ 
-    title: 'Chat',
-    headerBackTitle: 'Back'
-  }} 
-/>
+On first run, you'll get an error:
+```
+The query requires an index. Click here to create it: [LINK]
 ```
 
-**✅ Checkpoint:** Can navigate to chat screen from conversations list
+**Solution:**
+1. Click the link in console
+2. Firebase creates index automatically
+3. Wait 1-2 minutes for index to build
+4. Reload app
+
+**Key Implementation Details:**
+- **Optimistic updates:** Temp message shows instantly, removed when real one arrives
+- **serverTimestamp():** CRITICAL - ensures correct message ordering
+- **MESSAGE_LIMIT:** From `utils/constants.ts` (100 messages)
+- **Dynamic header:** Shows other user's name (direct) or group name
+- **Listeners cleanup:** All `onSnapshot` return unsubscribe functions
+
+✅ **Checkpoint:** Messages send and receive in real-time
 
 ---
 
 ## Testing Phase 3
 
-### Test 3.1: Send Message (Online)
+### Test 3.1: Send Message
+1. User A: Open chat with User B → Type "Hello" → Send
+2. Expected: Message appears instantly (blue bubble, right-aligned)
+3. User B: Should see "Hello" appear in < 1 second
 
-**Steps:**
+### Test 3.2: Receive Message
+1. User B: Send "Hi back"
+2. User A: Should see message appear (gray bubble, left-aligned)
 
-1. Open a conversation
-2. Type a message
-3. Press send
+### Test 3.3: Persistence
+1. User A: Send message → Force quit app → Reopen → Open chat
+2. Expected: Message still visible
 
-**Expected:**
-
-- ✅ Message appears instantly at bottom
-- ✅ Shows "sending" status briefly
-- ✅ Status icon disappears when sent
-- ✅ Message persists after app restart
-
----
-
-### Test 3.2: Receive Message (Real-Time)
-
-**Setup:** 2 devices/emulators with different users
-
-**Steps:**
-
-1. User A opens conversation with User B
-2. User B sends a message
-
-**Expected:**
-
-- ✅ User A sees message appear within 1-2 seconds
-- ✅ No refresh needed
-- ✅ Message shows correct sender name
-- ✅ Timestamp displays correctly
-
----
-
-### Test 3.3: Offline Messaging
-
-**Steps:**
-
-1. Enable airplane mode
-2. Send a message
+### Test 3.4: Offline Mode
+1. User A: Enable airplane mode → Send "Offline test"
+2. Expected: "⚠️ Offline" banner appears, message shows ⏳ or 📤
 3. Disable airplane mode
+4. Expected: Message syncs, banner disappears
 
-**Expected:**
-
-- ✅ Offline banner appears
-- ✅ Message shows "queued" status (📤)
-- ✅ After reconnect, message sends automatically
-- ✅ Status updates to sent
-- ✅ Banner disappears
-
----
-
-### Test 3.4: Message Timeout
-
-**Setup:** Simulate slow/stuck network
-
-**Steps:**
-
-1. Send a message
-2. Wait 10+ seconds without connection
-
-**Expected:**
-
-- ✅ Message shows "failed" status (❌)
-- ✅ User can see it failed (Phase 3 shows status, Phase 7 will add retry)
-
----
-
-### Test 3.5: Multiple Messages
-
-**Steps:**
-
-1. Send 10+ messages rapidly
-2. Check order
-
-**Expected:**
-
-- ✅ All messages appear
-- ✅ Correct chronological order
-- ✅ No duplicates
-- ✅ All messages persist after restart
-
----
+### Test 3.5: Message Ordering
+1. User A: Send 5 messages rapidly
+2. Expected: All appear in correct chronological order
 
 ### Test 3.6: Long Messages
+1. Send 300-character message
+2. Expected: Text wraps in bubble, scrollable
 
-**Steps:**
-
-1. Type a message with 500+ characters
-2. Send
-
-**Expected:**
-
-- ✅ Message sends successfully
-- ✅ Bubble wraps text properly
-- ✅ Preview in conversation list truncated at 100 chars
+### Test 3.7: Group Chat
+1. Create 3-user group → User A sends message
+2. Expected: Users B & C see message with "User A" sender name above bubble
 
 ---
 
-### Test 3.7: Group Chat Messages
+## Common Issues
 
-**Setup:** Group conversation with 3+ users
+### Messages not appearing
+- **Check:** Console for index error → Click link to create index
+- **Check:** Firestore rules allow read/write for authenticated users
 
-**Steps:**
+### Messages out of order
+- **Check:** Using `serverTimestamp()` not `new Date()`
 
-1. Each user sends a message
-2. Check display
+### Duplicate messages
+- **Normal:** Temp message + real message briefly overlap (< 100ms)
+- **If persistent:** Check temp message removal logic
 
-**Expected:**
+### Keyboard covers input (Android)
+- **Solution:** Adjust `keyboardVerticalOffset` in MessageInput
 
-- ✅ Sender names show for received messages
-- ✅ Own messages don't show sender name
-- ✅ All users receive all messages
-- ✅ Correct styling for each message
-
----
-
-### Test 3.8: Empty State
-
-**Steps:**
-
-1. Create new conversation
-2. Open chat screen
-
-**Expected:**
-
-- ✅ Empty messages list
-- ✅ Input works
-- ✅ First message sends correctly
+### Offline banner doesn't show
+- **Check:** NetInfo installed: `npm list @react-native-community/netinfo`
 
 ---
 
-## Common Issues & Solutions
+## Firestore Security Rules
 
-### Issue: Messages not in correct order
+**Verify in Firebase Console → Firestore → Rules:**
 
-**Cause:** Using client timestamps instead of server timestamps
-
-**Solution:**
-
-- Verify `serverTimestamp()` is used in message creation
-- Check QUICK_REFERENCE.md lines 9-16
-
-```typescript
-// ✅ CORRECT
-createdAt: serverTimestamp()
-
-// ❌ WRONG
-createdAt: new Date()
+```javascript
+match /conversations/{conversationId}/messages/{messageId} {
+  allow read: if request.auth.uid in resource.data.participants;
+  allow create: if request.auth != null && request.auth.uid in request.resource.data.participants;
+}
 ```
-
----
-
-### Issue: Duplicate messages appearing
-
-**Cause:** Temp message not removed after real message arrives
-
-**Solution:**
-Ensure this code is in sendMessage:
-
-```typescript
-// Remove temp message
-setMessages(prev => prev.filter(m => m.id !== tempId));
-```
-
----
-
-### Issue: Messages don't persist after restart
-
-**Cause:** Firestore offline persistence not enabled
-
-**Solution:**
-Check `firebase.config.ts` has:
-
-```typescript
-db = initializeFirestore(app, {
-  cacheSizeBytes: 40 * 1024 * 1024,
-});
-```
-
----
-
-### Issue: "Failed" status on all messages
-
-**Cause:** Timeout too short or Firestore writes actually failing
-
-**Debug:**
-
-1. Check console for Firestore errors
-2. Verify Firestore rules allow message creation
-3. Try increasing timeout to 20 seconds for testing
-
----
-
-### Issue: Memory leak warning
-
-**Cause:** Firestore listeners not cleaned up
-
-**Solution:**
-Check ALL useEffect hooks with `onSnapshot` have return statements:
-
-```typescript
-useEffect(() => {
-  const unsubscribe = onSnapshot(/*...*/);
-  return unsubscribe; // CRITICAL
-}, [deps]);
-```
-
----
-
-### Issue: Offline banner not showing
-
-**Cause:** NetInfo not detecting offline state
-
-**Debug:**
-
-```typescript
-// Add to useEffect:
-NetInfo.addEventListener(state => {
-  console.log('Network state:', state.isConnected);
-  setIsOnline(state.isConnected ?? true);
-});
-```
-
-**Test:** Enable airplane mode, check console
-
----
-
-### Issue: Keyboard covers input on some Android devices
-
-**Cause:** `KeyboardAvoidingView` offset may need adjustment for specific devices
-
-**Debug:**
-
-1. Test on various Android devices/emulators
-2. If input is covered, try adjusting `keyboardVerticalOffset`
-3. Or change `behavior` from `undefined` to `"height"` for Android:
-
-```typescript
-<KeyboardAvoidingView
-  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-  keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
->
-```
-
-**Note:** This is device-specific. Test on your target devices.
-
----
-
-## Potential Roadblocks & Questions
-
-### 🟢 Resolved: Optimistic Update Strategy
-
-**Question:** Show temp message immediately or wait for Firestore?
-
-**Answer:** ✅ Show immediately (optimistic update)
-
-**Benefit:** Better UX, feels instant even with network latency
-
----
-
-### 🟢 Resolved: Failed Message Handling
-
-**Question:** What to do with failed messages?
-
-**Answer:** ✅ Show failed status, keep in list
-
-**Future (Phase 7):** Add retry button
-
----
-
-### 🟡 Unresolved: Message Pagination
-
-**Issue:** Only loading last 100 messages
-
-**Impact:** Can't see older messages if conversation has 100+
-
-**Mitigation:** Acceptable for MVP
-
-**Recommendation:** Add "Load More" in Phase 7 or post-MVP
-
-**Status:** ⚠️ Known limitation
-
----
-
-### 🟡 Unresolved: Message Editing/Deletion
-
-**Issue:** Can't edit or delete sent messages
-
-**Impact:** User has to live with typos
-
-**Mitigation:** MVP doesn't include this feature
-
-**Recommendation:** Phase 2 post-MVP enhancement
-
-**Status:** ⚠️ Out of scope for MVP
-
----
-
-### 🟢 Resolved: Offline Message Queueing
-
-**Question:** How do offline messages sync?
-
-**Answer:** ✅ Firestore SDK handles automatically
-
-**Details:** Writes are cached locally, auto-sync on reconnect
-
----
-
-### 🟡 Potential Issue: Large Message Lists
-
-**Issue:** Rendering 100 messages might be slow on older devices
-
-**Impact:** UI lag when opening chat with many messages
-
-**Mitigation:** FlatList is already optimized
-
-**Recommendation:** Monitor performance during testing
-
-**Status:** ⚠️ Monitor
 
 ---
 
 ## Verification Checklist
 
-Before proceeding to Phase 4, verify ALL of these:
-
-### Code Complete
-
-- [ ] `components/MessageBubble.tsx` created
-- [ ] `components/MessageList.tsx` created
-- [ ] `components/MessageInput.tsx` created
-- [ ] `components/OfflineBanner.tsx` created
-- [ ] `app/chat/[id].tsx` created (real implementation, not placeholder)
-- [ ] Chat route added to `app/_layout.tsx`
-- [ ] No TypeScript errors
-- [ ] No linter errors
-
-### Functionality Tests
-
-- [ ] Can send message in one-on-one chat
-- [ ] Can send message in group chat
-- [ ] Messages appear instantly (optimistic update)
-- [ ] Messages appear on other user's screen in real-time
-- [ ] Messages persist after app restart
-- [ ] Last 100 messages load correctly
-- [ ] Timestamps display correctly
+- [ ] All components compile (no TypeScript errors)
+- [ ] Messages send in real-time (< 1 second delay)
+- [ ] Optimistic updates work (instant feedback)
+- [ ] Messages persist across app restarts
 - [ ] Offline banner shows in airplane mode
-- [ ] Messages queue when offline
-- [ ] Messages auto-send when reconnected
-- [ ] Failed messages show ❌ status
-- [ ] Sender names show in group chats
-- [ ] Can type long messages (500+ chars)
-- [ ] Input clears after sending
-
-### Data Verification
-
-- [ ] Check Firebase Console → Firestore
-- [ ] Messages collection exists under conversations
-- [ ] Message documents have correct structure
-- [ ] `participants` array is denormalized
-- [ ] `createdAt` uses serverTimestamp
-- [ ] Conversation `lastMessage` updates
-- [ ] Conversation `lastMessageAt` updates
-
-### Memory & Performance
-
-- [ ] No memory leaks (all listeners cleaned up)
-- [ ] App doesn't crash on rapid message sending
-- [ ] Messages render smoothly (no lag)
-- [ ] Network transitions don't cause crashes
-
----
-
-## Summary
-
-**Phase 3 Complete When:**
-
-- ✅ Can send messages in one-on-one chats
-- ✅ Can send messages in group chats
-- ✅ Messages appear instantly (optimistic updates)
-- ✅ Real-time message sync works
-- ✅ Messages persist across sessions
-- ✅ Offline queueing works
-- ✅ Network status detection works
-- ✅ Message components are reusable and styled
-
-**Time Investment:** 3-4 hours  
-**Output:** Complete messaging infrastructure with real-time sync and offline support
-
-**Next:** Phase 4 - Group Messaging Enhancements (sender names, group indicators)
+- [ ] Messages queue and sync when reconnected
+- [ ] Message ordering correct (chronological)
+- [ ] Long messages wrap properly
+- [ ] Group chats show sender names
+- [ ] Dynamic header shows correct name/title
+- [ ] KeyboardAvoidingView works on iOS
+- [ ] Firestore index created (no console errors)
+- [ ] Last 100 messages load
 
 ---
 
 ## Before Phase 4
 
-### Commit Your Work
-
+1. Test with 2+ users to verify real-time sync
+2. Test airplane mode → send → reconnect flow
+3. Verify messages persist after force quit
+4. Commit Phase 3 work:
 ```bash
 git add .
 git commit -m "feat: complete Phase 3 - core messaging with real-time sync and offline support"
 ```
 
-### Update Progress
-
-Check off Phase 3 in `docs/PROGRESS_TRACKER.md`
-
-### Prepare for Phase 4
-
-Phase 4 will enhance group chat features:
-
-- Ensure sender names display correctly
-- Group-specific UI adjustments
-- Testing with multiple participants
-
-**Estimated time:** 1-2 hours
-
----
-
-## 📋 Comprehensive Manual Testing Checklist - Phases 2 & 3
-
-### 🔧 Test Setup
-
-**Prerequisites:**
-
-- [ ] Expo dev server running (`npx expo start --clear`)
-- [ ] App open in Expo Go on your phone
-- [ ] At least **2 test accounts** registered (note their emails)
-- [ ] Ideally: **2 physical devices or 1 device + 1 emulator** for real-time testing
-
----
-
-## Phase 2: User Discovery & Conversations
-
-### ✅ Test 2.1: Authentication & Navigation
-
-1. **Login** with User A
-2. **Verify** you're redirected to the Chats tab (empty state)
-3. **Check** bottom tabs show "Chats" and "New Chat"
-4. **Tap** "New Chat" tab
-5. **Expected:** New chat screen appears with email input
-
----
-
-### ✅ Test 2.2: User Discovery - Valid Email
-
-1. On "New Chat" screen, **enter User B's email**
-2. **Tap** "Find User"
-3. **Expected:**
-   - ✅ User B appears in list with display name and email
-   - ✅ "Create Chat" button appears
-   - ✅ No error messages
-
----
-
-### ✅ Test 2.3: User Discovery - Invalid Email
-
-1. **Enter** `notanemail` (no @ symbol)
-2. **Tap** "Find User"
-3. **Expected:**
-   - ❌ Error: "Invalid email format"
-   - ❌ No user added to list
-
----
-
-### ✅ Test 2.4: User Discovery - User Not Found
-
-1. **Enter** `nonexistent@example.com`
-2. **Tap** "Find User"
-3. **Expected:**
-   - ❌ Error: "No user found with that email"
-   - ❌ No user added to list
-
----
-
-### ✅ Test 2.5: Self-Add Prevention
-
-1. **Enter your own email** (User A's email)
-2. **Tap** "Find User"
-3. **Expected:**
-   - ❌ Error: "You can't add yourself"
-
----
-
-### ✅ Test 2.6: Create Direct Chat
-
-1. **Find User B** (valid email)
-2. **Tap** "Create Chat"
-3. **Expected:**
-   - ✅ Navigate to chat screen (shows "Chat" or User B's name in header)
-   - ✅ Empty message area with input at bottom
-4. **Go back** to Chats tab
-5. **Expected:**
-   - ✅ Conversation with User B appears in list
-   - ✅ Shows "No messages yet" as last message
-
----
-
-### ✅ Test 2.7: Duplicate Conversation Prevention
-
-1. Go to "New Chat" again
-2. **Find User B** again
-3. **Tap** "Create Chat"
-4. **Expected:**
-   - ✅ Opens the **same** conversation (not a new one)
-   - ✅ Same conversation ID in the chat screen
-
----
-
-### ✅ Test 2.8: Group Chat Creation
-
-1. Go to "New Chat"
-2. **Tap** "Switch to Group Chat"
-3. **Add User B** (email + "Add User")
-4. **Add User C** (email + "Add User")
-5. **Expected:**
-   - ✅ Both users appear in list
-   - ✅ Button shows "Create Group (3 members)"
-6. **Tap** "Create Group"
-7. **Expected:**
-   - ✅ Navigate to group chat screen
-   - ✅ Header shows "Group with 3 members"
-8. **Go back** to Chats tab
-9. **Expected:**
-   - ✅ Group conversation appears in list
-
----
-
-### ✅ Test 2.9: Group Chat - Minimum Users Validation
-
-1. Go to "New Chat"
-2. **Switch to Group Chat** mode
-3. **Add only 1 user**
-4. **Tap** "Create Group"
-5. **Expected:**
-   - ❌ Error: "Need at least 2 users for a group chat"
-
----
-
-### ✅ Test 2.10: Mode Switch with Selected Users
-
-1. In "New Chat", add User B
-2. **Tap** "Switch to Group Chat"
-3. **Expected:**
-   - ⚠️ Confirmation dialog appears
-   - Dialog text: "Switching modes will clear your selected users. Continue?"
-4. **Tap** "Cancel"
-5. **Expected:**
-   - ✅ User B still in list
-   - ✅ Still in direct chat mode
-6. **Tap switch again** → **Tap "Switch"**
-7. **Expected:**
-   - ✅ User list cleared
-   - ✅ Now in group mode
-
----
-
-### ✅ Test 2.11: Conversations List - Real-Time Updates
-
-**Setup:** 2 devices/emulators
-
-1. **Device 1:** Login as User A
-2. **Device 2:** Login as User B
-3. **Device 1:** Create conversation with User B
-4. **Expected on Device 1:**
-   - ✅ Conversation appears immediately
-5. **Expected on Device 2:**
-   - ✅ Conversation appears within 1-2 seconds (no refresh needed)
-   - ✅ Shows User A's name
-
----
-
-### ✅ Test 2.12: Logout
-
-1. On Chats tab, **tap "Logout"**
-2. **Expected:**
-   - ✅ Redirected to login screen
-   - ✅ Conversations list cleared
-
----
-
-## Phase 3: Core Messaging
-
-### ✅ Test 3.1: Send Message (Online)
-
-1. **Login** as User A
-2. **Open** conversation with User B
-3. **Type** "Hello from User A"
-4. **Tap** send button (airplane icon)
-5. **Expected:**
-   - ✅ Message appears **instantly** at bottom
-   - ✅ Shows timestamp
-   - ✅ Blue bubble on the right
-   - ✅ Briefly shows ⏳ "sending" status
-   - ✅ Status disappears after ~1 second (sent)
-
----
-
-### ✅ Test 3.2: Receive Message (Real-Time)
-
-**Setup:** 2 devices
-
-1. **Device 1:** User A in conversation with User B
-2. **Device 2:** User B opens same conversation
-3. **Device 2:** Send message "Hello from User B"
-4. **Expected on Device 1:**
-   - ✅ Message appears within 1-2 seconds
-   - ✅ Gray bubble on the left
-   - ✅ Shows User B's name (if group) or no name (if direct)
-   - ✅ Shows timestamp
-
----
-
-### ✅ Test 3.3: Message Persistence
-
-1. Send 3-5 messages in a conversation
-2. **Close app** completely (swipe away from task manager)
-3. **Reopen app** and login
-4. **Open same conversation**
-5. **Expected:**
-   - ✅ All messages still visible
-   - ✅ Correct order (oldest to newest)
-   - ✅ Timestamps preserved
-
----
-
-### ✅ Test 3.4: Optimistic Updates
-
-1. **Turn on airplane mode** (Settings → Airplane Mode)
-2. **Type** "Offline message"
-3. **Tap** send
-4. **Expected:**
-   - ✅ Orange offline banner appears at top
-   - ✅ Message appears immediately in list
-   - ✅ Shows 📤 "queued" status
-5. **Turn off airplane mode**
-6. **Expected (within 2-5 seconds):**
-   - ✅ Offline banner disappears
-   - ✅ Message status changes from 📤 to sent (icon disappears)
-   - ✅ Message has real timestamp
-
----
-
-### ✅ Test 3.5: Multiple Messages Rapidly
-
-1. **Type and send** 10 messages very quickly
-2. **Expected:**
-   - ✅ All messages appear
-   - ✅ In correct chronological order
-   - ✅ No duplicates
-   - ✅ All show proper status indicators
-
----
-
-### ✅ Test 3.6: Long Messages
-
-1. **Type** a message with 500+ characters
-2. **Send**
-3. **Expected:**
-   - ✅ Message sends successfully
-   - ✅ Bubble wraps text (doesn't overflow)
-   - ✅ Readable on screen
-4. **Go back** to Chats list
-5. **Expected:**
-   - ✅ Preview truncated at ~100 characters with "..."
-
----
-
-### ✅ Test 3.7: Empty Message Prevention
-
-1. **Leave input empty**
-2. **Expected:**
-   - ✅ Send button is disabled (grayed out)
-3. **Type spaces only**
-4. **Expected:**
-   - ✅ Send button still disabled
-
----
-
-### ✅ Test 3.8: Group Chat Messages
-
-**Setup:** Group with 3+ users
-
-1. **User A:** Send "Message from A"
-2. **User B:** Send "Message from B"
-3. **User C:** Send "Message from C"
-4. **Expected (on each device):**
-   - ✅ All messages visible
-   - ✅ Own messages: Blue bubbles, right-aligned, no sender name
-   - ✅ Others' messages: Gray bubbles, left-aligned, **sender name shown**
-   - ✅ Correct chronological order
-
----
-
-### ✅ Test 3.9: Conversations List Updates with Messages
-
-1. Have 2+ conversations in list
-2. **Open** Conversation A
-3. **Send** a message
-4. **Go back** to Chats tab
-5. **Expected:**
-   - ✅ Conversation A moves to top of list
-   - ✅ Shows last message preview
-   - ✅ Shows timestamp (e.g., "Just now", "2m ago")
-
----
-
-### ✅ Test 3.10: Auto-Scroll to Latest Message
-
-1. Open conversation with 50+ messages (send many for testing)
-2. **Expected:**
-   - ✅ Automatically scrolls to bottom
-   - ✅ Latest message visible
-3. **Send new message**
-4. **Expected:**
-   - ✅ Auto-scrolls to show new message
-
----
-
-### ✅ Test 3.11: Message Timeout (Advanced)
-
-**Setup:** Simulate poor network
-
-1. **Enable airplane mode**
-2. **Send** a message
-3. **Keep airplane mode on** for 10+ seconds
-4. **Expected:**
-   - ✅ Message shows 📤 initially
-   - ✅ After 10 seconds: Changes to ❌ "failed"
-5. **Turn off airplane mode**
-6. **Note:** Failed message stays failed (retry in Phase 7)
-
----
-
-### ✅ Test 3.12: Keyboard Behavior
-
-1. **Tap** message input
-2. **Expected:**
-   - ✅ Keyboard appears
-   - ✅ Input field moves up (not covered by keyboard)
-3. **Type** multiple lines
-4. **Expected:**
-   - ✅ Input expands vertically
-   - ✅ Max height reached (~100px), then scrolls
-5. **Send** message
-6. **Expected:**
-   - ✅ Input clears
-   - ✅ Input height resets to single line
-
----
-
-### ✅ Test 3.13: Header Title Display
-
-1. **Open direct chat** with User B
-2. **Expected:** Header shows "User B's Display Name"
-3. **Open group chat**
-4. **Expected:** Header shows "Group with X members" or group name
-
----
-
-## 🐛 Common Issues to Watch For
-
-### Phase 2 Issues
-
-- ❌ **Firestore Index Error:** First time loading conversations, you'll see "The query requires an index" - click the link in the error to create it
-- ❌ **Conversations not appearing:** Check Firebase Console → Firestore → conversations collection
-- ❌ **Email case sensitivity:** Emails are normalized to lowercase automatically
-
-### Phase 3 Issues
-
-- ❌ **Messages Index Error:** First time sending messages, might need another Firestore index for messages collection
-- ❌ **Messages not syncing:** Check both users are in the `participants` array
-- ❌ **Offline banner stuck:** Force close and reopen app
-- ❌ **Duplicate messages:** Usually means temp message wasn't removed - check console logs
-
----
-
-## ✅ Success Criteria
-
-**Phase 2 Complete When:**
-
-- ✅ Can find users by email
-- ✅ Can create direct chats
-- ✅ Can create group chats
-- ✅ Conversations appear in list
-- ✅ Real-time updates work
-
-**Phase 3 Complete When:**
-
-- ✅ Can send/receive messages
-- ✅ Messages persist after restart
-- ✅ Optimistic updates work
-- ✅ Offline queueing works
-- ✅ Group messages show sender names
-- ✅ Everything is fast and responsive
-
----
-
-## 🎯 Quick Smoke Test (5 minutes)
-
-If you just want to verify basics work:
-
-1. ✅ Login → See tabs
-2. ✅ New Chat → Find user → Create chat
-3. ✅ Send message → Appears instantly
-4. ✅ Second device: See message in real-time
-5. ✅ Airplane mode → Send message → Shows queued
-6. ✅ Turn off airplane → Message sends
-
-**All working? ✅ You're good to go!**
-
----
-
-**Ready to proceed? Ensure ALL verification checklist items are complete before moving to Phase 4.**
+**Time:** 3-4 hours | **Next:** Phase 4 (Group Messaging Enhancements)

@@ -1,756 +1,376 @@
 # Phase 7: Testing & Polish
 
-**Estimated Time:** 4-6 hours  
-**Goal:** Comprehensive testing, bug fixes, and final polish to ensure the MVP is production-ready
+**Time:** 3-5 hours | **Goal:** Comprehensive testing, bug fixes, code cleanup, production-ready MVP
 
-**Prerequisites:** Phases 0-6 complete (all features implemented)
+**Prerequisites:** Phase 0-6 complete (all features implemented)
 
 ---
 
 ## Objectives
 
-By the end of Phase 7, you will have:
+- ✅ End-to-end testing (all core flows)
+- ✅ Edge case testing (offline, rapid actions, stress tests)
+- ✅ Multi-user testing (2-3 simultaneous users)
+- ✅ Bug fixes (memory leaks, timestamps, errors)
+- ✅ Code cleanup (console.logs, linter, TypeScript)
+- ✅ Documentation (README, setup instructions)
+- ✅ Production-ready deployment
 
-- ✅ Verified all core features work end-to-end
-- ✅ Fixed all critical bugs and memory leaks
-- ✅ Tested edge cases and error handling
-- ✅ Verified offline/online behavior
-- ✅ Tested on both Android and iOS (if available)
-- ✅ Code cleanup (removed debug code, fixed linter/type errors)
-- ✅ Documentation updated (README, Firestore rules)
-- ✅ App ready for deployment/demo
-
-**Note:** This phase is critical. A feature-complete app that crashes is worse than a limited but stable app. **Prioritize reliability over adding features.**
+**Reference:** mvp-prd-plus.md Section 10 for complete testing checklist
 
 ---
 
 ## Testing Strategy
 
-Phase 7 follows a systematic testing approach:
-
 ```
-1. Core Flow Testing (all primary user journeys)
+1. Core Flows (auth, discovery, messaging)
     ↓
-2. Edge Case Testing (offline, network issues, rapid actions)
+2. Edge Cases (offline, network, rapid actions)
     ↓
-3. Multi-User Testing (2-3 simultaneous users)
+3. Multi-User (2-3 simultaneous users)
     ↓
-4. Notification Testing (Phase 6 smoke test)
+4. Platform Testing (Android + iOS)
     ↓
-5. Platform Testing (Android + iOS)
+5. Bug Fixing
     ↓
-6. Bug Fixing & Code Cleanup
+6. Code Cleanup
     ↓
-7. Documentation & Final Verification
+7. Final Verification
 ```
-
-### Critical Focus Areas
-
-1. **Memory Leaks:** Most common cause of crashes (unsubscribed Firestore listeners)
-2. **Message Ordering:** Must use server timestamps consistently
-3. **Optimistic Updates:** Temp messages must sync correctly
-4. **Network Transitions:** Offline → Online must not lose messages
-5. **Firestore Rules:** Must be properly configured
-
----
-
-## Before Starting Phase 7
-
-### Verify All Phases Complete
-
-Quick checklist:
-
-- [ ] Phase 1: Can register, login, logout
-- [ ] Phase 2: Can create conversations (direct and group)
-- [ ] Phase 3: Can send/receive messages in real-time
-- [ ] Phase 4: Group chats show sender names
-- [ ] Phase 5: Typing indicators, online status, read receipts work
-- [ ] Phase 6: Notifications appear on new messages
-
-**If any phase is incomplete, finish it before starting Phase 7.**
 
 ---
 
 ## Task 7.1: Core Flow Testing
 
-### Purpose
-Verify all primary user flows work without errors from start to finish.
+### Authentication Flow
+1. Fresh install → Register with email/password/display name
+2. Expected: ✅ User created in Firestore, auto-login
+3. Force quit → Relaunch
+4. Expected: ✅ Session persists, auto-login
 
----
+### User Discovery (Direct)
+1. User A: New Chat → Enter User B's email → Find User
+2. Expected: ✅ User found, navigates to chat
+3. Try invalid email
+4. Expected: ✅ Error "No user found"
 
-### Test 7.1.1: Authentication Flow
+### User Discovery (Group)
+1. User A: Group Chat → Add User B, User C → Create Group
+2. Expected: ✅ Group created with 3 members
+3. Try adding invalid email
+4. Expected: ✅ Invalid email rejected, valid ones proceed
 
-**Setup:** Fresh app install
+### One-on-One Messaging
+1. User A → User B: Send "Hello"
+2. Expected:
+   - ✅ Instant on A's device (optimistic)
+   - ✅ Appears on B in < 1 second
+   - ✅ Blue bubble (A), gray bubble (B)
+   - ✅ Timestamps display correctly
+3. Force quit → Relaunch
+4. Expected: ✅ Message persists
 
-**Steps:**
-1. Launch app → Should land on login screen
-2. Tap "Register"
-3. Enter: email, password, display name
-4. Tap "Register" → Should navigate to conversations list
-5. Force quit app
-6. Relaunch → Should auto-login
+### Group Messaging
+1. User A: Send "Test" in 3-user group
+2. Expected:
+   - ✅ All participants receive message
+   - ✅ "User A" shows above message for B & C
+   - ✅ No sender name on A's device
 
-**Expected:**
-- ✅ Registration succeeds, user doc created in Firestore
-- ✅ Session persists after force quit
-- ✅ No crashes or infinite loading
+### Conversations List
+1. User A: Create conversation with User B → Send message
+2. Go to "Chats" tab
+3. Expected:
+   - ✅ Conversation appears
+   - ✅ Last message preview shows
+   - ✅ Timestamp displays
+4. User B: Send message
+5. Expected: ✅ Conversation moves to top
 
----
-
-### Test 7.1.2: User Discovery (Direct Chat)
-
-**Setup:** 2 registered users
-
-**Steps:**
-1. User A: Tap "New Chat" → Enter User B's email → "Find User"
-2. Should show "✅ User found: [Display Name]"
-3. Tap "Create Chat" → Should open chat screen
-
-**Test invalid email:**
-1. Enter `nonexistent@example.com` → "Find User"
-2. Should show error, button stays disabled
-
-**Expected:**
-- ✅ Valid email found, displays name
-- ✅ Invalid email shows error
-- ✅ Conversation created in Firestore
-
----
-
-### Test 7.1.3: User Discovery (Group Chat)
-
-**Setup:** 3 registered users (A, B, C)
-
-**Steps:**
-1. User A: Toggle to "Group Chat"
-2. Add User B → Shows in list
-3. Add User C → Shows in list
-4. "Create Group" enabled → Tap it
-
-**Test mixed valid/invalid:**
-1. Enter invalid email → Error, not added
-2. Enter valid email → Added successfully
-
-**Expected:**
-- ✅ Both valid users added
-- ✅ Invalid emails rejected
-- ✅ Group created with 3 participants
-- ✅ Header shows "Group (3 members)"
-
----
-
-### Test 7.1.4: One-on-One Messaging
-
-**Setup:** User A and User B in a conversation
-
-**Steps:**
-1. User A: Send "Hello from A"
-2. Should appear instantly (optimistic update)
-3. User B: Should see in < 1 second
-4. User B: Send "Hi from B"
-5. User A: Should see in real-time
-6. Both force quit and relaunch
-7. Messages should persist
-
-**Expected:**
-- ✅ Instant optimistic updates
-- ✅ Real-time delivery (< 1 second)
-- ✅ Messages persist
-- ✅ Correct order (chronological)
-- ✅ Sent messages right-aligned (blue)
-- ✅ Received messages left-aligned (gray)
-
-**Check Firestore:**
-- ✅ `createdAt` is server timestamp (not client date)
-- ✅ `lastMessage` and `lastMessageAt` updated
-
----
-
-### Test 7.1.5: Group Messaging
-
-**Setup:** User A, B, C in a group
-
-**Steps:**
-1. User A: Send "Hello group!"
-2. User B and C: See with "User A" as sender name
-3. User B: Send "Hi everyone"
-4. User A and C: See with "User B" as sender name
-5. All force quit and relaunch
-6. Messages persist
-
-**Expected:**
-- ✅ All participants receive in real-time
-- ✅ Sender names correct (others' messages only)
-- ✅ Own messages don't show sender name
-- ✅ Messages persist
-- ✅ Header shows participant count
-
----
-
-### Test 7.1.6: Conversation List Updates
-
-**Setup:** User A with multiple conversations
-
-**Steps:**
-1. Create conversation with User B (send 1 message)
-2. Create conversation with User C (send 1 message)
-3. Go to "Chats" tab → Both listed
-4. User B sends new message
-5. Conversation with User B moves to top
-6. Last message preview updates
-
-**Expected:**
-- ✅ Sorted by `lastMessageAt` (most recent first)
-- ✅ Last message preview updates in real-time
-- ✅ New message brings conversation to top
+✅ **Checkpoint:** All core flows work end-to-end
 
 ---
 
 ## Task 7.2: Offline & Network Testing
 
-### Purpose
-Verify the app handles network issues gracefully.
-
----
-
-### Test 7.2.1: Send Message While Offline
-
-**Steps:**
+### Send Message Offline
 1. User A: Enable airplane mode
-2. "Offline" banner appears
-3. Send message "Offline message"
-4. Shows "queued" or "sending" status
+2. Expected: ✅ "⚠️ Offline" banner appears
+3. Send "Offline test"
+4. Expected: ✅ Message shows "queued" or "sending"
 5. Disable airplane mode
-6. Status changes to "sent"
-7. User B receives message
+6. Expected: ✅ Message syncs, User B receives it
 
-**Expected:**
-- ✅ Offline banner appears
-- ✅ Message persists locally
-- ✅ Syncs after reconnect
-- ✅ No crashes
-
----
-
-### Test 7.2.2: Receive Messages While Offline
-
-**Steps:**
-1. User A: Enable airplane mode
+### Receive Messages While Offline
+1. User A: Airplane mode ON
 2. User B: Send "You're offline"
-3. User A: Doesn't see yet
-4. User A: Disable airplane mode
-5. Message appears immediately
+3. User A: Disable airplane mode
+4. Expected: ✅ Message appears immediately
 
-**Expected:**
-- ✅ Messages don't appear while offline
-- ✅ Appear instantly after reconnect
-- ✅ Order preserved
+### Network Banner
+1. Toggle airplane mode ON/OFF
+2. Expected: ✅ Banner shows/hides correctly
 
----
-
-### Test 7.2.3: Network State Banner
-
-**Steps:**
-1. Enable airplane mode → Banner appears
-2. Disable airplane mode → Banner disappears
-
-**Expected:**
-- ✅ Banner shows/hides correctly
-- ✅ Doesn't block UI
+✅ **Checkpoint:** Offline behavior works correctly
 
 ---
 
 ## Task 7.3: Real-Time Features Testing
 
-### Purpose
-Verify Phase 5 features work correctly.
-
----
-
-### Test 7.3.1: Typing Indicators
-
-**Direct Chat:**
+### Typing Indicators
 1. User B: Start typing (don't send)
-2. User A: See "User B is typing..."
-3. User B: Stop typing 500ms → Disappears
-4. User B: Type and send → Disappears immediately
+2. User A: Expected ✅ "User B is typing..."
+3. User B: Stop for 500ms
+4. User A: Expected ✅ Indicator disappears
+5. User B: Type + send immediately
+6. User A: Expected ✅ Indicator clears on send
 
-**Group Chat:**
-1. User B and C: Both type
-2. User A: See "2 people are typing..."
+### Online/Offline Status
+1. User B: App in foreground
+2. User A: Open chat with B
+3. Expected: ✅ Header shows "Online" or green dot
+4. User B: Put app in background
+5. User A: Expected ✅ "Last seen just now"
+6. Wait 1 minute
+7. User A: Expected ✅ "Last seen 1m ago"
 
-**Expected:**
-- ✅ Appears when other user types
-- ✅ Disappears after 500ms inactivity
-- ✅ Disappears on send
-- ✅ Multiple users shown correctly
-
----
-
-### Test 7.3.2: Online/Offline Status
-
-**Steps:**
-1. User B: App open (foreground)
-2. User A: Open chat → Shows "Online" or green dot
-3. User B: Put in background
-4. User A: Status changes to "Last seen just now"
-5. Wait 1 minute → "Last seen 1m ago"
-
-**Expected:**
-- ✅ Online status when active
-- ✅ Offline status when backgrounded
-- ✅ "Last seen" timestamp updates
-- ✅ Human-readable format ("2m ago", "5h ago")
-
----
-
-### Test 7.3.3: Read Receipts (Direct Chat)
-
-**Steps:**
-1. User A: Send "Read receipt test"
-2. Shows single checkmark ✓ (sent)
+### Read Receipts (Direct)
+1. User A: Send message
+2. Expected: ✅ Single checkmark ✓
 3. User B: Open conversation
-4. User A: Checkmark changes to ✓✓ (read)
+4. User A: Expected ✅ Double checkmark ✓✓
 
-**Expected:**
-- ✅ Single checkmark when sent
-- ✅ Double checkmark when read
-- ✅ Only sender sees checkmarks
+### Read Receipts (Group)
+1. User A: Send message in 3-user group
+2. Expected: ✅ Single ✓
+3. Users B & C: Open conversation
+4. User A: Expected ✅ Double ✓✓
 
----
-
-### Test 7.3.4: Read Receipts (Group Chat)
-
-**Steps:**
-1. User A: Send "Group read test" → Shows ✓
-2. User B: Open conversation → Updates
-3. User C: Open conversation → Shows ✓✓ (all read)
-
-**Expected:**
-- ✅ Single checkmark initially
-- ✅ Double checkmark when all read
-
-**Note:** Simple ✓/✓✓ only. Detailed "Read by Alice, Bob" is Post-MVP.
+✅ **Checkpoint:** Real-time features functional
 
 ---
 
 ## Task 7.4: Edge Cases & Stress Testing
 
-### Purpose
-Test uncommon scenarios users might encounter.
+### Rapid Message Sending
+1. User A: Send 20 messages rapidly
+2. Expected:
+   - ✅ All messages appear
+   - ✅ Correct chronological order
+   - ✅ No crashes
 
----
+### Long Messages
+1. Send 500-character message
+2. Expected: ✅ Text wraps in bubble
 
-### Test 7.4.1: Rapid Message Sending
+### 100+ Messages
+1. Send 110 messages in conversation
+2. Open conversation
+3. Expected: ✅ Last 100 load (pagination is Post-MVP)
 
-**Steps:**
-1. User A: Send 20 messages rapidly (10 seconds)
-2. All appear in correct order
-3. User B: Receives all 20 in order
-
-**Expected:**
-- ✅ No messages lost
-- ✅ Order preserved
-- ✅ No crashes
-- ✅ Optimistic updates work
-
----
-
-### Test 7.4.2: Long Messages
-
-**Steps:**
-1. User A: Send 500-character message
-2. Displays correctly (wrapped text)
-3. User B: Receives full message
-
-**Expected:**
-- ✅ Text wraps properly in bubble
-- ✅ No truncation
-- ✅ Input handles multiline (max 1000 chars)
-
----
-
-### Test 7.4.3: Empty Conversation List
-
-**Steps:**
-1. Register new user
-2. Go to "Chats" tab
-
-**Expected:**
-- ✅ Empty state message displayed (not blank screen)
-- ✅ No crashes
-
----
-
-### Test 7.4.4: Conversation with 100+ Messages
-
-**Steps:**
-1. Send 110 messages between User A and B
-2. Open conversation → Last 100 load
-
-**Expected:**
-- ✅ Last 100 messages load
-- ✅ Performance acceptable (no lag)
-- ✅ Correct order
-
----
-
-### Test 7.4.5: Rapid Screen Navigation
-
-**Steps:**
-1. User A: Tap conversation → back → different conversation
+### Rapid Navigation
+1. Tap conversation → back → different conversation
 2. Repeat 10 times rapidly
+3. Expected: ✅ No crashes, no memory leak warnings
 
-**Expected:**
-- ✅ No crashes
-- ✅ No "memory leak" warnings
-- ✅ Each conversation loads correctly
+### Force Quit During Send
+1. Airplane mode ON → Send message → Force quit
+2. Disable airplane mode → Relaunch
+3. Expected: ✅ Message syncs via Firestore offline cache
 
-**Critical:** All Firestore listeners must have cleanup (`return unsubscribe;`)
-
----
-
-### Test 7.4.6: App Force Quit During Message Send
-
-**Steps:**
-1. User A: Enable airplane mode
-2. Send "Force quit test" → Shows "queued"
-3. Force quit app
-4. Disable airplane mode → Relaunch app
-5. Open conversation → Message still there
-
-**Expected:**
-- ✅ Message persists locally
-- ✅ Syncs after relaunch + reconnect
+✅ **Checkpoint:** Edge cases handled gracefully
 
 ---
 
 ## Task 7.5: Multi-User Testing
 
-### Purpose
-Test with 2-3 simultaneous users.
+### Three-User Group
+**Setup:** 3 devices/emulators
 
----
+1. All users open group chat
+2. User A, B, C: Each send message
+3. Expected: ✅ All see all messages with correct sender names
 
-### Test 7.5.1: Three-User Group Chat
+### Simultaneous Sending
+1. User A & B: Both send at exact same time
+2. Expected: ✅ Both messages appear, consistent order
 
-**Steps:**
-1. All three users open group chat
-2. Each user sends a message
-3. All see all messages in real-time
-
-**Expected:**
-- ✅ All messages appear on all devices
-- ✅ Sender names correct
-- ✅ Order consistent across devices
-
----
-
-### Test 7.5.2: Simultaneous Sends
-
-**Steps:**
-1. User A and B: Send at exact same time
-2. Both messages appear
-
-**Expected:**
-- ✅ No messages lost
-- ✅ Order consistent (server timestamp)
+✅ **Checkpoint:** Multi-user scenarios work
 
 ---
 
 ## Task 7.6: Notification Testing
 
-### Purpose
-Verify Phase 6 notifications work correctly.
+### Permission Request
+1. Fresh install → Launch app
+2. Expected: ✅ Permission dialog appears
+
+### Notification Appears
+1. User A: Put app in background
+2. User B: Send "Test notification"
+3. Expected:
+   - ✅ Notification appears
+   - ✅ Shows "User B" + message
+   - ✅ Sound plays
+
+### Notification Tap
+1. User A: Tap notification
+2. Expected: ✅ Opens chat with User B
+
+### No Self-Notification
+1. User A: Send message
+2. Expected: ✅ NO notification on A's device
+
+✅ **Checkpoint:** Notifications work
 
 ---
 
-**Run the complete Phase 6 smoke test:**
+## Task 7.7: Bug Fixing Checklist
 
+### Critical Fixes
+
+**1. Memory Leaks**
 ```bash
-# Reference: /docs/PHASE_6_SMOKE_TEST.md
+grep -r "onSnapshot" app/ components/
 ```
-
-**Quick summary:**
-1. ✅ Permission request on first launch
-2. ✅ Notifications appear when app is backgrounded
-3. ✅ Tapping notification navigates to conversation
-4. ✅ No notification for own messages
-5. ✅ No notification when app is in foreground
-6. ✅ Group chat notifications work
-7. ✅ Long messages truncated
-
-**If all 7 tests pass, Task 7.6 is complete.**
-
-**Note:** Our implementation shows notifications **only when app is backgrounded** (not when on different screens). This is intentional for MVP.
-
----
-
-## Task 7.7: Platform-Specific Testing
-
-### Purpose
-Test on both Android and iOS.
-
----
-
-### Android Emulator
-
-**Steps:**
-1. `npx expo start --android`
-2. Run Tests 7.1-7.6
-
-**Check:**
-- ✅ KeyboardAvoidingView works
-- ✅ Notification channel created
-- ✅ Back button behavior works
-
----
-
-### iOS Simulator (macOS Only)
-
-**Steps:**
-1. `npx expo start --ios`
-2. Run Tests 7.1-7.6
-
-**Check:**
-- ✅ KeyboardAvoidingView works
-- ✅ Safe areas respected
-- ✅ Status bar doesn't overlap
-
----
-
-## Task 7.8: Bug Fixing Checklist
-
-### Purpose
-Fix common issues before final verification.
-
----
-
-### 1. Memory Leaks
-
-**Check all Firestore listeners have cleanup:**
-
-```bash
-grep -r "onSnapshot" app/
-```
-
-**For each `onSnapshot`:**
-```typescript
-useEffect(() => {
-  const unsubscribe = onSnapshot(/*...*/);
-  return unsubscribe;  // MUST BE PRESENT
-}, []);
-```
+**Verify each has:** `return unsubscribe;`
 
 **Files to check:**
 - `app/chat/[id].tsx` (messages, typing, conversation, presence)
 - `app/(tabs)/index.tsx` (conversations list)
-- `app/_layout.tsx` (notification listeners)
 
----
-
-### 2. Server Timestamps
-
-**Check for client-side Date():**
-
+**2. Server Timestamps**
 ```bash
 grep -r "new Date()" app/ services/
 ```
-
 **Rule:** All Firestore timestamps MUST use `serverTimestamp()`
 
-```typescript
-// ✅ Correct
-createdAt: serverTimestamp()
+**3. Console Errors**
+Run app → Check Metro terminal for red errors → Fix all
 
-// ❌ Wrong - breaks ordering
-createdAt: new Date()
-```
-
----
-
-### 3. Console Errors
-
-**Steps:**
-1. Open Metro bundler terminal
-2. Run through all core flows
-3. Fix all red errors
-
-Common issues:
-- Missing dependencies in `useEffect`
-- Accessing undefined properties
-- Type errors
-
----
-
-### 4. Linter & TypeScript
-
-**Run validation:**
-
+**4. Linter Warnings**
 ```bash
-npm run validate
+npm run lint
 ```
+Fix all errors/warnings
 
-**Fix all errors before proceeding.**
+**5. TypeScript Errors**
+```bash
+npm run type-check
+```
+Fix all type errors
 
----
-
-### 5. Verify Empty/Loading States Exist
-
-**Check these are present:**
-- Conversations list empty state
-- Login/Register loading indicators
-- Message list initial load indicator
-- User lookup "Finding user..." state
-
-**Note:** Don't add new ones, just verify existing ones work.
+✅ **Checkpoint:** No errors or warnings
 
 ---
 
-### 6. Verify User-Friendly Error Messages
+## Task 7.8: Code Cleanup
 
-**Check these show friendly errors:**
-- Login fails: "Invalid email or password"
-- Register fails: "Email already in use"
-- User not found: "No user found with that email"
+### Remove Debug Code
+- Remove `console.log()` (except critical errors)
+- Remove commented-out code
+- Remove test/dummy data
+- Keep `console.error()` for real errors
 
-**Avoid raw Firebase errors like:** `"auth/user-not-found"`
+### Format Code
+```bash
+npm run format  # If prettier configured
+```
+Or manually ensure consistent indentation/quotes
 
----
-
-## Task 7.9: Code Cleanup
-
-### Purpose
-Clean up code for readability.
-
----
-
-### Cleanup Checklist
-
-**Remove:**
-- Debug-only `console.log()` (e.g., "TESTING 123")
-- Commented-out code blocks
-- Test/dummy data
-- Unused imports
-
-**Keep:**
-- `console.error()` for real errors
-- `console.warn()` for important warnings
-- `console.log()` with emoji prefixes (helpful for debugging)
-
-**Fix:**
+### Remove Unused Imports
 ```bash
 npm run lint -- --fix
 ```
 
-**Check for `any` types:**
+### Replace `any` Types
 ```bash
-grep -r ": any" app/ components/ services/ store/
+grep -r ": any" app/ components/ services/
 ```
+Replace with specific types/interfaces
 
-Replace with specific types where possible.
-
----
-
-## Task 7.10: Documentation
-
-### Purpose
-Update documentation for deployment.
+✅ **Checkpoint:** Code is clean and professional
 
 ---
 
-### 1. Update README.md
+## Task 7.9: Documentation
 
-Create or update with:
+### Update README.md
 
 ```markdown
 # MessageAI MVP
 
-Real-time messaging app built with React Native (Expo) + Firebase.
+Production-quality messaging app built with React Native (Expo) + Firebase.
 
 ## Features
-
-- ✅ User authentication (email/password)
-- ✅ One-on-one messaging
-- ✅ Group chat (3+ users)
-- ✅ Real-time message delivery
-- ✅ Typing indicators
-- ✅ Online/offline status
-- ✅ Read receipts
-- ✅ Local notifications
-- ✅ Offline support
-
-## Tech Stack
-
-- **Frontend:** React Native (Expo SDK 54)
-- **Backend:** Firebase (Auth + Firestore)
-- **State:** Zustand + AsyncStorage
-- **Navigation:** Expo Router
+- User authentication (email/password)
+- One-on-one & group messaging
+- Real-time delivery
+- Typing indicators, online status, read receipts
+- Local notifications
+- Offline support
 
 ## Setup
+1. Clone repo: `git clone <url>`
+2. Install: `npm install`
+3. Configure Firebase:
+   - Create project at console.firebase.google.com
+   - Enable Email/Password auth
+   - Create Firestore (test mode)
+   - Copy config to `.env`:
+     ```
+     EXPO_PUBLIC_FIREBASE_API_KEY=...
+     EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+     EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
+     EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+     EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+     EXPO_PUBLIC_FIREBASE_APP_ID=...
+     ```
+4. Deploy Firestore rules (see below)
+5. Run: `npx expo start`
 
-### Prerequisites
-
-- Node.js 20.19.4+
-- Expo CLI
-- Firebase account
-
-### Installation
-
-\`\`\`bash
-git clone <repo>
-cd message-ai
-npm install
-\`\`\`
-
-### Configure Firebase
-
-1. Create Firebase project
-2. Enable Email/Password auth
-3. Create Firestore database
-4. Copy config to `.env`:
-
-\`\`\`
-EXPO_PUBLIC_FIREBASE_API_KEY=your_key
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your_domain
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=your_id
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your_bucket
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
-\`\`\`
-
-### Deploy Firestore Rules
-
-See `firestore.rules` → Deploy via Firebase Console
-
-### Run
-
-\`\`\`bash
-npx expo start
-\`\`\`
+## Firestore Security Rules
+```javascript
+// Firebase Console → Firestore → Rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /conversations/{conversationId} {
+      allow read: if request.auth.uid in resource.data.participants;
+      allow create: if request.auth != null;
+      allow update: if request.auth.uid in resource.data.participants;
+    }
+    match /conversations/{conversationId}/messages/{messageId} {
+      allow read: if request.auth.uid in resource.data.participants;
+      allow create: if request.auth != null && request.auth.uid in request.resource.data.participants;
+    }
+    match /conversations/{conversationId}/typingUsers/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+    }
+  }
+}
+```
 
 ## Testing
+- Tests: `npm test`
+- Lint: `npm run lint`
+- Type-check: `npm run type-check`
 
-\`\`\`bash
-npm run validate  # Lint + type-check + tests
-npm test          # Run tests only
-\`\`\`
-
-## Known MVP Limitations
-
-- Local notifications only (requires background app)
+## Known Limitations (MVP)
+- Local notifications only (no background push)
+- Last 100 messages (no infinite scroll)
 - No message editing/deletion
-- No media uploads (text-only)
-- Last 100 messages per conversation
+- No media uploads
 
 ## License
-
 MIT
 ```
 
----
-
-### 2. Create .env.example
+### Create .env.example
 
 ```
 EXPO_PUBLIC_FIREBASE_API_KEY=your_api_key_here
@@ -761,185 +381,123 @@ EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
 ```
 
----
-
-### 3. Create/Verify firestore.rules
-
-**File:** `/firestore.rules`
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Users: read all, write own
-    match /users/{uid} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid;
-    }
-    
-    // Conversations: participants only
-    match /conversations/{conversationId} {
-      allow read: if request.auth.uid in resource.data.participants;
-      allow create: if request.auth != null;
-      allow update: if request.auth.uid in resource.data.participants;
-    }
-    
-    // Messages: check denormalized participants
-    match /conversations/{conversationId}/messages/{messageId} {
-      allow read: if request.auth.uid in resource.data.participants;
-      allow create: if request.auth != null && 
-                      request.auth.uid in request.resource.data.participants;
-    }
-    
-    // Typing indicators
-    match /conversations/{conversationId}/typingUsers/{userId} {
-      allow read, write: if request.auth != null && 
-                           request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
-    }
-  }
-}
-```
-
-**Deploy:**
-1. Firebase Console → Firestore → Rules
-2. Paste rules above
-3. Click "Publish"
-
-**Note:** Only deploy when ready. Keep test mode during development.
+✅ **Checkpoint:** Documentation complete
 
 ---
 
-## Task 7.11: Final Verification
+## Task 7.10: Final Verification
 
-### Purpose
-Last comprehensive check before declaring MVP complete.
+### Must-Have Features
+- [ ] ✅ User registration
+- [ ] ✅ User login
+- [ ] ✅ Session persistence
+- [ ] ✅ Email-based user discovery
+- [ ] ✅ Create 1-on-1 chat
+- [ ] ✅ Create group chat
+- [ ] ✅ Send/receive messages in real-time
+- [ ] ✅ Message persistence
+- [ ] ✅ Optimistic UI updates
+- [ ] ✅ Offline queuing
+- [ ] ✅ Last 100 messages load
 
----
+### Should-Have Features
+- [ ] ✅ Typing indicators
+- [ ] ✅ Online/offline status
+- [ ] ✅ Read receipts
+- [ ] ✅ Network detection
+- [ ] ✅ Local notifications
 
-### Final Checklist
-
-#### Must-Have Features (All Must Work)
-
-- [ ] ✅ User can register
-- [ ] ✅ User can login
-- [ ] ✅ Session persists after restart
-- [ ] ✅ Can find users by email
-- [ ] ✅ Can create 1-on-1 chat
-- [ ] ✅ Can create group chat (2+ users)
-- [ ] ✅ Can send message in direct chat
-- [ ] ✅ Can send message in group chat
-- [ ] ✅ Messages appear in real-time (< 1 second)
-- [ ] ✅ Messages persist across restarts
-- [ ] ✅ Optimistic UI updates work
-- [ ] ✅ Offline queuing works
-- [ ] ✅ Last 100 messages load per conversation
-
-#### Should-Have Features (Important)
-
-- [ ] ✅ Typing indicators work
-- [ ] ✅ Online/offline status works
-- [ ] ✅ "Last seen" timestamps show
-- [ ] ✅ Read receipts work (✓/✓✓)
-- [ ] ✅ Network detection (offline banner)
-- [ ] ✅ Local notifications appear
-- [ ] ✅ Tapping notification navigates correctly
-
-#### Technical Requirements
-
-- [ ] ✅ No memory leaks (all listeners cleaned up)
+### Technical Requirements
+- [ ] ✅ No memory leaks
 - [ ] ✅ No crashes
-- [ ] ✅ All Firestore timestamps use `serverTimestamp()`
-- [ ] ✅ All error states handled
+- [ ] ✅ All listeners cleaned up
+- [ ] ✅ Server timestamps used
+- [ ] ✅ Works on Android emulator
+- [ ] ✅ Works on iOS simulator (if macOS)
 - [ ] ✅ No console errors
-- [ ] ✅ `npm run validate` passes
-- [ ] ✅ Works on Android
-- [ ] ✅ Works on iOS (if macOS available)
+- [ ] ✅ `npm run lint` passes
+- [ ] ✅ `npm run type-check` passes
+- [ ] ✅ `npm test` passes
 
-#### Documentation
-
-- [ ] ✅ `README.md` updated
+### Documentation
+- [ ] ✅ README.md updated
 - [ ] ✅ `.env.example` created
-- [ ] ✅ `firestore.rules` ready to deploy
+- [ ] ✅ Firestore rules deployed
+- [ ] ✅ Git repository clean
 - [ ] ✅ `.gitignore` includes `.env`
-- [ ] ✅ No sensitive data in git
+
+✅ **Checkpoint:** ALL checklists 100% complete
 
 ---
 
-## Common Issues & Solutions
+## Common Troubleshooting
 
 ### App Crashes on Navigation
-**Cause:** Memory leak from unsubscribed listeners  
-**Fix:** Check all `useEffect` with `onSnapshot` have `return unsubscribe;`
+**Fix:** Check all `onSnapshot` have `return unsubscribe;`
 
 ### Messages Out of Order
-**Cause:** Client timestamps  
-**Fix:** Replace all `new Date()` with `serverTimestamp()`
+**Fix:** Use `serverTimestamp()` not `new Date()`
 
 ### Offline Messages Don't Sync
-**Cause:** Firestore persistence not configured  
-**Fix:** Check `firebase.config.ts` has offline persistence enabled
+**Fix:** Verify Firestore offline persistence enabled in `firebase.config.ts`
 
 ### Notifications Don't Appear
-**Cause:** Permissions denied or handler not configured  
-**Fix:** Verify notification setup in `app/_layout.tsx`
+**Fix:** Check permissions, notification handler configured, Android channel created
+
+### TypeScript/Linter Errors
+```bash
+npm run type-check  # See specific errors
+npm run lint        # Auto-fix many issues
+```
 
 ---
 
-## Summary
+## Before Deployment
 
-**Phase 7 Complete When:**
-
-- ✅ All core flows tested and working
-- ✅ All edge cases handled
-- ✅ Real-time features functional
-- ✅ Notifications working
-- ✅ Multi-user testing passed
-- ✅ Platform testing passed
-- ✅ All bugs fixed
-- ✅ Code cleaned up
-- ✅ Documentation complete
-- ✅ Final verification 100% complete
-
-**Time Investment:** 4-6 hours  
-**Output:** Production-ready MVP
-
----
-
-## Commit & Deploy
-
-### Commit Your Work
-
+1. Run through all test scenarios
+2. Verify all checklists complete
+3. Final commit:
 ```bash
 git add .
-git commit -m "feat: complete Phase 7 - testing, bug fixes, and polish
+git commit -m "feat: complete Phase 7 - testing, bug fixes, and final polish
 
-Phase 7 Deliverables:
-- ✅ Comprehensive testing (all core flows, edge cases, multi-user)
-- ✅ Platform testing (Android + iOS)
-- ✅ Bug fixes (memory leaks, timestamps, error handling)
-- ✅ Code cleanup (removed debug code, fixed linter/type errors)
+- ✅ Comprehensive end-to-end testing
+- ✅ Edge case & stress testing
+- ✅ Multi-user testing (2-3 users)
+- ✅ Bug fixes (memory leaks, timestamps, errors)
+- ✅ Code cleanup (removed console.logs, fixed linter/type errors)
 - ✅ Documentation (README, .env.example, Firestore rules)
-- ✅ Final verification complete
+- ✅ All verification checklists complete
 
 MVP Status: READY FOR DEPLOYMENT"
 ```
 
-### Update Progress Tracker
-
-Check off Phase 7 in `/docs/PROGRESS_TRACKER.md`
+4. Update `docs/PROGRESS_TRACKER.md` - check off Phase 7
 
 ---
 
 ## Congratulations! 🎉
 
-**Your MVP is complete:**
+**Your MVP is complete!**
 
-- ✅ Production-quality messaging app
-- ✅ Real-time sync with Firebase
-- ✅ Offline support
-- ✅ Typing indicators, presence, read receipts
-- ✅ Local notifications
-- ✅ Thoroughly tested
-- ✅ Fully documented
+### What You Built
+- Production-quality messaging app
+- User authentication
+- One-on-one & group messaging
+- Real-time sync with Firebase
+- Typing indicators, presence, read receipts
+- Local notifications
+- Offline support
+- Tested across platforms
 
-**Ready to demo and deploy!** 🚀
+### Next Steps (Post-MVP)
+- Deploy to TestFlight/Google Play (internal testing)
+- Add background push notifications (FCM)
+- Implement infinite scroll pagination
+- Add message editing/deletion
+- Add media uploads
+- Implement username system
+
+**Time:** 3-5 hours | **Total MVP:** ~22 hours
+
+**Ready to ship! 🚀**
