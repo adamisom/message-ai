@@ -22,26 +22,8 @@ import TypingIndicator from '../../components/TypingIndicator';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
 import { useAuthStore } from '../../store/authStore';
-import { MESSAGE_LIMIT, MESSAGE_TIMEOUT_MS } from '../../utils/constants';
-
-interface Message {
-  id: string;
-  text: string;
-  senderId: string;
-  senderName: string;
-  createdAt: Date | { toDate: () => Date } | null;
-  participants: string[];
-  status?: 'sending' | 'sent' | 'failed' | 'queued';
-}
-
-interface Conversation {
-  id: string;
-  type: 'direct' | 'group';
-  name?: string;
-  participants: string[];
-  participantDetails: Record<string, { displayName: string; email: string }>;
-  lastRead?: Record<string, string>; // Phase 5: uid -> messageId for read receipts
-}
+import { Message, Conversation, TypingUser, UserStatusInfo } from '../../types';
+import { MESSAGE_LIMIT, MESSAGE_TIMEOUT_MS, TYPING_DEBOUNCE_MS } from '../../utils/constants';
 
 export default function ChatScreen() {
   const { id: conversationId } = useLocalSearchParams();
@@ -54,11 +36,11 @@ export default function ChatScreen() {
   const [isOnline, setIsOnline] = useState(true);
   
   // Phase 5: Typing indicators
-  const [typingUsers, setTypingUsers] = useState<{ uid: string; displayName: string; at: any }[]>([]);
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const lastTypingWriteRef = useRef<number>(0);
   
   // Phase 5: Online status tracking
-  const [userStatuses, setUserStatuses] = useState<Record<string, { isOnline: boolean; lastSeenAt: any }>>({});
+  const [userStatuses, setUserStatuses] = useState<Record<string, UserStatusInfo>>({});
   
   // Phase 5: Read receipts tracking
   const lastMarkedReadRef = useRef<string | null>(null);
@@ -226,7 +208,7 @@ export default function ChatScreen() {
     const unsubscribe = onSnapshot(typingRef, (snapshot) => {
       const typing = snapshot.docs
         .map(doc => ({ uid: doc.id, ...doc.data() }))
-        .filter(t => t.uid !== user.uid) as { uid: string; displayName: string; at: any }[];
+        .filter(t => t.uid !== user.uid) as TypingUser[];
       
       console.log('⌨️ [ChatScreen] Typing users:', typing.length);
       setTypingUsers(typing);
@@ -354,9 +336,9 @@ export default function ChatScreen() {
   const handleTyping = async () => {
     if (!conversationId || typeof conversationId !== 'string' || !user) return;
     
-    // Debounce: only write if 500ms has passed since last write
+    // Debounce: only write if TYPING_DEBOUNCE_MS has passed since last write
     const now = Date.now();
-    if (lastTypingWriteRef.current && now - lastTypingWriteRef.current < 500) {
+    if (lastTypingWriteRef.current && now - lastTypingWriteRef.current < TYPING_DEBOUNCE_MS) {
       return;  // Skip write, too soon since last write
     }
     

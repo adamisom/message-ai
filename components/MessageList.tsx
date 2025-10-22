@@ -1,16 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { FlatList, StyleSheet } from 'react-native';
+import { Message } from '../types';
 import MessageBubble from './MessageBubble';
-
-interface Message {
-  id: string;
-  text: string;
-  senderId: string;
-  senderName: string;
-  createdAt: Date | { toDate: () => Date } | null;
-  participants: string[];
-  status?: 'sending' | 'sent' | 'failed' | 'queued';
-}
 
 interface MessageListProps {
   messages: Message[];

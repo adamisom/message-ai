@@ -1,23 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Conversation, UserStatusInfo } from '../types';
 import { getConversationName } from '../utils/conversationHelpers';
 import { formatConversationTime } from '../utils/timeFormat';
 import UserStatusBadge from './UserStatusBadge';
 
-interface Conversation {
-  id: string;
-  type: 'direct' | 'group';
-  name?: string;
-  participants: string[];
-  participantDetails: Record<string, { displayName: string; email: string }>;
-  lastMessageAt: any;
-  lastMessage: string | null;
-}
-
 interface ConversationItemProps {
   conversation: Conversation;
   currentUserId: string;
-  userStatuses?: Record<string, { isOnline: boolean; lastSeenAt: any }>;
+  userStatuses?: Record<string, UserStatusInfo>;
   onPress: () => void;
 }
 

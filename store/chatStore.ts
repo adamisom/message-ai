@@ -1,16 +1,5 @@
 import { create } from 'zustand';
-
-interface Conversation {
-  id: string;
-  type: 'direct' | 'group';
-  name?: string;
-  participants: string[];
-  participantDetails: Record<string, { displayName: string; email: string }>;
-  lastMessageAt: any;
-  lastMessage: string | null;
-  lastRead?: Record<string, string>;
-  createdAt: any;
-}
+import { Conversation } from '../types';
 
 interface ChatState {
   conversations: Conversation[];

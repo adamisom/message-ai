@@ -1,10 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-
-interface TypingUser {
-  uid: string;
-  displayName: string;
-  at: any;
-}
+import { TypingUser } from '../types';
 
 interface TypingIndicatorProps {
   typingUsers: TypingUser[];

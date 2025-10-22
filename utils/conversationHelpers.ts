@@ -4,13 +4,7 @@
  * These are extracted to enable unit testing
  */
 
-interface Conversation {
-  id: string;
-  type: 'direct' | 'group';
-  name?: string;
-  participants: string[];
-  participantDetails: Record<string, { displayName: string; email: string }>;
-}
+import { Conversation } from '../types';
 
 /**
  * Get display name for a conversation

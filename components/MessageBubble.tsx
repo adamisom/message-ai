@@ -1,14 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { Message } from '../types';
 import { formatMessageTime } from '../utils/timeFormat';
-
-interface Message {
-  id: string;
-  text: string;
-  senderId: string;
-  senderName: string;
-  createdAt: Date | { toDate: () => Date } | null;
-  status?: 'sending' | 'sent' | 'failed' | 'queued';
-}
 
 interface MessageBubbleProps {
   message: Message;

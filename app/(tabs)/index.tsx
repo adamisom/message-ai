@@ -7,6 +7,7 @@ import { db } from '../../firebase.config';
 import { logoutUser } from '../../services/authService';
 import { useAuthStore } from '../../store/authStore';
 import { useChatStore } from '../../store/chatStore';
+import { UserStatusInfo } from '../../types';
 
 export default function ConversationsList() {
   const { user, logout } = useAuthStore();
@@ -14,7 +15,7 @@ export default function ConversationsList() {
   const router = useRouter();
   
   // Phase 5: Track online statuses for all conversation participants
-  const [userStatuses, setUserStatuses] = useState<Record<string, { isOnline: boolean; lastSeenAt: any }>>({});
+  const [userStatuses, setUserStatuses] = useState<Record<string, UserStatusInfo>>({});
 
   console.log('📋 [ConversationsList] Rendering with', conversations.length, 'conversations');
 
