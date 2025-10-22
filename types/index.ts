@@ -26,6 +26,7 @@ export interface Conversation {
   lastMessageAt?: any;
   lastMessage?: string | null;
   lastRead?: Record<string, string>; // Phase 5: uid -> messageId for read receipts
+  lastReadAt?: Record<string, any>; // Phase 5: uid -> timestamp for unread indicators
   createdAt?: any;
   creatorId?: string;
 }

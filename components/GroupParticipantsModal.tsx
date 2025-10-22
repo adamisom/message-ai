@@ -10,14 +10,23 @@ interface Participant {
 interface GroupParticipantsModalProps {
   visible: boolean;
   participants: Participant[];
+  currentUserId: string; // NEW: to identify current user
   onClose: () => void;
 }
 
 export default function GroupParticipantsModal({
   visible,
   participants,
+  currentUserId,
   onClose
 }: GroupParticipantsModalProps) {
+  // Sort participants: current user first, then others alphabetically
+  const sortedParticipants = [...participants].sort((a, b) => {
+    if (a.uid === currentUserId) return -1;
+    if (b.uid === currentUserId) return 1;
+    return a.displayName.localeCompare(b.displayName);
+  });
+
   return (
     <Modal
       visible={visible}
@@ -39,19 +48,37 @@ export default function GroupParticipantsModal({
           </View>
 
           <ScrollView style={styles.list}>
-            {participants.map((participant) => (
-              <View key={participant.uid} style={styles.participantItem}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {participant.displayName.charAt(0).toUpperCase()}
-                  </Text>
+            {sortedParticipants.map((participant) => {
+              const isCurrentUser = participant.uid === currentUserId;
+              
+              return (
+                <View key={participant.uid} style={styles.participantItem}>
+                  <View style={[
+                    styles.avatar,
+                    isCurrentUser && styles.avatarCurrent
+                  ]}>
+                    <Text style={styles.avatarText}>
+                      {participant.displayName.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.participantInfo}>
+                    <Text style={[
+                      styles.participantName,
+                      isCurrentUser && styles.participantNameCurrent
+                    ]}>
+                      {participant.displayName}
+                      {isCurrentUser && ' (You)'}
+                    </Text>
+                    <Text style={[
+                      styles.participantEmail,
+                      isCurrentUser && styles.participantEmailCurrent
+                    ]}>
+                      {participant.email}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.participantInfo}>
-                  <Text style={styles.participantName}>{participant.displayName}</Text>
-                  <Text style={styles.participantEmail}>{participant.email}</Text>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </ScrollView>
         </View>
       </TouchableOpacity>
@@ -112,6 +139,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
+  avatarCurrent: {
+    backgroundColor: '#999',
+  },
   avatarText: {
     color: '#fff',
     fontSize: 18,
@@ -126,9 +156,15 @@ const styles = StyleSheet.create({
     color: '#000',
     marginBottom: 2,
   },
+  participantNameCurrent: {
+    color: '#999',
+  },
   participantEmail: {
     fontSize: 13,
     color: '#666',
+  },
+  participantEmailCurrent: {
+    color: '#999',
   },
 });
 

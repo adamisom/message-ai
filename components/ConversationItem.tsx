@@ -33,19 +33,60 @@ export default function ConversationItem({
 
   // Check if conversation has unread messages
   const hasUnread = () => {
+    console.log(`[ConversationItem] Checking unread for ${conversation.id}:`, {
+      hasLastMessageAt: !!conversation.lastMessageAt,
+      hasLastReadAt: !!conversation.lastReadAt,
+      hasLastRead: !!conversation.lastRead,
+      lastMessageAt: conversation.lastMessageAt,
+      lastReadAt: conversation.lastReadAt,
+      lastRead: conversation.lastRead,
+      currentUserId,
+    });
+
     // If no messages yet, not unread
-    if (!conversation.lastMessageAt) return false;
+    if (!conversation.lastMessageAt) {
+      console.log(`[ConversationItem] ${conversation.id}: No messages yet`);
+      return false;
+    }
     
-    // If no lastRead object at all, it's unread (new conversation or never implemented)
-    if (!conversation.lastRead) return true;
+    // If no lastReadAt tracking, fall back to checking lastRead existence
+    if (!conversation.lastReadAt) {
+      console.log(`[ConversationItem] ${conversation.id}: No lastReadAt, using legacy check`);
+      // Legacy check: if no lastRead object at all, it's unread
+      if (!conversation.lastRead) {
+        console.log(`[ConversationItem] ${conversation.id}: No lastRead object - UNREAD`);
+        return true;
+      }
+      // If user hasn't read any messages in this conversation, it's unread
+      const hasUserRead = !!conversation.lastRead[currentUserId];
+      console.log(`[ConversationItem] ${conversation.id}: User read status: ${hasUserRead}`);
+      return !hasUserRead;
+    }
     
-    // If user hasn't read any messages in this conversation, it's unread
-    const userLastRead = conversation.lastRead[currentUserId];
-    if (!userLastRead) return true;
+    // New logic: Compare timestamps
+    const userLastReadAt = conversation.lastReadAt[currentUserId];
+    if (!userLastReadAt) {
+      console.log(`[ConversationItem] ${conversation.id}: User never read - UNREAD`);
+      return true; // Never read
+    }
     
-    // If user has a lastRead entry, we assume they've read the conversation
-    // (The entry gets updated whenever they view the chat in ChatScreen)
-    return false;
+    // Compare: is lastMessageAt after lastReadAt?
+    const lastMessageTime = conversation.lastMessageAt.toMillis ? 
+      conversation.lastMessageAt.toMillis() : 
+      conversation.lastMessageAt.toDate().getTime();
+    
+    const lastReadTime = userLastReadAt.toMillis ? 
+      userLastReadAt.toMillis() : 
+      userLastReadAt.toDate().getTime();
+    
+    const isUnread = lastMessageTime > lastReadTime;
+    console.log(`[ConversationItem] ${conversation.id}: Timestamp comparison:`, {
+      lastMessageTime,
+      lastReadTime,
+      isUnread,
+    });
+    
+    return isUnread;
   };
 
   const isUnread = hasUnread();

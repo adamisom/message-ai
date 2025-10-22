@@ -290,6 +290,7 @@ export default function ChatScreen() {
       
       updateDoc(doc(db, 'conversations', conversationId), {
         [`lastRead.${user.uid}`]: lastMessage.id,
+        [`lastReadAt.${user.uid}`]: serverTimestamp(), // Add timestamp for comparison
       }).catch(error => {
         console.error('❌ [ChatScreen] Error updating last read:', error);
       });
@@ -356,6 +357,7 @@ export default function ChatScreen() {
       await updateDoc(doc(db, 'conversations', conversationId), {
         lastMessage: text.substring(0, 100),
         lastMessageAt: serverTimestamp(),
+        [`lastReadAt.${user.uid}`]: serverTimestamp(), // Mark as read by sender immediately
       });
 
       console.log('✅ [ChatScreen] Conversation lastMessage updated');
@@ -529,6 +531,7 @@ export default function ChatScreen() {
           displayName: details.displayName,
           email: details.email,
         }))}
+        currentUserId={user?.uid || ''}
         onClose={() => setShowParticipantsModal(false)}
       />
     </View>
