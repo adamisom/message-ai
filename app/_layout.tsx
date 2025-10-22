@@ -40,10 +40,12 @@ export default function RootLayout() {
       }
     });
 
-    // Set offline on unmount (app close)
+    // Set offline on unmount (app close or logout)
     return () => {
       console.log('🔌 [RootLayout] Cleaning up presence tracking');
       subscription.remove();
+      // Note: setUserOffline will check if user is still authenticated
+      // If user logged out, this will be skipped gracefully
       setUserOffline(user.uid);
     };
   }, [user]);

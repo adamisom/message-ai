@@ -13,9 +13,12 @@ jest.mock('firebase/firestore', () => ({
   serverTimestamp: jest.fn(() => 'MOCK_TIMESTAMP'),
 }));
 
-// Mock firebase config
+// Mock firebase config with auth
 jest.mock('../../firebase.config', () => ({
   db: {},
+  auth: {
+    currentUser: { uid: 'mock-user' }, // Mock authenticated user by default
+  },
 }));
 
 describe('presenceService', () => {
