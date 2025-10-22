@@ -15,8 +15,10 @@
 
 - Commit during substantial PR implementation work, before user review
 - Do NOT commit during user's PR review/approval phase unless they ask me to
-- Before each commit: run `npm run validate` (lint + type-check + test)
+- **Before each commit:** run `npm run validate` (lint + type-check + test)
 - If validation fails: fix issues, validate again, then commit fixes
+- **After commit:** Do NOT run validate again (linter may auto-fix imports, creating extra commits)
+- If linter auto-fixed files after commit, include those fixes in the next commit
 - Review changes and assess if high-value unit tests should be added
 - Write succinct, clear commit messages
 - Only commit when code is working and tests pass
