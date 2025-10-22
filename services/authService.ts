@@ -4,16 +4,16 @@
  */
 
 import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut,
 } from 'firebase/auth';
 import {
-  doc,
-  setDoc,
-  getDoc,
-  serverTimestamp,
-  updateDoc,
+    doc,
+    getDoc,
+    serverTimestamp,
+    setDoc,
+    updateDoc,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase.config';
 
