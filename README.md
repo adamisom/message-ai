@@ -22,6 +22,8 @@ Real-time messaging app built with React Native (Expo) and Firebase.
 
 ## Quick Start
 
+> **New to this stack?** See [`/docs/DEVELOPER_SETUP.md`](/docs/DEVELOPER_SETUP.md) for comprehensive setup guide including emulator configuration and troubleshooting.
+
 ### 1. Install Dependencies
 
 ```bash
@@ -79,11 +81,11 @@ docs/         # Documentation and phase guides
 
 ## Documentation
 
-- **Setup:** `/docs/PHASE_0_SETUP.md`
+- **New Developer Setup:** [`/docs/DEVELOPER_SETUP.md`](/docs/DEVELOPER_SETUP.md)
 - **Architecture:** `/docs/architecture.md`
-- **Testing:** `/docs/MULTI_DEVICE_TESTING.md`
-- **Phase Guides:** `/docs/PHASE_1_*.md` through `/docs/PHASE_7_*.md`
-- **Post-MVP:** `/docs/POST_MVP.md`
+- **Manual Testing:** `/docs/MULTI_DEVICE_TESTING.md`
+- **Phase Guides:** `/docs/PHASE_0_*.md` through `/docs/PHASE_7_*.md`
+- **Post-MVP Work:** `/docs/POST_MVP.md`
 
 ## Known Limitations (MVP)
 
