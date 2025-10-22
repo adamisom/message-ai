@@ -65,8 +65,9 @@ export default function ChatScreen() {
           title = conversation.participantDetails[otherUserId].displayName;
         }
       } else {
-        // Group chat
-        title = conversation.name || 'Group Chat';
+        // Group chat with participant count
+        const participantCount = conversation.participants.length;
+        title = conversation.name || `Group (${participantCount} members)`;
       }
       
       console.log('📝 [ChatScreen] Setting header title:', title);

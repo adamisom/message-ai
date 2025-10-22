@@ -1,4 +1,5 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { formatConversationTime } from '../utils/timeFormat';
 import { getConversationName } from '../utils/conversationHelpers';
 
@@ -27,9 +28,14 @@ export default function ConversationItem({
     <TouchableOpacity style={styles.container} onPress={onPress}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.name} numberOfLines={1}>
-            {getConversationName(conversation, currentUserId)}
-          </Text>
+          <View style={styles.nameContainer}>
+            {conversation.type === 'group' && (
+              <Ionicons name="people" size={16} color="#666" style={styles.groupIcon} />
+            )}
+            <Text style={styles.name} numberOfLines={1}>
+              {getConversationName(conversation, currentUserId)}
+            </Text>
+          </View>
           {conversation.lastMessageAt && (
             <Text style={styles.time}>
               {formatConversationTime(conversation.lastMessageAt.toDate())}
@@ -60,6 +66,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
+  },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  groupIcon: {
+    marginRight: 4,
   },
   name: {
     fontSize: 16,

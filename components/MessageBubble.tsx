@@ -92,6 +92,7 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: 12,
     color: '#666',
+    fontWeight: '600',
     marginBottom: 2,
     marginLeft: 12,
   },
