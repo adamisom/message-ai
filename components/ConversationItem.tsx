@@ -33,18 +33,19 @@ export default function ConversationItem({
 
   // Check if conversation has unread messages
   const hasUnread = () => {
-    if (!conversation.lastMessageAt || !conversation.lastRead) return false;
+    // If no messages yet, not unread
+    if (!conversation.lastMessageAt) return false;
     
+    // If no lastRead object at all, it's unread (new conversation or never implemented)
+    if (!conversation.lastRead) return true;
+    
+    // If user hasn't read any messages in this conversation, it's unread
     const userLastRead = conversation.lastRead[currentUserId];
-    if (!userLastRead) return true; // Never read any messages
+    if (!userLastRead) return true;
     
-    // Compare timestamps (lastMessageAt is after user's last read)
-    const lastMessageTime = conversation.lastMessageAt.toMillis ? 
-      conversation.lastMessageAt.toMillis() : 
-      conversation.lastMessageAt.toDate().getTime();
-    
-    // Get the message ID's timestamp from Firestore (simplified: just check if lastRead exists)
-    return !userLastRead; // If no lastRead entry, it's unread
+    // If user has a lastRead entry, we assume they've read the conversation
+    // (The entry gets updated whenever they view the chat in ChatScreen)
+    return false;
   };
 
   const isUnread = hasUnread();
