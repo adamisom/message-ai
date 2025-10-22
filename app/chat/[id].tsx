@@ -240,13 +240,12 @@ export default function ChatScreen() {
     // Get the last message
     const lastMessage = messages[messages.length - 1];
     
-    // Only mark as read if:
-    // 1. It's not from me
-    // 2. It's a different message than what we last marked
-    if (lastMessage.senderId !== user.uid && lastMessage.id !== lastMarkedReadRef.current) {
+    // Only mark as read if it's a different message than what we last marked
+    // (Mark ALL messages as read, including our own, to clear unread indicators)
+    if (lastMessage.id !== lastMarkedReadRef.current) {
       lastMarkedReadRef.current = lastMessage.id;
       
-      console.log('✓✓ [ChatScreen] Marking message as read:', lastMessage.id);
+      console.log('✓✓ [ChatScreen] Marking conversation as read up to:', lastMessage.id);
       
       updateDoc(doc(db, 'conversations', conversationId), {
         [`lastRead.${user.uid}`]: lastMessage.id,
