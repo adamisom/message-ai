@@ -40,6 +40,27 @@
 - NEVER rewrite git history (no force push, no rebase on shared branches, no --amend on pushed commits)
 - Use `git revert` instead of rewriting history to undo changes
 
+### Dev Server Restarts
+
+After making code changes, inform the user if they need to restart the dev server (`npx expo start`):
+
+**Restart REQUIRED for:**
+- Changes to `app/_layout.tsx` or other root layout files
+- Changes to `firebase.config.ts` or config files
+- Adding new dependencies (after `npm install`)
+- Changes to `app.json` or `metro.config.js`
+- Adding new environment variables
+- Changes to native modules or assets
+
+**Hot reload SUFFICIENT for:**
+- Changes to screens/components (e.g., `app/chat/[id].tsx`, `components/*.tsx`)
+- Changes to services/utils (e.g., `services/authService.ts`, `utils/*.ts`)
+- Changes to stores (e.g., `store/authStore.ts`)
+- Style changes
+- Test file changes
+
+**Tell the user:** "✅ Hot reload should work fine" OR "⚠️ You'll need to restart the dev server (Ctrl+C, then `npx expo start`)"
+
 ### Document Generation
 
 - Check in before creating a markdown document — explain the purpose to me first

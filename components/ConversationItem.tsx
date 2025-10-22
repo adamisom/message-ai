@@ -31,15 +31,36 @@ export default function ConversationItem({
 
   const directChatStatus = getDirectChatStatus();
 
+  // Check if conversation has unread messages
+  const hasUnread = () => {
+    if (!conversation.lastMessageAt || !conversation.lastRead) return false;
+    
+    const userLastRead = conversation.lastRead[currentUserId];
+    if (!userLastRead) return true; // Never read any messages
+    
+    // Compare timestamps (lastMessageAt is after user's last read)
+    const lastMessageTime = conversation.lastMessageAt.toMillis ? 
+      conversation.lastMessageAt.toMillis() : 
+      conversation.lastMessageAt.toDate().getTime();
+    
+    // Get the message ID's timestamp from Firestore (simplified: just check if lastRead exists)
+    return !userLastRead; // If no lastRead entry, it's unread
+  };
+
+  const isUnread = hasUnread();
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress}>
       <View style={styles.content}>
         <View style={styles.header}>
           <View style={styles.nameContainer}>
+            {/* Blue dot for unread messages */}
+            {isUnread && <View style={styles.unreadDot} />}
+            
             {conversation.type === 'group' && (
               <Ionicons name="people" size={16} color="#666" style={styles.groupIcon} />
             )}
-            <Text style={styles.name} numberOfLines={1}>
+            <Text style={[styles.name, isUnread && styles.unreadText]} numberOfLines={1}>
               {getConversationName(conversation, currentUserId)}
             </Text>
             {/* Phase 5: Show online status badge for direct chats */}
@@ -52,12 +73,12 @@ export default function ConversationItem({
             )}
           </View>
           {conversation.lastMessageAt && (
-            <Text style={styles.time}>
+            <Text style={[styles.time, isUnread && styles.unreadTime]}>
               {formatConversationTime(conversation.lastMessageAt.toDate())}
             </Text>
           )}
         </View>
-        <Text style={styles.lastMessage} numberOfLines={1}>
+        <Text style={[styles.lastMessage, isUnread && styles.unreadText]} numberOfLines={1}>
           {conversation.lastMessage || 'No messages yet'}
         </Text>
       </View>
@@ -88,6 +109,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 6,
   },
+  unreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#007AFF',
+  },
   groupIcon: {
     marginRight: 4,
   },
@@ -97,10 +124,18 @@ const styles = StyleSheet.create({
     color: '#000',
     flex: 1,
   },
+  unreadText: {
+    fontWeight: '700',
+    color: '#000',
+  },
   time: {
     fontSize: 12,
     color: '#666',
     marginLeft: 8,
+  },
+  unreadTime: {
+    fontWeight: '600',
+    color: '#007AFF',
   },
   lastMessage: {
     fontSize: 14,

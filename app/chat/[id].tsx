@@ -14,7 +14,9 @@ import {
     updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import GroupParticipantsModal from '../../components/GroupParticipantsModal';
 import MessageInput from '../../components/MessageInput';
 import MessageList from '../../components/MessageList';
 import OfflineBanner from '../../components/OfflineBanner';
@@ -34,6 +36,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   
   // Phase 5: Typing indicators
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
@@ -105,9 +108,19 @@ export default function ChatScreen() {
           }
         }
       } else {
-        // Group chat with participant count (from Phase 4)
+        // Group chat with participant count (from Phase 4) + info button
         const participantCount = conversation.participants.length;
         title = conversation.name || `Group (${participantCount} members)`;
+        
+        // Add info button for group participants
+        headerRight = () => (
+          <TouchableOpacity 
+            onPress={() => setShowParticipantsModal(true)}
+            style={{ marginRight: 16 }}
+          >
+            <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
+          </TouchableOpacity>
+        );
       }
       
       console.log('📝 [ChatScreen] Setting header title:', title);
@@ -467,6 +480,19 @@ export default function ChatScreen() {
         onStopTyping={handleStopTyping}
         disabled={false} // Can send even when offline (will queue)
       />
+      
+      {/* Group Participants Modal */}
+      {conversation.type === 'group' && (
+        <GroupParticipantsModal
+          visible={showParticipantsModal}
+          participants={Object.entries(conversation.participantDetails).map(([uid, details]) => ({
+            uid,
+            displayName: details.displayName,
+            email: details.email,
+          }))}
+          onClose={() => setShowParticipantsModal(false)}
+        />
+      )}
     </View>
   );
 }
