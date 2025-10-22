@@ -21,7 +21,7 @@ export const CONVERSATION_TYPE = {
 export const MESSAGE_LIMIT = 100; // Load last 100 messages per conversation
 export const TYPING_DEBOUNCE_MS = 500; // Debounce typing indicator updates
 export const MESSAGE_TIMEOUT_MS = 10000; // 10 seconds before marking message as failed
-export const TYPING_CLEAR_DELAY_MS = 500; // Clear typing indicator after 500ms inactivity
+export const TYPING_CLEAR_DELAY_MS = 2000; // Clear typing indicator after 2 seconds inactivity
 
 // UI Constants
 export const MIN_PASSWORD_LENGTH = 6;

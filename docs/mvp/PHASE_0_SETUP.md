@@ -270,18 +270,25 @@ cat .gitignore | grep .env
 
 ### Step 7: Create Firebase Config File
 
-Create `firebase.config.js` in project root:
+**⚠️ IMPORTANT:** Use TypeScript (`.ts`) not JavaScript (`.js`) for proper type safety.
+
+Create `firebase.config.ts` in project root:
 
 ```bash
-touch firebase.config.js
+touch firebase.config.ts
 ```
 
 Add this exact content:
 
-```javascript
+```typescript
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { initializeAuth, getAuth, Auth } from 'firebase/auth';
+import { initializeFirestore, getFirestore, Firestore } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Import getReactNativePersistence dynamically to avoid TS issues
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { getReactNativePersistence } = require('firebase/auth');
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -296,27 +303,40 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-
-// Enable offline persistence (critical for MVP offline support)
-if (typeof window !== 'undefined') {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-    } else if (err.code === 'unimplemented') {
-      console.warn('The current browser does not support persistence.');
-    }
+// Initialize Firebase Auth with AsyncStorage persistence for React Native
+let auth: Auth;
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
   });
+} catch (error) {
+  // If auth already initialized, get existing instance
+  auth = getAuth(app);
 }
+
+// Initialize Firestore with cache settings for React Native
+let db: Firestore;
+try {
+  db = initializeFirestore(app, {
+    cacheSizeBytes: 40 * 1024 * 1024, // 40MB cache (recommended for mobile)
+  });
+} catch (error) {
+  // If firestore already initialized, get existing instance
+  db = getFirestore(app);
+}
+
+export { auth, db };
 ```
 
 **Why this structure?**
 
-- Reads from `.env` automatically
-- Enables offline persistence (required for MVP)
-- Exports `auth` and `db` for use throughout app
+- **TypeScript:** Proper typing for `auth` and `db` exports
+- **React Native Persistence:** Uses `AsyncStorage` (not IndexedDB) for mobile
+- **Offline Support:** `initializeFirestore` with cache settings enables offline functionality
+- **Hot Reload Safe:** Try/catch handles re-initialization during development
+- **Special Import:** `require()` for `getReactNativePersistence` avoids TypeScript module resolution issues
+
+**✅ VERIFIED:** This approach was successfully implemented in Phase 0.
 
 ### Step 8: Test Firebase Connection
 
@@ -394,8 +414,10 @@ const styles = StyleSheet.create({
 **Test it:**
 
 1. Save the file
-2. Run `npx expo start --android` (if not already running)
-3. Wait for app to reload on emulator
+2. Run `npx expo start --tunnel` (or `--android` if emulator ready)
+3. Wait for app to load
+   - **Note:** Initial bundle with `--clear --tunnel` takes 30-60 seconds (this is normal)
+   - Firebase SDK is ~1-2MB and needs to be bundled first time
 4. **Expected:** See "✅ SUCCESS! Firebase is working" message on screen
 
 **Verify in Firebase Console:**
@@ -414,6 +436,8 @@ const styles = StyleSheet.create({
 - Restart Expo: `npx expo start --clear`
 
 **After success:**
+
+**✅ VERIFIED:** This testing approach worked perfectly in implementation.
 
 - Leave this code in `app/index.tsx` for now
 - It will be replaced in Phase 1 with the landing/redirect screen

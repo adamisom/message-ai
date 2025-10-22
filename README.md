@@ -1,50 +1,102 @@
-# Welcome to your Expo app 👋
+# MessageAI
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Real-time messaging app built with React Native (Expo) and Firebase.
 
-## Get started
+## Features
 
-1. Install dependencies
+- User authentication (email/password)
+- One-on-one and group messaging
+- Real-time message delivery
+- Typing indicators
+- Online/offline status
+- Read receipts
+- Local notifications
+- Offline support
 
-   ```bash
-   npm install
-   ```
+## Tech Stack
 
-2. Start the app
+**Frontend:** React Native (Expo SDK 54), Expo Router  
+**Backend:** Firebase (Auth + Firestore)  
+**State:** Zustand + AsyncStorage  
+**Testing:** Jest (105 tests)
 
-   ```bash
-   npx expo start
-   ```
+## Quick Start
 
-In the output, you'll find options to open the app in a
+> **New to this stack?** See [`/docs/DEVELOPER_SETUP.md`](/docs/DEVELOPER_SETUP.md) for comprehensive setup guide including emulator configuration and troubleshooting.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+### 1. Install Dependencies
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Configure Firebase
 
-## Learn more
+Create `.env` in project root with your Firebase credentials:
 
-To learn more about developing your project with Expo, look at the following resources:
+```
+EXPO_PUBLIC_FIREBASE_API_KEY=your_api_key
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your_domain
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your_bucket
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+See `/docs/PHASE_0_SETUP.md` for detailed Firebase setup.
 
-## Join the community
+### 3. Deploy Firestore Rules
 
-Join our community of developers creating universal apps.
+Copy rules from `/firestore.rules` to Firebase Console → Firestore → Rules → Publish
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+**MVP Note:** Currently using test mode rules (any authenticated user can read/write). See `/docs/POST_MVP.md` for restoring proper permissions.
+
+### 4. Run the App
+
+```bash
+npx expo start --tunnel
+```
+
+**Testing:** See `/docs/MULTI_DEVICE_TESTING.md` for multi-device testing setup.
+
+## Development
+
+```bash
+npm run validate  # Run lint, type-check, and all tests
+npm test          # Run tests only
+npm run lint      # ESLint check
+npm run type-check # TypeScript check
+```
+
+## Project Structure
+
+```
+app/          # Expo Router screens (file-based routing)
+components/   # Reusable UI components
+services/     # Firebase services (auth, firestore, notifications, presence)
+store/        # Zustand stores (auth, chat)
+utils/        # Helpers and constants
+docs/         # Documentation and phase guides
+```
+
+## Documentation
+
+- **New Developer Setup:** [`/docs/DEVELOPER_SETUP.md`](/docs/DEVELOPER_SETUP.md)
+- **Architecture:** `/docs/architecture.md`
+- **Manual Testing:** `/docs/MULTI_DEVICE_TESTING.md`
+- **Phase Guides:** `/docs/PHASE_0_*.md` through `/docs/PHASE_7_*.md`
+- **Post-MVP Work:** `/docs/POST_MVP.md`
+
+## Known Limitations (MVP)
+
+- Local notifications only (background notifications require FCM)
+- No message editing/deletion
+- No media uploads (text-only)
+- Last 100 messages per conversation
+- Test mode Firestore rules
+
+See `/docs/POST_MVP.md` for full list and roadmap.
+
+## License
+
+MIT

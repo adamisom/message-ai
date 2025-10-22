@@ -10,12 +10,12 @@ import {
 } from 'firebase/auth';
 import {
   doc,
-  setDoc,
   getDoc,
   serverTimestamp,
-  updateDoc,
+  setDoc,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase.config';
+import { setUserOffline, setUserOnline } from './presenceService';
 
 /**
  * User profile data structure
@@ -53,7 +53,7 @@ export const registerUser = async (
 
     return userProfile;
   } catch (error: any) {
-    console.error('Registration error:', error);
+    console.error('Registration error code:', error.code);
     throw new Error(getAuthErrorMessage(error.code));
   }
 };
@@ -87,7 +87,7 @@ export const loginUser = async (
 
     return userProfile;
   } catch (error: any) {
-    console.error('Login error:', error);
+    console.error('Login error code:', error.code);
     throw new Error(getAuthErrorMessage(error.code));
   }
 };
@@ -157,38 +157,6 @@ export const getUserProfile = async (
   } catch (error: any) {
     console.error('Get profile error:', error);
     throw new Error('Failed to fetch user profile');
-  }
-};
-
-/**
- * Set user online status to true
- */
-export const setUserOnline = async (uid: string): Promise<void> => {
-  try {
-    await updateDoc(doc(db, 'users', uid), {
-      isOnline: true,
-      lastSeenAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error: any) {
-    console.error('Set online error:', error);
-    // Don't throw - online status is not critical
-  }
-};
-
-/**
- * Set user online status to false
- */
-export const setUserOffline = async (uid: string): Promise<void> => {
-  try {
-    await updateDoc(doc(db, 'users', uid), {
-      isOnline: false,
-      lastSeenAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error: any) {
-    console.error('Set offline error:', error);
-    // Don't throw - online status is not critical
   }
 };
 

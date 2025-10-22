@@ -15,8 +15,10 @@
 
 - Commit during substantial PR implementation work, before user review
 - Do NOT commit during user's PR review/approval phase unless they ask me to
-- Before each commit: run `npm run validate` (lint + type-check + test)
+- **Before each commit:** run `npm run validate` (lint + type-check + test)
 - If validation fails: fix issues, validate again, then commit fixes
+- **After commit:** Do NOT run validate again (linter may auto-fix imports, creating extra commits)
+- If linter auto-fixed files after commit, include those fixes in the next commit
 - Review changes and assess if high-value unit tests should be added
 - Write succinct, clear commit messages
 - Only commit when code is working and tests pass
@@ -38,9 +40,32 @@
 - NEVER rewrite git history (no force push, no rebase on shared branches, no --amend on pushed commits)
 - Use `git revert` instead of rewriting history to undo changes
 
+### Dev Server Restarts
+
+After making code changes, inform the user if they need to restart the dev server (`npx expo start`):
+
+**Restart REQUIRED for:**
+- Changes to `app/_layout.tsx` or other root layout files
+- Changes to `firebase.config.ts` or config files
+- Adding new dependencies (after `npm install`)
+- Changes to `app.json` or `metro.config.js`
+- Adding new environment variables
+- Changes to native modules or assets
+
+**Hot reload SUFFICIENT for:**
+- Changes to screens/components (e.g., `app/chat/[id].tsx`, `components/*.tsx`)
+- Changes to services/utils (e.g., `services/authService.ts`, `utils/*.ts`)
+- Changes to stores (e.g., `store/authStore.ts`)
+- Style changes
+- Test file changes
+
+**Tell the user:** "✅ Hot reload should work fine" OR "⚠️ You'll need to restart the dev server (Ctrl+C, then `npx expo start`)"
+
 ### Document Generation
 
-- Check in before creating a markdown document — explain the purpose to me first
+- Check in before creating a markdown document — explain the purpose to me first
+- NEVER directly update `/docs/memory.md` — instead, suggest changes in chat when updating lots of documentation
+- The user maintains direct control over memory.md
 
 ### Accuracy
 
