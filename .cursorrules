@@ -23,12 +23,12 @@
 - Write succinct, clear commit messages
 - Only commit when code is working and tests pass
 
-### Progress Tracking
+<!-- ### Progress Tracking
 
 - After completing a phase (or significant tasks within a phase), update and check off items in `/docs/PROGRESS_TRACKER.md`
 - Mark tasks as complete with checkboxes: `- [x] Task completed`
 - Progress tracker updates should be committed AFTER code commits (separate commit)
-- This helps track overall project progress and ensures nothing is missed
+- This helps track overall project progress and ensures nothing is missed -->
 
 ### Deployment
 
@@ -45,6 +45,7 @@
 After making code changes, inform the user if they need to restart the dev server (`npx expo start`):
 
 **Restart REQUIRED for:**
+
 - Changes to `app/_layout.tsx` or other root layout files
 - Changes to `firebase.config.ts` or config files
 - Adding new dependencies (after `npm install`)
@@ -53,6 +54,7 @@ After making code changes, inform the user if they need to restart the dev serve
 - Changes to native modules or assets
 
 **Hot reload SUFFICIENT for:**
+
 - Changes to screens/components (e.g., `app/chat/[id].tsx`, `components/*.tsx`)
 - Changes to services/utils (e.g., `services/authService.ts`, `utils/*.ts`)
 - Changes to stores (e.g., `store/authStore.ts`)
@@ -97,7 +99,7 @@ After making code changes, inform the user if they need to restart the dev serve
 
 ## Documentation
 
-Refer to `/docs/mvp-prd-plus.md` for:
+Refer to `/docs/mvp-prd-plus.md` to understand what's already built:
 
 - Complete feature requirements
 - Firestore schema
