@@ -1,4 +1,4 @@
-# AI Features Implementation - Phase Documentation
+# AI Features Implementation - Sub-Phase Documentation
 
 **Project:** Message AI - AI Features Implementation  
 **Based on:** ai-prd.md v1.1  
@@ -8,19 +8,19 @@
 
 ## Documentation Structure
 
-This folder contains comprehensive implementation task lists for the AI features, organized into three phases with multiple stages each.
+This folder contains comprehensive implementation task lists for the AI features, organized into three sub-phases with multiple stages each.
 
-### Phase → Stage Hierarchy
+### Sub-Phase → Stage Hierarchy
 
-- **PHASE** = High-level grouping (Setup, Features, Integration)
+- **SUB-PHASE** = High-level grouping (Setup, Features, Integration)
 - **STAGE** = Individual implementation milestone (0-10)
 - **TASK** = Specific work items with code examples
 
 ---
 
-## 📁 Phase Documents
+## 📁 Sub-Phase Documents
 
-### [PHASE_0_SETUP.md](./PHASE_0_SETUP.md)
+### [SUB-PHASE_0_SETUP.md](./SUB-PHASE_0_SETUP.md)
 **Infrastructure, External Services & Foundation**
 
 **Stages Included:**
@@ -39,7 +39,7 @@ This folder contains comprehensive implementation task lists for the AI features
 
 ---
 
-### [PHASE_1_FEATURES.md](./PHASE_1_FEATURES.md)
+### [SUB-PHASE_1_FEATURES.md](./SUB-PHASE_1_FEATURES.md)
 **AI Capabilities Implementation**
 
 **Stages Included:**
@@ -60,7 +60,7 @@ This folder contains comprehensive implementation task lists for the AI features
 
 ---
 
-### [PHASE_2_INTEGRATION_TESTING.md](./PHASE_2_INTEGRATION_TESTING.md)
+### [SUB-PHASE_2_INTEGRATION_TESTING.md](./SUB-PHASE_2_INTEGRATION_TESTING.md)
 **Frontend Integration, Testing & Deployment**
 
 **Stages Included:**
@@ -90,9 +90,9 @@ This folder contains comprehensive implementation task lists for the AI features
 
 ## 🚀 Getting Started
 
-1. **Read:** Start with [PHASE_0_SETUP.md](./PHASE_0_SETUP.md)
+1. **Read:** Start with [SUB-PHASE_0_SETUP.md](./SUB-PHASE_0_SETUP.md)
 2. **Prerequisites:** Check Stage 0 for required accounts and billing
-3. **Follow in Order:** Complete phases sequentially (0 → 1 → 2)
+3. **Follow in Order:** Complete sub-phases sequentially (0 → 1 → 2)
 4. **Test as You Go:** Each stage includes testing instructions
 
 ---
@@ -141,12 +141,12 @@ This folder contains comprehensive implementation task lists for the AI features
 
 ## 🆘 Common Issues
 
-See individual phase documents for detailed troubleshooting:
-- **PHASE_0_SETUP.md** - Extensive troubleshooting for external services
-- **PHASE_1_FEATURES.md** - AI feature-specific debugging
-- **PHASE_2_INTEGRATION_TESTING.md** - Integration and deployment issues
+See individual sub-phase documents for detailed troubleshooting:
+- **SUB-PHASE_0_SETUP.md** - Extensive troubleshooting for external services
+- **SUB-PHASE_1_FEATURES.md** - AI feature-specific debugging
+- **SUB-PHASE_2_INTEGRATION_TESTING.md** - Integration and deployment issues
 
 ---
 
-**Ready to begin?** → [Start with PHASE_0_SETUP.md](./PHASE_0_SETUP.md)
+**Ready to begin?** → [Start with SUB-PHASE_0_SETUP.md](./SUB-PHASE_0_SETUP.md)
 
