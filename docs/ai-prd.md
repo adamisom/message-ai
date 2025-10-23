@@ -1,7 +1,7 @@
-# Product Requirements Document: Message AI - AI Features MVP
+# Product Requirements Document: Message AI - AI Features
 
-**Document Version:** 1.0  
-**Last Updated:** October 22, 2025  
+**Document Version:** 1.1  
+**Last Updated:** October 23, 2025  
 **Author:** Product Team  
 **Status:** Ready for Implementation
 
@@ -135,6 +135,9 @@ Mobile messaging users who need to:
   lastReadAt: { [uid]: timestamp },  // Last read timestamp per user
   createdAt: timestamp,
   
+  // AI feature fields
+  messageCount: number,              // Incremented on each message (for cache invalidation)
+  
   // Group-specific fields
   name?: string,
   creatorId?: string
@@ -164,8 +167,13 @@ Mobile messaging users who need to:
 - 1-on-1 chats: Deterministic ID using sorted UIDs → `[uid1, uid2].sort().join('_')`
 - Group chats: Auto-generated Firestore document ID
 
-**Note on Message Count:**
-The conversation document includes a `messageCount` field (incremented on each message) used for cache invalidation. See caching strategy section for details.
+**Important Initialization Notes:**
+
+1. **Message `embedded` field**: All messages must be created with `embedded: false` initially. The batch embedding process will update this to `true` after successful indexing.
+
+2. **Conversation `messageCount` field**: Should be initialized to `0` when conversation is created. The `incrementMessageCounter` trigger will increment it on each message.
+
+3. **Existing conversations**: If adding to an existing app, run a migration to add `messageCount: 0` to all conversations and `embedded: false` to all messages.
 
 #### New Collections for AI Features
 
@@ -206,6 +214,11 @@ The conversation document includes a `messageCount` field (incremented on each m
 
 **Note:** Future releases will support `sourceType: 'manual'` for user-created action items.
 
+**Cache Documents:**
+- `/conversations/{conversationId}/ai_summaries/latest` - Most recent summary cache
+- `/conversations/{conversationId}/ai_action_items_cache` - Action items cache document  
+- `/conversations/{conversationId}/ai_decisions_cache` - Decisions cache document
+
 **`/conversations/{conversationId}/ai_decisions/{decisionId}`**
 ```typescript
 {
@@ -242,16 +255,6 @@ Message embeddings are stored exclusively in Pinecone (vector database). The `em
 }
 ```
 
-**`/conversations/{conversationId}/metadata`** (Cache Invalidation)
-```typescript
-{
-  messageCount: number,             // Incremented on each message
-  lastMessageAt: timestamp
-}
-```
-
-**Note:** The `messageCount` field is added to the main conversation document, not a separate metadata document.
-
 **`/embedding_retry_queue/{messageId}`** (Error Handling)
 ```typescript
 {
@@ -273,6 +276,100 @@ Message embeddings are stored exclusively in Pinecone (vector database). The `em
 - **Storage:** Pinecone vector database (no Firestore mirror to save costs)
 - **Tracking:** `embedded` boolean field on message documents
 - **Context Window:** All messages per conversation (no limit)
+
+**Pinecone Index Initialization:**
+
+Before deploying Cloud Functions, you must create and configure the Pinecone index:
+
+```bash
+# 1. Create Pinecone account at https://www.pinecone.io/
+
+# 2. Create index via Pinecone dashboard or API:
+#    - Index name: message-ai-embeddings
+#    - Dimensions: 1536 (matches text-embedding-3-small)
+#    - Metric: cosine (for semantic similarity)
+#    - Pod type: p1.x1 (starter)
+#    - Replicas: 1 (can increase for production)
+
+# 3. Example using Pinecone Python SDK:
+pip install pinecone-client
+
+python3 << EOF
+import pinecone
+pinecone.init(api_key="YOUR_API_KEY", environment="us-west1-gcp")
+
+pinecone.create_index(
+    name="message-ai-embeddings",
+    dimension=1536,
+    metric="cosine",
+    pod_type="p1.x1"
+)
+
+# Verify index created
+print(pinecone.list_indexes())
+EOF
+
+# 4. Add to Cloud Functions environment variables:
+#    PINECONE_API_KEY=...
+#    PINECONE_ENVIRONMENT=us-west1-gcp
+#    PINECONE_INDEX_NAME=message-ai-embeddings
+```
+
+> ⚠️ **RISK CALLOUT: Pinecone Vector Database Dependency**
+>
+> **Risk**: Search functionality depends on Pinecone. If Pinecone is down or misconfigured, semantic search will fail.
+>
+> **Mitigation**:
+> 1. Hybrid search with local keyword fallback (searches last 20 messages)
+> 2. Pinecone outages don't affect message sending/reading
+> 3. Failed embeddings go to retry queue for later processing
+> 4. Firestore tracks embedding status (`embedded` field)
+>
+> **Manual Testing**:
+> ```bash
+> # Test 1: Pinecone connectivity
+> 1. Deploy Cloud Functions with Pinecone credentials
+> 2. Send test message
+> 3. Wait 6 minutes for embedding
+> 4. Check Pinecone dashboard: verify vector count increased
+> 5. Try semantic search: verify results returned
+>
+> # Test 2: Metadata storage
+> 1. Embed a test message via batch process
+> 2. Query Pinecone index for that message ID
+> 3. Verify metadata includes: conversationId, text, participants, senderId
+> 4. Verify participants is an array of UIDs
+>
+> # Test 3: Pinecone failure simulation
+> 1. Temporarily break Pinecone API key
+> 2. Send test messages
+> 3. Verify messages still sent/readable (core functionality intact)
+> 4. Verify semantic search returns local fallback results only
+> 5. Fix API key
+> 6. Verify retry queue processes failed embeddings
+>
+> # Test 4: Hybrid search fallback
+> 1. Send message with unique keyword "TESTXYZ123"
+> 2. Search for "TESTXYZ123" immediately (before embedding)
+> 3. Verify message found via local fallback
+> 4. Wait 6 minutes for embedding
+> 5. Search again, verify message found via vector search
+> ```
+>
+> **Troubleshooting**:
+> - **Symptom**: Search returns no results
+>   - Check: Pinecone API key validity
+>   - Check: Index name matches environment variable
+>   - Check: Messages have `embedded: true` in Firestore
+>   - Check: Vector count in Pinecone dashboard
+> - **Symptom**: Search returns wrong conversations
+>   - SECURITY ISSUE: Check post-query filtering is applied
+>   - Check: Participants array in Pinecone metadata
+>   - Check: conversationId filter working
+> - **Symptom**: Embedding batch fails
+>   - Check: Pinecone index exists and is active
+>   - Check: Index dimension is 1536
+>   - Check: Pinecone quota not exceeded
 
 **Query Patterns:**
 
@@ -297,15 +394,23 @@ const messagesQuery = query(
 const queryEmbedding = await generateEmbedding(userQuery);
 
 // Pinecone vector search
+// NOTE: Security filter - verify exact Pinecone syntax during implementation
+// May need to be: participants: userId (if Pinecone supports array membership)
+// Or use post-query filtering for guaranteed security
 const searchResults = await pinecone.query({
   vector: queryEmbedding,
   filter: { 
-    conversationId: conversationId,
-    participants: { $in: [userId] }  // Security filter
+    conversationId: conversationId
+    // Additional participant filtering done post-query for security
   },
-  topK: 10,
+  topK: 20,  // Get extra results for post-filtering
   includeMetadata: true
 });
+
+// Defense-in-depth: Filter results to ensure user has access
+const secureResults = searchResults.matches.filter(match =>
+  match.metadata.participants && match.metadata.participants.includes(userId)
+).slice(0, 10);
 
 // Fetch full messages from Firestore
 const messageIds = searchResults.matches.map(m => m.id);
@@ -314,7 +419,13 @@ const messages = await fetchMessagesByIds(conversationId, messageIds);
 
 3. **Collection Group Query** (for cross-conversation search):
 ```javascript
-// Note: Requires composite index in Firestore
+// IMPORTANT: Requires composite index in Firestore
+// Firestore will prompt you to create this index on first query attempt
+// Or manually create via Firebase console:
+//   Collection Group: messages
+//   Fields: participants (Array-contains), createdAt (Descending), __name__ (Descending)
+//   Query scope: Collection group
+
 const allMessagesQuery = query(
   collectionGroup(db, 'messages'),
   where('participants', 'array-contains', userId),
@@ -322,6 +433,57 @@ const allMessagesQuery = query(
   limit(1000)
 );
 ```
+
+> ⚠️ **RISK CALLOUT: Firestore Composite Indexes Required**
+>
+> **Risk**: Collection group queries (used by batch embedding and batch priority analysis) will fail without proper composite indexes.
+>
+> **Required Indexes**:
+> 1. **For batch embedding** (collection group: `messages`):
+>    - Fields: `embedded` (==), `createdAt` (Ascending)
+> 2. **For batch priority analysis** (collection group: `messages`):
+>    - Fields: `priorityNeedsAnalysis` (==), `createdAt` (Descending)
+>
+> **How to Create**:
+> - **Option 1 (Recommended)**: Let Firestore auto-prompt
+>   1. Deploy Cloud Function
+>   2. Wait for first scheduled run
+>   3. Check Cloud Function logs for index creation URL
+>   4. Click URL to auto-create index
+>   5. Wait ~5 minutes for index to build
+> - **Option 2**: Manual creation via Firebase Console
+>   1. Go to Firestore > Indexes > Composite Indexes
+>   2. Click "Create Index"
+>   3. Collection Group ID: `messages`
+>   4. Add fields as specified above
+>
+> **Manual Testing**:
+> ```bash
+> # Test: Verify indexes exist before deploying
+> 1. Check Firebase Console > Firestore > Indexes
+> 2. Verify composite indexes listed above exist
+> 3. Verify status is "Enabled" (not "Building")
+> 
+> # Test: Batch embedding without index
+> 1. Deploy without creating index
+> 2. Wait for batch function to run
+> 3. Check logs for index creation URL
+> 4. Create index via URL
+> 5. Wait 5 minutes
+> 6. Verify next batch run succeeds
+> ```
+>
+> **Troubleshooting**:
+> - **Symptom**: "The query requires an index" error
+>   - Check: Cloud Function logs for index creation link
+>   - Check: Firebase Console for index status
+>   - Action: Click link or manually create index
+> - **Symptom**: "Index is still building"
+>   - Wait: Indexes take 5-10 minutes to build
+>   - Check: Firebase Console shows "Enabled" status
+> - **Symptom**: Batch functions timeout
+>   - May be due to missing index (forces full collection scan)
+>   - Check: All required composite indexes exist and are enabled
 
 ---
 
@@ -389,6 +551,60 @@ Provide a summary in the following JSON format:
 Focus on: main topics discussed, important decisions, action items, and key information shared.
 `;
 ```
+
+> ⚠️ **RISK CALLOUT: Anthropic Claude API Dependency**
+>
+> **Risk**: All AI features (summarization, action items, decisions, priority analysis) depend on Anthropic Claude API. Outages or rate limiting will prevent these features from working.
+>
+> **Mitigation**:
+> 1. Timeout handling (10s for summaries, 8s for actions, etc.)
+> 2. Clear error messages to users
+> 3. Cache reduces repeated API calls (>50% cache hit rate expected)
+> 4. Rate limiting prevents runaway costs (50 actions/hour per user)
+> 5. Structured output validation catches malformed responses
+>
+> **Manual Testing**:
+> ```bash
+> # Test 1: Normal summarization
+> 1. Create conversation with 50 messages
+> 2. Click "Summarize Thread"
+> 3. Verify summary appears within 5 seconds
+> 4. Verify summary accurately reflects conversation
+> 5. Click "Summarize" again immediately
+> 6. Verify cache hit (< 1 second response)
+>
+> # Test 2: API failure simulation
+> 1. Temporarily break Anthropic API key
+> 2. Try to generate summary
+> 3. Verify friendly error message shown
+> 4. Verify no app crash
+> 5. Fix API key and retry
+> 6. Verify summary now works
+>
+> # Test 3: Timeout handling
+> 1. Request summary of 100-message conversation
+> 2. If response > 10 seconds, verify timeout error shown
+> 3. Verify user can retry
+>
+> # Test 4: Malformed response handling
+> 1. Monitor for validation errors in Cloud Function logs
+> 2. If Claude returns non-JSON, verify error logged
+> 3. Verify user sees "Failed to generate summary" not raw error
+> ```
+>
+> **Troubleshooting**:
+> - **Symptom**: "Summary failed, please try again"
+>   - Check: Anthropic API key validity
+>   - Check: Cloud Function logs for API errors
+>   - Check: Rate limit not exceeded (50 requests/min)
+> - **Symptom**: Incorrect or incomplete summaries
+>   - Check: Prompt includes all message context
+>   - Check: Message count matches what was requested
+>   - Check: Claude response includes keyPoints array
+> - **Symptom**: Validation errors in logs
+>   - Check: Claude response format matches Zod schema
+>   - Check: Response includes markdown code blocks (should be stripped)
+>   - Verify parseAIResponse() function working correctly
 
 **Performance Targets:**
 - Response time: 3-5 seconds for 100 messages (target), 8 seconds maximum
@@ -532,7 +748,6 @@ When users type action items in messages, the app should:
 2. If user types a display name that has duplicates, show warning: "2+ [name]s in thread, you must specify their email"
 3. Insert email when user selects from picker (e.g., "@john.doe@company.com")
 4. This ensures AI can unambiguously extract assignees
-```
 
 **Performance Targets:**
 - Response time: 2-4 seconds for 100 messages (target), 6 seconds maximum
@@ -595,21 +810,98 @@ interface SearchRequest {
 3. Fetch full message documents from Firestore using returned message IDs
 4. Return results with relevance scores
 
-// Pinecone query
+// Pinecone query with defense-in-depth security
 const results = await pineconeIndex.query({
   vector: queryEmbedding,  // 1536-dim vector
   filter: { 
-    participants: { $in: [userId] },
     ...(conversationId && { conversationId })
+    // Note: Participant filtering done post-query for guaranteed security
   },
-  topK: limit,
+  topK: limit * 2,  // Get extra results for filtering
   includeMetadata: true
 });
+
+// SECURITY-CRITICAL: Filter results on server side
+const secureResults = results.matches.filter(match =>
+  match.metadata.participants && match.metadata.participants.includes(userId)
+).slice(0, limit);
+
+return secureResults;
 ```
+
+> ⚠️ **RISK CALLOUT: Pinecone Security Filtering**
+>
+> **Risk**: Pinecone metadata filters may not work as expected with array fields, potentially allowing unauthorized access to messages.
+>
+> **Mitigation**: We use defense-in-depth approach:
+> 1. Filter by conversationId in Pinecone (reduces result set)
+> 2. Filter by participants array in application code (guaranteed security)
+> 3. Always verify user is in participants array before returning results
+>
+> **Testing**: Before deploying, manually test that users cannot see messages from conversations they're not in:
+> ```bash
+> # Test: Try to search across all conversations as user A
+> # Verify: Results only contain messages from user A's conversations
+> # Test: Add user B to conversation, verify they can now search those messages
+> # Test: Remove user B, verify they can no longer search those messages
+> ```
+>
+> **Troubleshooting**: If users report seeing messages from wrong conversations:
+> 1. Check Cloud Function logs for "SECURITY VIOLATION" warnings
+> 2. Verify participants array is correctly stored in Pinecone metadata
+> 3. Verify post-query filtering is applied before returning results
+> 4. Check that conversation participant list is up to date
 
 **Embedding Pipeline (Batch Processing):**
 
 *Cloud Function: `batchEmbedMessages` (scheduled every 5 minutes)*
+
+> ⚠️ **RISK CALLOUT: OpenAI Embedding API Dependency**
+>
+> **Risk**: Batch embedding pipeline depends on OpenAI API. If API is down or rate-limited, new messages won't be searchable.
+>
+> **Mitigation**:
+> 1. Retry queue with exponential backoff (max 5 attempts)
+> 2. Messages remain readable even if embedding fails
+> 3. Queue monitoring alerts if backlog grows
+> 4. Graceful degradation: Hybrid search includes local keyword fallback
+>
+> **Manual Testing**:
+> ```bash
+> # Test 1: Normal operation
+> 1. Send 10 test messages
+> 2. Wait 6 minutes (one batch cycle + buffer)
+> 3. Verify all messages have embedded:true in Firestore
+> 4. Verify messages are searchable via Smart Search
+>
+> # Test 2: API failure simulation
+> 1. Temporarily break OpenAI API key (add invalid character)
+> 2. Send test messages
+> 3. Verify messages still sent/readable
+> 4. Check retry queue populates correctly
+> 5. Fix API key
+> 6. Verify retry processor clears queue
+>
+> # Test 3: Rate limit handling
+> 1. Send 600 messages rapidly (exceeds 500/batch limit)
+> 2. Verify first 500 processed in batch 1
+> 3. Verify remaining 100 processed in batch 2
+> 4. Check no errors or dropped messages
+> ```
+>
+> **Troubleshooting**:
+> - **Symptom**: Messages not becoming searchable
+>   - Check: `embedded: false` messages in Firestore
+>   - Check: Cloud Function logs for OpenAI API errors
+>   - Check: Retry queue size (should be < 100)
+> - **Symptom**: High retry queue size (>1000)
+>   - Check: OpenAI API status
+>   - Check: API key validity
+>   - Check: Pinecone connectivity
+> - **Symptom**: Search results missing recent messages
+>   - Expected: Up to 5-minute delay for new messages
+>   - Check: Batch function running (every 5 min)
+>   - Check: Hybrid search fallback working (last 20 messages)
 
 ```typescript
 /**
@@ -753,14 +1045,14 @@ exports.retryFailedEmbeddings = functions.pubsub
         }
         
         // Retry embedding
-        const embedding = await openai.embeddings.create({
-          model: "text-embedding-3-small",
+    const embedding = await openai.embeddings.create({
+      model: "text-embedding-3-small",
           input: messageSnap.data().text
-        });
-        
-        await pineconeIndex.upsert([{
+    });
+    
+    await pineconeIndex.upsert([{
           id: item.messageId,
-          values: embedding.data[0].embedding,
+      values: embedding.data[0].embedding,
           metadata: { /* ... */ }
         }]);
         
@@ -1263,12 +1555,14 @@ DECISIONS_CACHE_MAX_NEW_MESSAGES=10
 | **Total** | | | **$0.90** |
 
 **Pinecone Costs:**
-- Starter plan: $70/month (1M vectors, sufficient for MVP)
+- Starter plan: $70/month (1M vectors, sufficient for initial release)
 - Scales with user base
 
 **Firebase Costs:**
-- Cloud Functions: Pay-as-you-go (~$10-50/month for MVP scale)
+- Cloud Functions: Pay-as-you-go (~$10-50/month for initial scale)
 - Firestore: Minimal (existing usage + AI metadata)
+
+> **Note**: Costs will scale with usage. Monitor Firebase and Pinecone dashboards for actual costs. Set up billing alerts at $50/month threshold.
 
 ---
 
@@ -1896,7 +2190,7 @@ try {
 ---
 
 **Document Status:** ✅ Ready for Implementation  
-**Next Steps:** Begin Phase 1 infrastructure setup
+**Next Steps:** Begin Phase 1 infrastructure setup  
 
 ---
 
