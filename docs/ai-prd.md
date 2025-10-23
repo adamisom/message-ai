@@ -25,22 +25,24 @@
 ## Executive Summary
 
 ### Purpose
-This PRD defines the MVP implementation of AI-powered features for Message AI, a React Native messaging application. The goal is to enhance user productivity through intelligent message analysis while maintaining the application's core focus on speed and real-time performance.
+This PRD defines the initial implementation of AI-powered features for Message AI, a React Native messaging application. The goal is to enhance user productivity through intelligent message analysis while maintaining the application's core focus on speed and real-time performance.
 
 ### Scope
-**MVP Features (Phase 1):**
+**AI Features (Initial Release):**
 - Thread Summarization
 - Action Item Extraction
 - Smart Search
 - Priority Message Detection
 - Decision Tracking
 
-**Out of Scope for MVP:**
+**Out of Scope for Initial Release:**
 - Streaming responses for summarization
 - Progressive loading for search results
 - Multi-language support
 - Voice message transcription
 - Sentiment analysis
+- Manual action item creation (future work)
+- User flagging of incorrect AI extractions (future work)
 
 ### Key Principles
 1. **Speed First:** AI features must not degrade core messaging performance
@@ -147,13 +149,23 @@ Mobile messaging users who need to:
   senderName: string,        // Denormalized for display
   participants: string[],    // Denormalized for security rules
   createdAt: timestamp,      // Server timestamp
-  status?: 'sending' | 'sent' | 'failed' | 'queued'  // Client-side only
+  status?: 'sending' | 'sent' | 'failed' | 'queued',  // Client-side only
+  
+  // AI feature fields
+  embedded: boolean,         // Whether message has been indexed for search
+  embeddedAt?: timestamp,    // When embedding was created
+  priority?: 'high' | 'medium' | 'low',  // AI-determined priority
+  priorityQuick?: 'high' | 'low' | 'unknown',  // Quick heuristic result
+  priorityAnalyzedAt?: timestamp  // When full AI analysis completed
 }
 ```
 
 **Conversation ID Patterns:**
 - 1-on-1 chats: Deterministic ID using sorted UIDs → `[uid1, uid2].sort().join('_')`
 - Group chats: Auto-generated Firestore document ID
+
+**Note on Message Count:**
+The conversation document includes a `messageCount` field (incremented on each message) used for cache invalidation. See caching strategy section for details.
 
 #### New Collections for AI Features
 
@@ -177,17 +189,22 @@ Mobile messaging users who need to:
 ```typescript
 {
   text: string,                 // Action item description
-  assignee?: string,            // UID if assignee mentioned
-  assigneeName?: string,        // Display name of assignee
+  assigneeUid?: string,         // UID if assignee identified
+  assigneeDisplayName?: string, // Display name of assignee
+  assigneeEmail?: string,       // Email used for assignment resolution
   dueDate?: timestamp,          // Extracted due date if mentioned
   sourceMessageId: string,      // Message where item was identified
   sourceMessageText: string,    // Original message text
   priority: 'high' | 'medium' | 'low',
   status: 'pending' | 'completed',
+  sourceType: 'ai',             // Always 'ai' for initial release
   extractedAt: timestamp,       // When item was extracted
+  extractedBy: string,          // UID of user who requested extraction
   completedAt?: timestamp
 }
 ```
+
+**Note:** Future releases will support `sourceType: 'manual'` for user-created action items.
 
 **`/conversations/{conversationId}/ai_decisions/{decisionId}`**
 ```typescript
@@ -201,17 +218,49 @@ Mobile messaging users who need to:
 }
 ```
 
-**`/message_embeddings/{messageId}`** (Pinecone metadata mirrored in Firestore)
+**Note on Embeddings Storage:**
+Message embeddings are stored exclusively in Pinecone (vector database). The `embedded` boolean field on message documents tracks indexing status. We do not mirror the full embedding vectors in Firestore to avoid storage costs (1536 floats × 8 bytes = ~12KB per message).
+
+**`/users/{uid}/ai_usage/{month}`** (Rate Limiting & Usage Tracking)
+```typescript
+{
+  month: string,                    // "2025-10"
+  totalActions: number,             // All AI feature calls combined
+  embeddingCalls: number,
+  summaryCalls: number,
+  actionItemCalls: number,
+  searchCalls: number,
+  priorityCalls: number,
+  decisionCalls: number,
+  totalCost: number,                // Estimated cost in USD
+  
+  // Rate limiting
+  actionsThisHour: number,
+  hourStartedAt: timestamp,
+  
+  lastUpdated: timestamp
+}
+```
+
+**`/conversations/{conversationId}/metadata`** (Cache Invalidation)
+```typescript
+{
+  messageCount: number,             // Incremented on each message
+  lastMessageAt: timestamp
+}
+```
+
+**Note:** The `messageCount` field is added to the main conversation document, not a separate metadata document.
+
+**`/embedding_retry_queue/{messageId}`** (Error Handling)
 ```typescript
 {
   messageId: string,
   conversationId: string,
-  text: string,
-  embedding: number[],          // 1536-dim vector (text-embedding-3-small)
-  senderId: string,
-  senderName: string,
-  createdAt: timestamp,
-  indexedAt: timestamp
+  error: string,
+  retryCount: number,
+  nextRetryAfter: timestamp,        // Exponential backoff
+  queuedAt: timestamp
 }
 ```
 
@@ -219,9 +268,11 @@ Mobile messaging users who need to:
 
 **Embedding Strategy:**
 - **Model:** OpenAI `text-embedding-3-small` (1536 dimensions)
-- **Trigger:** Real-time as messages are sent (Cloud Function)
-- **Storage:** Pinecone vector database with Firestore metadata backup
-- **Context Window:** Last 500 messages per conversation (expandable)
+- **Trigger:** Batch processing every 5 minutes (scheduled Cloud Function)
+- **Batch Size:** 500 messages per batch (serves as natural rate limit)
+- **Storage:** Pinecone vector database (no Firestore mirror to save costs)
+- **Tracking:** `embedded` boolean field on message documents
+- **Context Window:** All messages per conversation (no limit)
 
 **Query Patterns:**
 
@@ -340,9 +391,15 @@ Focus on: main topics discussed, important decisions, action items, and key info
 ```
 
 **Performance Targets:**
-- Response time: 3-5 seconds for 100 messages
+- Response time: 3-5 seconds for 100 messages (target), 8 seconds maximum
+- Timeout: 10 seconds (client-side)
 - Cache hit rate: >50% for frequently accessed threads
 - Cost per summary: <$0.05
+
+**Caching Strategy:**
+- Cache lifetime: 1 hour OR until 5 new messages (whichever comes first)
+- Cache scope: Per-conversation (shared by all participants)
+- Cache storage: `/conversations/{conversationId}/ai_summaries/latest`
 
 **Error Handling:**
 - Network timeout: Show "Summary failed, please try again"
@@ -398,6 +455,9 @@ interface ActionItemRequest {
 const prompt = `
 Extract action items from this conversation. An action item is a task, commitment, or to-do mentioned by any participant.
 
+Participants:
+${participants.map(p => `- ${p.displayName} (${p.email})`).join('\n')}
+
 Messages:
 ${formattedMessages}
 
@@ -405,25 +465,85 @@ Return JSON array:
 [
   {
     "text": "Description of the action item",
-    "assignee": "Name of person responsible (if mentioned)",
+    "assigneeIdentifier": "Display name OR email if specified",
     "dueDate": "ISO timestamp (if mentioned, otherwise null)",
     "priority": "high|medium|low",
     "sourceMessageId": "ID of message containing this item"
   }
 ]
 
-Rules:
-- Only extract clear, actionable items
+Assignment rules:
+- Use display name if mentioned unambiguously (e.g., "John should review")
+- Use email if explicitly mentioned (e.g., "john@company.com should review")
+- Leave null if assignee is unclear or not mentioned
+
+Priority rules:
 - High priority: uses urgent language, has near deadline
 - Medium priority: standard tasks with timeframes
 - Low priority: suggestions or optional items
 `;
+
+// After getting AI response, resolve assignee
+async function resolveAssignee(
+  identifier: string | null,
+  conversationId: string
+): Promise<{ uid: string; displayName: string; email: string } | null> {
+  if (!identifier) return null;
+  
+  const conversationDoc = await db.doc(`conversations/${conversationId}`).get();
+  const participantDetails = conversationDoc.data().participantDetails;
+  
+  // Check if identifier is an email
+  const isEmail = identifier.includes('@');
+  
+  if (isEmail) {
+    // Find by email
+    for (const [uid, details] of Object.entries(participantDetails)) {
+      if (details.email.toLowerCase() === identifier.toLowerCase()) {
+        return { uid, displayName: details.displayName, email: details.email };
+      }
+    }
+  } else {
+    // Find by display name
+    const matches = [];
+    for (const [uid, details] of Object.entries(participantDetails)) {
+      if (details.displayName.toLowerCase() === identifier.toLowerCase()) {
+        matches.push({ uid, displayName: details.displayName, email: details.email });
+      }
+    }
+    
+    if (matches.length === 1) {
+      return matches[0];
+    } else if (matches.length > 1) {
+      console.warn(`Ambiguous assignee "${identifier}" - ${matches.length} matches found`);
+      return null;  // Cannot resolve ambiguous assignee
+    }
+  }
+  
+  console.warn(`Assignee "${identifier}" not found in conversation participants`);
+  return null;
+}
+```
+
+**Client-Side UX for Mentions:**
+
+When users type action items in messages, the app should:
+1. Detect `@` character and show mention picker
+2. If user types a display name that has duplicates, show warning: "2+ [name]s in thread, you must specify their email"
+3. Insert email when user selects from picker (e.g., "@john.doe@company.com")
+4. This ensures AI can unambiguously extract assignees
 ```
 
 **Performance Targets:**
-- Response time: 2-4 seconds for 100 messages
+- Response time: 2-4 seconds for 100 messages (target), 6 seconds maximum
+- Timeout: 8 seconds (client-side)
 - Accuracy: >85% precision on identifying actual action items
 - False positive rate: <20%
+
+**Caching Strategy:**
+- Cache lifetime: 24 hours OR until 10 new messages (whichever comes first)
+- Cache scope: Per-conversation (shared by all participants)
+- Cache storage: `/conversations/{conversationId}/ai_action_items_cache`
 
 **Edge Cases:**
 - Completed items mentioned in messages: Mark with strikethrough
@@ -487,57 +607,241 @@ const results = await pineconeIndex.query({
 });
 ```
 
-**Embedding Pipeline (Real-time):**
+**Embedding Pipeline (Batch Processing):**
 
-*Cloud Function: `embedMessage` (triggered on message creation)*
+*Cloud Function: `batchEmbedMessages` (scheduled every 5 minutes)*
 
 ```typescript
-// Firestore trigger
-exports.embedMessage = functions.firestore
-  .document('conversations/{conversationId}/messages/{messageId}')
-  .onCreate(async (snap, context) => {
-    const message = snap.data();
+/**
+ * Batch Embedding Processor
+ * 
+ * Runs every 5 minutes to embed messages that haven't been indexed yet.
+ * 
+ * RATE LIMITING:
+ * The `limit(500)` serves dual purpose:
+ * 1. Prevents function timeout (batch size management)
+ * 2. Acts as natural rate limit (max 500 messages per 5 min = 6K/hour = 144K/day)
+ * 
+ * Cost protection: Max cost per batch = 500 × $0.0001 = $0.05
+ * Max daily cost for embeddings: 144K × $0.0001 = $14.40
+ */
+exports.batchEmbedMessages = functions.pubsub
+  .schedule('every 5 minutes')
+  .timeoutSeconds(540)  // 9 minutes (max for Cloud Functions)
+  .memory('512MB')
+  .onRun(async (context) => {
+    // Find unembedded messages across all conversations
+    const unembeddedMessages = await db.collectionGroup('messages')
+      .where('embedded', '==', false)
+      .orderBy('createdAt', 'asc')
+      .limit(500)  // RATE LIMIT: Max 500 per batch
+      .get();
     
-    // Generate embedding
-    const embedding = await openai.embeddings.create({
+    if (unembeddedMessages.empty) {
+      console.log('No messages to embed');
+      return;
+    }
+    
+    console.log(`Embedding ${unembeddedMessages.size} messages`);
+    
+    // Batch embed (OpenAI allows array of texts)
+    const texts = unembeddedMessages.docs.map(doc => doc.data().text);
+    
+    const embeddings = await openai.embeddings.create({
       model: "text-embedding-3-small",
-      input: message.text
+      input: texts
     });
     
-    // Store in Pinecone
-    await pineconeIndex.upsert([{
-      id: context.params.messageId,
-      values: embedding.data[0].embedding,
+    // Batch upsert to Pinecone
+    const vectors = unembeddedMessages.docs.map((doc, index) => ({
+      id: doc.id,
+      values: embeddings.data[index].embedding,
       metadata: {
-        conversationId: context.params.conversationId,
-        text: message.text,
-        senderId: message.senderId,
-        senderName: message.senderName,
-        participants: message.participants,
-        createdAt: message.createdAt.toMillis()
+        conversationId: doc.ref.parent.parent.id,
+        text: doc.data().text,
+        senderId: doc.data().senderId,
+        senderName: doc.data().senderName,
+        participants: doc.data().participants,
+        createdAt: doc.data().createdAt.toMillis()
       }
-    }]);
+    }));
     
-    // Optional: Mirror in Firestore for backup
-    await admin.firestore()
-      .collection('message_embeddings')
-      .doc(context.params.messageId)
-      .set({
-        messageId: context.params.messageId,
-        conversationId: context.params.conversationId,
-        indexedAt: admin.firestore.FieldValue.serverTimestamp()
+    await pineconeIndex.upsert(vectors);
+    
+    // Mark messages as embedded
+    const batch = db.batch();
+    unembeddedMessages.docs.forEach(doc => {
+      batch.update(doc.ref, {
+        embedded: true,
+        embeddedAt: admin.firestore.FieldValue.serverTimestamp()
       });
+    });
+    await batch.commit();
+    
+    console.log(`Successfully embedded ${unembeddedMessages.size} messages`);
   });
 ```
 
+**Fallback & Retry Strategy:**
+
+```typescript
+// Retry queue management
+async function queueForRetry(messageId: string, conversationId: string, error: Error) {
+  const queueRef = db.collection('embedding_retry_queue').doc(messageId);
+  const existingDoc = await queueRef.get();
+  
+  const retryCount = existingDoc.exists ? existingDoc.data().retryCount : 0;
+  const MAX_RETRIES = 5;
+  
+  if (retryCount >= MAX_RETRIES) {
+    console.error(`Message ${messageId} exceeded max retries, giving up`);
+    await queueRef.delete();
+    
+    // Log for monitoring
+    console.error('EMBEDDING_PERMANENT_FAILURE', {
+      messageId,
+      conversationId,
+      retryCount,
+      error: error.message
+    });
+    return;
+  }
+  
+  // Exponential backoff: 1min, 5min, 15min, 30min, 60min
+  const delays = [60, 300, 900, 1800, 3600]; // seconds
+  const delaySeconds = delays[Math.min(retryCount, delays.length - 1)];
+  const nextRetry = new Date(Date.now() + delaySeconds * 1000);
+  
+  await queueRef.set({
+    messageId,
+    conversationId,
+    error: error.message,
+    retryCount: retryCount + 1,
+    nextRetryAfter: admin.firestore.Timestamp.fromDate(nextRetry),
+    queuedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+// Retry processor (runs every 10 minutes)
+exports.retryFailedEmbeddings = functions.pubsub
+  .schedule('every 10 minutes')
+  .onRun(async (context) => {
+    const now = admin.firestore.Timestamp.now();
+    
+    const readyForRetry = await db.collection('embedding_retry_queue')
+      .where('nextRetryAfter', '<=', now)
+      .limit(100)
+      .get();
+    
+    if (readyForRetry.empty) {
+      return;
+    }
+    
+    console.log(`Retrying ${readyForRetry.size} failed embeddings`);
+    
+    for (const doc of readyForRetry.docs) {
+      const item = doc.data();
+      
+      try {
+        const messageSnap = await db
+          .doc(`conversations/${item.conversationId}/messages/${item.messageId}`)
+          .get();
+        
+        if (!messageSnap.exists) {
+          await doc.ref.delete();
+          continue;
+        }
+        
+        // Retry embedding
+        const embedding = await openai.embeddings.create({
+          model: "text-embedding-3-small",
+          input: messageSnap.data().text
+        });
+        
+        await pineconeIndex.upsert([{
+          id: item.messageId,
+          values: embedding.data[0].embedding,
+          metadata: { /* ... */ }
+        }]);
+        
+        await messageSnap.ref.update({
+          embedded: true,
+          embeddedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Success - remove from queue
+        await doc.ref.delete();
+        console.log(`Successfully retried ${item.messageId}`);
+        
+      } catch (error) {
+        console.error(`Retry failed for ${item.messageId}:`, error);
+        await queueForRetry(item.messageId, item.conversationId, error);
+      }
+    }
+  });
+
+// Monitoring: Log warning if queue grows large
+exports.monitorRetryQueue = functions.pubsub
+  .schedule('every 30 minutes')
+  .onRun(async () => {
+    const queueSize = await db.collection('embedding_retry_queue').count().get();
+    const count = queueSize.data().count;
+    
+    if (count > 1000) {
+      console.error('ALERT: Embedding retry queue large', { queueSize: count });
+    } else if (count > 100) {
+      console.warn('WARNING: Embedding retry queue growing', { queueSize: count });
+    }
+  });
+```
+
+**Graceful Degradation:**
+- Message sending never fails due to embedding issues
+- Messages are readable immediately even if not yet searchable
+- Retry queue ensures eventual consistency
+- Max 5 retries with exponential backoff (1min → 60min)
+- Queue monitoring alerts if problems persist
+
 **Performance Targets:**
-- Embedding generation: <200ms per message
-- Search query time: <500ms for embedding + search
-- Total search time: <800ms for 10 results (including Firestore fetches)
+- Embedding generation: <200ms per message (batch processing)
+- Search query time: <500ms for embedding + Pinecone search
+- Total search time: <800ms for 10 results (target), 1.5s maximum
+- Timeout: 3 seconds (client-side)
+- Batch embedding delay: Up to 5 minutes for new messages to become searchable
 
 **Search Quality Metrics:**
 - Relevance: Top result relevant >80% of the time
 - Recall: Finds target message in top 10 results >90% of the time
+
+**Hybrid Search (Handling Recent Messages):**
+
+To prevent "just sent message not found" issues during the 0-5 minute embedding delay:
+
+```typescript
+async function smartSearch(query: string, conversationId: string) {
+  // 1. Vector search (embedded messages only)
+  const vectorResults = await semanticSearchCloudFunction({ query, conversationId });
+  
+  // 2. Local fallback: keyword search in last 20 messages
+  const recentMessages = await db
+    .collection(`conversations/${conversationId}/messages`)
+    .orderBy('createdAt', 'desc')
+    .limit(20)
+    .get();
+  
+  const localMatches = recentMessages.docs
+    .filter(doc => doc.data().text.toLowerCase().includes(query.toLowerCase()))
+    .map(doc => ({ id: doc.id, ...doc.data(), source: 'local' }));
+  
+  // 3. Merge results (deduplicate by message ID)
+  const vectorIds = new Set(vectorResults.map(r => r.id));
+  const uniqueLocalMatches = localMatches.filter(m => !vectorIds.has(m.id));
+  
+  return [...uniqueLocalMatches, ...vectorResults];
+}
+```
+
+This ensures users always find their recently sent messages even before embedding completes.
 
 ---
 
@@ -551,6 +855,7 @@ exports.embedMessage = functions.firestore
 - Flag messages as high, medium, or low priority
 - Show priority badge on message
 - Send enhanced push notification for high-priority messages
+- Hybrid approach: Quick heuristic + batch AI refinement
 
 **UI/UX:**
 - **Entry Point:** Automatic, runs on all incoming messages
@@ -558,63 +863,140 @@ exports.embedMessage = functions.firestore
   - Priority badge on message (🔴 High, 🟡 Medium)
   - No badge for low priority (default)
   - Push notification includes priority level for high-priority messages
+  - If AI downgrades priority after analysis, show notification: "Message priority updated based on AI analysis"
 
-**Technical Implementation:**
+**Technical Implementation (Hybrid Approach):**
 
-*Cloud Function: `detectPriority` (triggered on message creation)*
+**Phase 1: Real-Time Quick Heuristic**
 
 ```typescript
-// Firestore trigger
-exports.detectPriority = functions.firestore
-  .document('conversations/{conversationId}/messages/{messageId}')
-  .onCreate(async (snap, context) => {
-    const message = snap.data();
-    
-    // Quick heuristic check first (avoid API calls for obvious low-priority)
-    const quickCheck = quickPriorityCheck(message.text);
-    if (quickCheck === 'low') {
-      return null;  // Skip AI analysis for clearly low-priority
-    }
-    
-    // Send to Claude for priority analysis
-    const priority = await analyzeMessagePriority(message.text);
-    
-    // Update message document
-    if (priority !== 'low') {
-      await snap.ref.update({ priority });
-      
-      // Send enhanced push notification for high priority
-      if (priority === 'high') {
-        await sendPriorityNotification(message, priority);
-      }
-    }
-  });
-
-// Quick heuristic check (avoids AI cost for obvious cases)
-function quickPriorityCheck(text: string): 'low' | 'unknown' {
+// Shared utility (client + server): utils/priorityHeuristics.ts
+export function quickPriorityCheck(text: string): 'high' | 'low' | 'unknown' {
   const lowPriorityPatterns = [
-    /^(ok|okay|sure|thanks|lol|haha|👍|😊)/i,
-    /^(see you|bye|good ?night|good morning)/i
+    /^(ok|okay|sure|thanks|thx|ty|lol|haha|😊|👍|❤️)$/i,
+    /^(good ?night|good ?morning|see you|bye|later|ttyl)/i,
+    /^(nice|cool|awesome|great|sounds good)/i
   ];
   
-  const urgentKeywords = [
-    'urgent', 'asap', 'immediately', 'emergency', 'critical',
-    'deadline', 'important', 'need now', 'right away'
+  const highPriorityKeywords = [
+    'urgent', 'asap', 'immediately', 'emergency', 'critical', 'important',
+    'deadline', 'need now', 'right away', 'time sensitive', 'breaking',
+    'alert', 'attention', 'priority', 'action required'
   ];
   
-  if (lowPriorityPatterns.some(pattern => pattern.test(text))) {
+  const urgentPunctuation = /\?{2,}|!{2,}/;  // "WHAT??" or "NOW!!!"
+  
+  // Check low priority (skip AI)
+  if (lowPriorityPatterns.some(p => p.test(text)) && text.length < 30) {
     return 'low';
   }
   
-  if (urgentKeywords.some(keyword => text.toLowerCase().includes(keyword))) {
-    return 'unknown';  // Needs AI analysis
+  // Check high priority indicators
+  const lowerText = text.toLowerCase();
+  if (highPriorityKeywords.some(kw => lowerText.includes(kw))) {
+    return 'high';
+  }
+  
+  if (urgentPunctuation.test(text)) {
+    return 'high';
+  }
+  
+  // Check all caps (might be urgent)
+  if (text.length > 10 && text === text.toUpperCase() && /[A-Z]/.test(text)) {
+    return 'high';
   }
   
   return text.length < 30 ? 'low' : 'unknown';
 }
 
+// Real-time Cloud Function trigger
+exports.quickPriorityCheck = functions.firestore
+  .document('conversations/{conversationId}/messages/{messageId}')
+  .onCreate(async (snap, context) => {
+    const message = snap.data();
+    const quickPriority = quickPriorityCheck(message.text);
+    
+    if (quickPriority === 'high') {
+      // Send enhanced push notification NOW
+      await sendPriorityNotification(message, 'high');
+      
+      // Mark for full AI analysis
+      await snap.ref.update({ 
+        priorityQuick: 'high',
+        priority: 'high',  // Tentative, may be refined by batch
+        priorityNeedsAnalysis: true
+      });
+    } else if (quickPriority === 'low') {
+      await snap.ref.update({ 
+        priorityQuick: 'low',
+        priority: 'low',
+        priorityNeedsAnalysis: false
+      });
+    } else {
+      // Unknown - defer to batch analysis
+      await snap.ref.update({ 
+        priorityQuick: 'unknown',
+        priorityNeedsAnalysis: true
+      });
+    }
+  });
+```
+
+**Phase 2: Batch AI Refinement**
+
+```typescript
+/**
+ * Batch Priority Analysis
+ * 
+ * Runs every 10 minutes to refine priority detection with full AI analysis.
+ * Only analyzes messages where heuristic returned 'high' or 'unknown'.
+ * Provides more accurate priority but doesn't delay notifications.
+ */
+exports.batchAnalyzePriority = functions.pubsub
+  .schedule('every 10 minutes')
+  .onRun(async (context) => {
+    const needsAnalysis = await db.collectionGroup('messages')
+      .where('priorityNeedsAnalysis', '==', true)
+      .orderBy('createdAt', 'desc')
+      .limit(100)
+      .get();
+    
+    if (needsAnalysis.empty) {
+      return;
+    }
+    
+    console.log(`Analyzing priority for ${needsAnalysis.size} messages`);
+    
+    for (const messageDoc of needsAnalysis.docs) {
+      const message = messageDoc.data();
+      
+      try {
+        const aiPriority = await analyzeMessagePriorityWithAI(message.text);
+        
+        // Check if priority changed from heuristic
+        const priorityChanged = message.priorityQuick === 'high' && aiPriority !== 'high';
+        
+        await messageDoc.ref.update({
+          priority: aiPriority,
+          priorityNeedsAnalysis: false,
+          priorityAnalyzedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Notify user if priority was downgraded
+        if (priorityChanged) {
+          await notifyPriorityDowngrade(message, aiPriority);
+        }
+        
+      } catch (error) {
+        console.error(`Priority analysis failed for ${messageDoc.id}:`, error);
+        // Keep heuristic result, don't retry
+        await messageDoc.ref.update({ priorityNeedsAnalysis: false });
+      }
+    }
+  });
+
 // Claude priority analysis
-async function analyzeMessagePriority(text: string): Promise<Priority> {
+async function analyzeMessagePriorityWithAI(text: string): Promise<Priority> {
   const prompt = `
 Analyze this message and determine its priority level.
 
@@ -635,21 +1017,47 @@ Priority guidelines:
     messages: [{ role: "user", content: prompt }]
   });
   
-  const result = JSON.parse(response.content[0].text);
+  let jsonText = response.content[0].text.trim();
+  
+  // Strip markdown code blocks if present
+  if (jsonText.startsWith('```')) {
+    jsonText = jsonText.replace(/^```json?\n/, '').replace(/\n```$/, '');
+  }
+  
+  const result = JSON.parse(jsonText);
   return result.priority;
+}
+
+// Notify user when priority downgraded
+async function notifyPriorityDowngrade(message: any, newPriority: string) {
+  // Send in-app notification to conversation participants
+  await sendInAppNotification({
+    conversationId: message.conversationId,
+    message: `Message priority updated to '${newPriority}' based on AI analysis`,
+    messageId: message.messageId,
+    type: 'priority_update'
+  });
 }
 ```
 
 **Performance Targets:**
-- Quick heuristic: <10ms
-- AI analysis: <500ms
-- False positive rate (marking non-urgent as urgent): <15%
-- API cost: <$0.001 per message analyzed
+- Quick heuristic: <10ms (client + server)
+- Heuristic accuracy: ~70% (acceptable for notifications)
+- AI analysis: <500ms per message (batch processing)
+- AI accuracy: >85%
+- Timeout: 2 seconds (not user-facing, batch process only)
+- Cost reduction: ~70% (only analyze 30% of messages with AI)
 
 **Priority Indicators:**
-- **High Priority:** Urgent keywords, deadlines, questions requiring immediate response, emergencies
+- **High Priority:** Urgent keywords, deadlines, questions requiring immediate response, emergencies, all caps, excessive punctuation
 - **Medium Priority:** Requests for action, questions, meeting scheduling, decisions needed
 - **Low Priority:** Acknowledgments, casual chat, emoji-only messages, greetings
+
+**Why Hybrid Approach:**
+1. **Notifications need speed:** Real-time heuristic ensures high-priority messages trigger enhanced notifications immediately
+2. **Accuracy over time:** Batch AI refinement improves accuracy without delaying notifications
+3. **Cost effective:** ~70% of messages skip AI analysis (quick heuristic sufficient)
+4. **User transparency:** Notifications inform users when AI refines the priority
 
 ---
 
@@ -723,9 +1131,15 @@ Examples of decisions:
 ```
 
 **Performance Targets:**
-- Response time: 3-4 seconds for 100 messages
+- Response time: 3-4 seconds for 100 messages (target), 7 seconds maximum
+- Timeout: 10 seconds (client-side)
 - Accuracy: >75% precision on identifying real decisions
 - False positive rate: <25%
+
+**Caching Strategy:**
+- Cache lifetime: 24 hours OR until 10 new messages (whichever comes first)
+- Cache scope: Per-conversation (shared by all participants)
+- Cache storage: `/conversations/{conversationId}/ai_decisions_cache`
 
 ---
 
@@ -733,36 +1147,45 @@ Examples of decisions:
 
 ### Development Phases
 
-**Phase 1: Infrastructure Setup (Week 1)**
+**Phase 1: Infrastructure Setup**
 - Set up Firebase Cloud Functions project
-- Install Vercel AI SDK and Anthropic SDK
+- Install dependencies: Vercel AI SDK, Anthropic SDK, OpenAI SDK, Pinecone client, Zod
 - Set up Pinecone account and index
 - Configure environment variables and secrets
 - Create Firestore security rules for new AI collections
+- Set up rate limiting and usage tracking collections
 
-**Phase 2: Embedding Pipeline (Week 1-2)**
-- Implement `embedMessage` Cloud Function with Firestore trigger
+**Phase 2: Embedding Pipeline**
+- Implement `batchEmbedMessages` scheduled Cloud Function
+- Implement retry queue and error handling
 - Test embedding generation and Pinecone storage
-- Backfill embeddings for existing messages (batch job)
+- Backfill embeddings for existing messages (one-time script)
 - Monitor embedding costs and performance
+- Implement message counter for cache invalidation
 
-**Phase 3: Core AI Features (Week 2-4)**
-- Implement Thread Summarization
-- Implement Action Item Extraction
-- Implement Smart Search
-- Implement Priority Message Detection
-- Implement Decision Tracking
+**Phase 3: Core AI Features**
+- Implement Thread Summarization with caching
+- Implement Action Item Extraction with assignee resolution
+- Implement Smart Search with hybrid local fallback
+- Implement Priority Message Detection (hybrid heuristic + batch)
+- Implement Decision Tracking with caching
+- Add Zod schema validation for all AI responses
+- Add timeout handling for all features
 
-**Phase 4: Frontend Integration (Week 3-5)**
+**Phase 4: Frontend Integration**
 - Create UI components for all features
 - Implement loading states and error handling
 - Add feature entry points to existing screens
+- Implement mention picker for action item assignees
+- Add timeout wrappers for all AI feature calls
+- Implement priority downgrade notifications
 - Test on iOS and Android
 
-**Phase 5: Testing & Optimization (Week 5-6)**
+**Phase 5: Testing & Optimization**
 - End-to-end testing of all features
-- Performance optimization
+- Performance optimization and timeout testing
 - Cost analysis and optimization
+- Rate limiting validation
 - User acceptance testing
 - Bug fixes and refinements
 
@@ -775,15 +1198,19 @@ functions/
 │   │   ├── summarization.ts      # Thread summarization logic
 │   │   ├── actionItems.ts        # Action item extraction
 │   │   ├── search.ts             # Semantic search
-│   │   ├── priority.ts           # Priority detection
+│   │   ├── priority.ts           # Priority detection (heuristic + batch)
 │   │   ├── decisions.ts          # Decision tracking
-│   │   └── embeddings.ts         # Embedding generation
+│   │   └── embeddings.ts         # Batch embedding generation
 │   ├── utils/
 │   │   ├── anthropic.ts          # Claude API client
 │   │   ├── pinecone.ts           # Pinecone client
 │   │   ├── openai.ts             # OpenAI embeddings client
-│   │   ├── validation.ts         # Request validation
-│   │   └── security.ts           # Permission checks
+│   │   ├── validation.ts         # Zod schemas for validation
+│   │   ├── security.ts           # Permission checks
+│   │   ├── rateLimit.ts          # Rate limiting logic
+│   │   ├── caching.ts            # Cache invalidation helpers
+│   │   ├── priorityHeuristics.ts # Quick priority check (shared)
+│   │   └── timeout.ts            # Timeout utilities
 │   └── index.ts                  # Function exports
 ├── package.json
 └── tsconfig.json
@@ -805,7 +1232,20 @@ PINECONE_INDEX_NAME=message-ai-embeddings
 
 # Feature flags
 ENABLE_PRIORITY_DETECTION=true
-ENABLE_REAL_TIME_EMBEDDING=true
+ENABLE_BATCH_EMBEDDING=true
+ENABLE_PRIORITY_BATCH_REFINEMENT=true
+
+# Rate limiting
+AI_ACTIONS_PER_HOUR_LIMIT=50
+AI_ACTIONS_PER_MONTH_LIMIT=1000
+
+# Caching thresholds
+SUMMARY_CACHE_MAX_AGE_MS=3600000        # 1 hour
+SUMMARY_CACHE_MAX_NEW_MESSAGES=5
+ACTION_ITEMS_CACHE_MAX_AGE_MS=86400000  # 24 hours
+ACTION_ITEMS_CACHE_MAX_NEW_MESSAGES=10
+DECISIONS_CACHE_MAX_AGE_MS=86400000     # 24 hours
+DECISIONS_CACHE_MAX_NEW_MESSAGES=10
 ```
 
 ### Cost Estimation
@@ -836,14 +1276,22 @@ ENABLE_REAL_TIME_EMBEDDING=true
 
 ### Response Time Targets
 
-| Feature | Target | Maximum Acceptable |
-|---------|--------|-------------------|
-| Thread Summarization (100 msgs) | 3-5s | 8s |
-| Action Item Extraction | 2-4s | 6s |
-| Smart Search | <800ms | 1.5s |
-| Priority Detection | <500ms | 1s |
-| Decision Tracking | 3-4s | 7s |
-| Message Embedding | <200ms | 500ms |
+| Feature | Target | Maximum | Client Timeout |
+|---------|--------|---------|----------------|
+| Thread Summarization (100 msgs) | 3-5s | 8s | 10s |
+| Action Item Extraction | 2-4s | 6s | 8s |
+| Smart Search | <800ms | 1.5s | 3s |
+| Priority Detection (heuristic) | <10ms | 50ms | N/A |
+| Priority Detection (AI batch) | <500ms | 1s | 2s |
+| Decision Tracking | 3-4s | 7s | 10s |
+| Message Embedding (batch) | <200ms/msg | 500ms/msg | N/A |
+
+**Testing Methodology:**
+- **End-to-end measurement:** From user button click to UI update
+- **Network assumption:** Good WiFi (10+ Mbps) or LTE/5G
+- **Test environment:** Same geographic region as Firebase/Cloud Functions
+- **Device:** Physical device (not emulator)
+- **Timeout implementation:** Client-side wrapper aborts request if exceeded
 
 ### Scalability Targets
 
@@ -857,6 +1305,144 @@ ENABLE_REAL_TIME_EMBEDDING=true
 - **Uptime:** 99.5% (excluding scheduled maintenance)
 - **Error Rate:** <2% for AI feature requests
 - **Cache Hit Rate:** >50% for summaries and action items
+- **Retry Success Rate:** >90% for failed embeddings (within 5 attempts)
+- **Heuristic Accuracy:** >70% for priority detection quick checks
+
+### AI Response Validation & Error Handling
+
+**Structured Output Processing:**
+
+All AI features return JSON that must be validated before storage:
+
+```typescript
+import { z } from 'zod';
+
+// Zod schemas for each feature
+const SummarySchema = z.object({
+  summary: z.string().min(10).max(1000),
+  keyPoints: z.array(z.string()).min(3).max(10)
+});
+
+const ActionItemSchema = z.object({
+  text: z.string(),
+  assigneeIdentifier: z.string().optional().nullable(),
+  dueDate: z.string().datetime().optional().nullable(),
+  priority: z.enum(['high', 'medium', 'low']),
+  sourceMessageId: z.string()
+});
+
+const DecisionSchema = z.object({
+  decision: z.string(),
+  context: z.string(),
+  participantIds: z.array(z.string()),
+  sourceMessageIds: z.array(z.string()),
+  confidence: z.number().min(0).max(1)
+});
+
+// Generic parser with validation
+function parseAIResponse<T>(
+  rawResponse: string,
+  schema: z.ZodSchema<T>
+): T {
+  // 1. Clean response (strip markdown code blocks)
+  let json = rawResponse.trim();
+  if (json.startsWith('```')) {
+    json = json.replace(/^```json?\n/, '').replace(/\n```$/, '');
+  }
+  
+  // 2. Parse JSON
+  let parsed;
+  try {
+    parsed = JSON.parse(json);
+  } catch (error) {
+    throw new Error(`JSON parsing failed: ${error.message}`);
+  }
+  
+  // 3. Validate with Zod
+  const result = schema.safeParse(parsed);
+  if (!result.success) {
+    throw new Error(`Validation failed: ${result.error.message}`);
+  }
+  
+  return result.data;
+}
+
+// Usage in Cloud Functions
+const rawResponse = claudeResponse.content[0].text;
+const validatedSummary = parseAIResponse(rawResponse, SummarySchema);
+```
+
+**Error Handling Strategy:**
+
+1. **Parsing errors:** Log raw response, return user-friendly error
+2. **Validation errors:** Log validation details, return error with specifics
+3. **API timeouts:** Retry with exponential backoff (max 3 attempts)
+4. **Rate limit errors:** Queue for later processing
+5. **Invalid auth:** Return 401, don't retry
+
+### Comprehensive Caching Strategy
+
+**Cache Configuration Table:**
+
+| Feature | Max Age | Max New Messages | Storage Location | Shared? |
+|---------|---------|------------------|------------------|---------|
+| Thread Summarization | 1 hour (3600000ms) | 5 messages | `/conversations/{id}/ai_summaries/latest` | Yes (per-conversation) |
+| Action Items | 24 hours (86400000ms) | 10 messages | `/conversations/{id}/ai_action_items_cache` | Yes (per-conversation) |
+| Decisions | 24 hours (86400000ms) | 10 messages | `/conversations/{id}/ai_decisions_cache` | Yes (per-conversation) |
+| Priority Detection | N/A (not cached) | N/A | Stored on message doc | N/A |
+| Smart Search | N/A (not cached) | N/A | N/A (real-time queries) | N/A |
+
+**Cache Invalidation Logic:**
+
+```typescript
+async function getCachedResult<T>(
+  conversationId: string,
+  cacheDocPath: string,
+  maxAge: number,
+  maxNewMessages: number
+): Promise<T | null> {
+  const [cache, conversation] = await Promise.all([
+    db.doc(cacheDocPath).get(),
+    db.doc(`conversations/${conversationId}`).get()
+  ]);
+  
+  if (!cache.exists) {
+    return null;
+  }
+  
+  const cacheData = cache.data();
+  const currentMessageCount = conversation.data()?.messageCount || 0;
+  const messagesSinceCache = currentMessageCount - cacheData.messageCountAtGeneration;
+  const ageMs = Date.now() - cacheData.generatedAt.toMillis();
+  
+  // Cache is valid if BOTH conditions are met
+  if (ageMs < maxAge && messagesSinceCache < maxNewMessages) {
+    console.log(`Cache hit: age=${ageMs}ms, newMessages=${messagesSinceCache}`);
+    return cacheData as T;
+  }
+  
+  console.log(`Cache miss: age=${ageMs}ms, newMessages=${messagesSinceCache}`);
+  return null;
+}
+```
+
+**Incrementing Message Counter:**
+
+```typescript
+// Firestore trigger on message creation
+exports.incrementMessageCounter = functions.firestore
+  .document('conversations/{conversationId}/messages/{messageId}')
+  .onCreate(async (snap, context) => {
+    try {
+      await db.doc(`conversations/${context.params.conversationId}`).update({
+        messageCount: admin.firestore.FieldValue.increment(1)
+      });
+    } catch (error) {
+      // If increment fails (rare contention), log but don't fail
+      console.warn('Failed to increment message counter:', error);
+    }
+  });
+```
 
 ---
 
@@ -889,10 +1475,14 @@ service cloud.firestore {
     match /conversations/{conversationId}/ai_action_items/{itemId} {
       allow read: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+      
+      // Users can mark action items as complete (status, completedAt only)
       allow update: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedAt']);
-      allow create, delete: if false;  // Only Cloud Functions
+      
+      // Only Cloud Functions can create/delete (future: allow manual creation)
+      allow create, delete: if false;
     }
     
     // AI decisions
@@ -902,13 +1492,103 @@ service cloud.firestore {
       allow write: if false;  // Only Cloud Functions can write
     }
     
-    // Message embeddings metadata (Pinecone is source of truth)
-    match /message_embeddings/{messageId} {
-      allow read: if false;  // Only used by Cloud Functions
-      allow write: if false;  // Only Cloud Functions
+    // Rate limiting & usage tracking
+    match /users/{userId}/ai_usage/{month} {
+      allow read: if request.auth.uid == userId;
+      allow write: if false;  // Only Cloud Functions can write
+    }
+    
+    // Embedding retry queue
+    match /embedding_retry_queue/{messageId} {
+      allow read, write: if false;  // Only Cloud Functions
     }
   }
 }
+```
+
+### Rate Limiting Implementation
+
+**Per-User Rate Limits:**
+- **Hourly:** 50 AI actions (any feature)
+- **Monthly:** 1000 AI actions (any feature)
+
+**Implementation:**
+
+```typescript
+async function checkAIRateLimit(userId: string, feature: string): Promise<boolean> {
+  const month = new Date().toISOString().slice(0, 7);
+  const usageRef = db.doc(`users/${userId}/ai_usage/${month}`);
+  
+  return await db.runTransaction(async (transaction) => {
+    const usageDoc = await transaction.get(usageRef);
+    const now = Date.now();
+    const oneHourAgo = now - 3600000;
+    
+    if (!usageDoc.exists) {
+      // First action this month
+      transaction.set(usageRef, {
+        month,
+        totalActions: 1,
+        [`${feature}Calls`]: 1,
+        actionsThisHour: 1,
+        hourStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return true;
+    }
+    
+    const data = usageDoc.data();
+    
+    // Reset hourly counter if hour has elapsed
+    const hourlyActions = (data.hourStartedAt?.toMillis() < oneHourAgo) 
+      ? 0 
+      : data.actionsThisHour || 0;
+    
+    // Check limits
+    const HOURLY_LIMIT = 50;
+    const MONTHLY_LIMIT = 1000;
+    
+    if (hourlyActions >= HOURLY_LIMIT) {
+      return false;
+    }
+    
+    if ((data.totalActions || 0) >= MONTHLY_LIMIT) {
+      return false;
+    }
+    
+    // Increment counters
+    transaction.update(usageRef, {
+      totalActions: admin.firestore.FieldValue.increment(1),
+      [`${feature}Calls`]: admin.firestore.FieldValue.increment(1),
+      actionsThisHour: hourlyActions >= HOURLY_LIMIT || data.hourStartedAt?.toMillis() < oneHourAgo 
+        ? 1  // Reset
+        : admin.firestore.FieldValue.increment(1),
+      hourStartedAt: data.hourStartedAt?.toMillis() < oneHourAgo
+        ? admin.firestore.FieldValue.serverTimestamp()
+        : data.hourStartedAt,
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return true;
+  });
+}
+
+// Usage in all AI feature Cloud Functions
+exports.generateSummary = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+  
+  const allowed = await checkAIRateLimit(context.auth.uid, 'summary');
+  if (!allowed) {
+    throw new functions.https.HttpsError(
+      'resource-exhausted',
+      'You have exceeded your AI usage limit. Please try again later.'
+    );
+  }
+  
+  // Proceed with feature...
+});
 ```
 
 ### Privacy Considerations
@@ -918,6 +1598,7 @@ service cloud.firestore {
    - Action items persist until conversation is deleted
    - Embeddings in Pinecone persist for search functionality
    - Users can request data deletion (delete conversation deletes all AI data)
+   - Usage tracking persists indefinitely for analytics
 
 2. **Third-Party Data Sharing:**
    - Message content sent to Anthropic for processing (covered by their privacy policy)
@@ -1073,7 +1754,7 @@ analytics.logEvent('ai_feature_feedback', {
 
 ### Phase 2: UX Improvements
 
-**Progressive Search Results (4-6 hours implementation)**
+**Progressive Search Results**
 - **Current:** All 10 results appear at once (~800ms)
 - **Enhancement:** First result at ~500ms, remaining results load progressively
 - **UX Benefit:** Feels 300ms faster, matches user expectations (Google-like)
@@ -1084,7 +1765,11 @@ analytics.logEvent('ai_feature_feedback', {
 - Marginal UX benefit (users need complete summary to act)
 - Possibly worse UX (distracting, hard to skim)
 - Users expect to wait for complete summaries
-- Not worth implementation time (4-6 hours)
+
+**Manual Action Item Management:**
+- Allow users to create action items manually
+- Allow users to delete or flag incorrect AI-extracted items
+- Add `sourceType: 'manual'` support
 
 ### Phase 3: Advanced Features
 
@@ -1159,13 +1844,59 @@ analytics.logEvent('ai_feature_feedback', {
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| 1.0 | Oct 22, 2025 | Product Team | Initial MVP specification |
+| 1.0 | Oct 22, 2025 | Product Team | Initial specification |
+| 1.1 | Oct 23, 2025 | Product Team | Updated architecture: batch embeddings, hybrid priority detection, rate limiting, caching strategy, timeout handling, Zod validation |
+
+---
+
+### Client-Side Timeout Implementation
+
+**Timeout Wrapper Utility:**
+
+```typescript
+// utils/aiTimeout.ts
+export async function callAIFeatureWithTimeout<T>(
+  functionName: string,
+  data: any,
+  timeoutMs: number
+): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Request timeout')), timeoutMs);
+  });
+  
+  const functionPromise = httpsCallable(functions, functionName)(data);
+  
+  try {
+    const result = await Promise.race([functionPromise, timeoutPromise]);
+    return result.data as T;
+  } catch (error) {
+    if (error.message === 'Request timeout') {
+      throw new Error('AI feature is taking longer than expected. Please try again.');
+    }
+    throw error;
+  }
+}
+
+// Usage in components
+try {
+  setSummaryLoading(true);
+  const summary = await callAIFeatureWithTimeout(
+    'generateSummary',
+    { conversationId, messageCount: 100 },
+    10000  // 10 second timeout
+  );
+  setSummary(summary);
+} catch (error) {
+  showError(error.message);
+} finally {
+  setSummaryLoading(false);
+}
+```
 
 ---
 
 **Document Status:** ✅ Ready for Implementation  
-**Next Steps:** Begin Phase 1 infrastructure setup  
-**Questions?** Contact product team
+**Next Steps:** Begin Phase 1 infrastructure setup
 
 ---
 
