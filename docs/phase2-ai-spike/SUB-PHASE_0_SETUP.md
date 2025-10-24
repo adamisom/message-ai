@@ -4,6 +4,16 @@
 
 ---
 
+**⚠️ IMPORTANT: IMPLEMENTATION NOTE**
+This document will be implemented by AI assistance. The AI should:
+1. Read through each task and subtask carefully
+2. Explain what it's about to do
+3. **WAIT for explicit user approval before taking action**
+4. Proceed only after receiving confirmation
+5. Report results and wait for next instruction
+
+---
+
 ## Phase Overview
 
 **Goal:** Establish the technical foundation for AI features by setting up external services (Anthropic, OpenAI, Pinecone), initializing Firebase Cloud Functions infrastructure, and implementing the batch embedding pipeline.
