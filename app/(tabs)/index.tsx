@@ -75,7 +75,7 @@ export default function ConversationsList() {
             
             scheduleMessageNotification(
               senderName,
-              currentLastMessage,
+              currentLastMessage?.text || 'New message',
               convo.id
             );
           }
