@@ -57,15 +57,19 @@ export default function ConversationsList() {
           // This prevents notifications from triggering on app launch for existing messages
           const isFirstLoad = !(convo.id in previousConversationsRef.current);
           
+          // Compare by text content to avoid object reference issues
+          const previousText = previousLastMessage?.text || '';
+          const currentText = currentLastMessage?.text || '';
+          
           // Only notify if:
           // 1. There's a current last message
           // 2. This is NOT the first load (we've seen this conversation before)
-          // 3. The message has changed from the previous one
+          // 3. The message text has changed from the previous one
           // 4. The message is not from the current user
           if (
             currentLastMessage && 
             !isFirstLoad &&
-            currentLastMessage !== previousLastMessage &&
+            currentText !== previousText &&
             convo.lastMessageSenderId !== user.uid
           ) {
             console.log('🔔 [ConversationsList] New message in conversation:', convo.id);
@@ -75,7 +79,7 @@ export default function ConversationsList() {
             
             scheduleMessageNotification(
               senderName,
-              currentLastMessage?.text || 'New message',
+              currentText,
               convo.id
             );
           }

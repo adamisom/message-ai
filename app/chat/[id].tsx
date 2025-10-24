@@ -2,17 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    limit,
+    onSnapshot,
+    orderBy,
+    query,
+    serverTimestamp,
+    setDoc,
+    updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -217,6 +217,16 @@ export default function ChatScreen() {
         ...doc.data(),
       })) as Message[];
 
+      // DEBUG: Log all message IDs to see if we have temp messages
+      console.log('🔍 [ChatScreen] Message IDs:', msgs.map(m => `${m.id.substring(0, 20)}... (${m.text?.substring(0, 10)}...)`));
+      
+      // Check for temp messages that should have been removed
+      const tempMessages = msgs.filter(m => m.id.startsWith('temp_'));
+      if (tempMessages.length > 0) {
+        console.warn('⚠️ [ChatScreen] Found', tempMessages.length, 'temp messages still in state!');
+        tempMessages.forEach(tm => console.warn('  - Temp:', tm.id, 'text:', tm.text));
+      }
+
       // Phase 6: No notification logic here - notifications happen in conversation list
       // when a message arrives for a chat that's NOT currently open
 
@@ -342,7 +352,12 @@ export default function ChatScreen() {
 
       // Update conversation's lastMessage
       await updateDoc(doc(db, 'conversations', conversationId), {
-        lastMessage: text.substring(0, 100),
+        lastMessage: {
+          text,
+          senderId: user.uid,
+          senderName,
+          createdAt: serverTimestamp(),
+        },
         lastMessageAt: serverTimestamp(),
         lastMessageSenderId: user.uid, // Track who sent the last message (for notifications)
         [`lastReadAt.${user.uid}`]: serverTimestamp(), // Mark as read by sender immediately
@@ -351,7 +366,12 @@ export default function ChatScreen() {
       console.log('✅ [ChatScreen] Conversation lastMessage updated');
 
       // Remove temp message (real one will appear via listener)
-      setMessages(prev => prev.filter(m => m.id !== tempId));
+      console.log('🗑️ [ChatScreen] Removing temp message:', tempId);
+      setMessages(prev => {
+        const filtered = prev.filter(m => m.id !== tempId);
+        console.log('📊 [ChatScreen] Messages after removal:', filtered.length, 'remaining');
+        return filtered;
+      });
 
     } catch (error) {
       console.error('❌ [ChatScreen] Send message error:', error);

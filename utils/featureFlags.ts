@@ -10,10 +10,10 @@ export const FEATURE_FLAGS = {
    * Priority Badge Detection (Phase 2 AI)
    * Shows colored badges (🔴 high, 🟡 medium) next to messages based on AI priority analysis.
    * 
-   * Status: Disabled due to layout issues causing text truncation
-   * TODO: Fix layout before re-enabling
+   * Status: Enabled for testing - only shows high priority (red) badges
+   * TODO: Monitor for layout issues
    */
-  PRIORITY_BADGES_ENABLED: false,
+  PRIORITY_BADGES_ENABLED: true,
 
   /**
    * Semantic Search (Phase 2 AI)
