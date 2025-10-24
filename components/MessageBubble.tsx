@@ -29,6 +29,14 @@ export default function MessageBubble({
     return 'Sending...';
   };
 
+  const getPriorityBadge = () => {
+    if (message.priority === 'high') return '🔴';
+    if (message.priority === 'medium') return '🟡';
+    return null;
+  };
+
+  const priorityBadge = getPriorityBadge();
+
   return (
     <View style={[
       styles.container, 
@@ -43,12 +51,17 @@ export default function MessageBubble({
         styles.bubble,
         isOwnMessage ? styles.ownBubble : styles.otherBubble
       ]}>
-        <Text style={[
-          styles.text,
-          isOwnMessage ? styles.ownText : styles.otherText
-        ]}>
-          {message.text}
-        </Text>
+        <View style={styles.textContainer}>
+          <Text style={[
+            styles.text,
+            isOwnMessage ? styles.ownText : styles.otherText
+          ]}>
+            {message.text}
+          </Text>
+          {priorityBadge && (
+            <Text style={styles.priorityBadge}>{priorityBadge}</Text>
+          )}
+        </View>
         
         <View style={styles.footer}>
           <Text style={[
@@ -109,9 +122,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5EA',
     borderBottomLeftRadius: 4,
   },
+  textContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   text: {
     fontSize: 16,
     lineHeight: 20,
+    flex: 1,
+  },
+  priorityBadge: {
+    fontSize: 16,
   },
   ownText: {
     color: '#fff',

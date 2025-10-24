@@ -2,9 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp } from 'firebase/app';
 import { Auth, getAuth, initializeAuth } from 'firebase/auth';
 import { Firestore, getFirestore, initializeFirestore } from 'firebase/firestore';
+import { Functions, getFunctions } from 'firebase/functions';
 
 // Import getReactNativePersistence dynamically to avoid TS issues
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 const { getReactNativePersistence } = require('firebase/auth');
 
 // Firebase configuration from environment variables
@@ -42,4 +43,7 @@ try {
   db = getFirestore(app);
 }
 
-export { auth, db };
+// Initialize Firebase Functions
+const functions: Functions = getFunctions(app);
+
+export { auth, db, functions };

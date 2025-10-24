@@ -2,24 +2,29 @@ import { Ionicons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    limit,
-    onSnapshot,
-    orderBy,
-    query,
-    serverTimestamp,
-    setDoc,
-    updateDoc
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
+import { ActionItemsModal } from '../../components/ActionItemsModal';
+import { DecisionsModal } from '../../components/DecisionsModal';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
 import MessageInput from '../../components/MessageInput';
 import MessageList from '../../components/MessageList';
 import OfflineBanner from '../../components/OfflineBanner';
+import { SearchModal } from '../../components/SearchModal';
+import { SummaryModal } from '../../components/SummaryModal';
 import TypingIndicator from '../../components/TypingIndicator';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
@@ -37,6 +42,13 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  
+  // AI Features Modals
+  const [showAIMenu, setShowAIMenu] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [showActionItemsModal, setShowActionItemsModal] = useState(false);
+  const [showDecisionsModal, setShowDecisionsModal] = useState(false);
   
   // Phase 5: Typing indicators
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
@@ -104,6 +116,9 @@ export default function ChatScreen() {
                   showText={true}
                 />
               )}
+              <TouchableOpacity onPress={() => setShowAIMenu(true)}>
+                <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => setShowParticipantsModal(true)}>
                 <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
               </TouchableOpacity>
@@ -115,14 +130,16 @@ export default function ChatScreen() {
         const participantCount = conversation.participants.length;
         title = conversation.name || `Group (${participantCount} members)`;
         
-        // Add info button for group participants
+        // Add info button for group participants + AI features
         headerRight = () => (
-          <TouchableOpacity 
-            onPress={() => setShowParticipantsModal(true)}
-            style={{ marginRight: 16 }}
-          >
-            <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, gap: 12 }}>
+            <TouchableOpacity onPress={() => setShowAIMenu(true)}>
+              <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowParticipantsModal(true)}>
+              <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
         );
       }
       
@@ -500,6 +517,46 @@ export default function ChatScreen() {
         }))}
         currentUserId={user?.uid || ''}
         onClose={() => setShowParticipantsModal(false)}
+      />
+
+      {/* AI Features Menu */}
+      <AIFeaturesMenu
+        visible={showAIMenu}
+        onClose={() => setShowAIMenu(false)}
+        onOpenSearch={() => setShowSearchModal(true)}
+        onOpenSummary={() => setShowSummaryModal(true)}
+        onOpenActionItems={() => setShowActionItemsModal(true)}
+        onOpenDecisions={() => setShowDecisionsModal(true)}
+        isGroupChat={conversation.type === 'group'}
+      />
+
+      {/* AI Feature Modals */}
+      <SearchModal
+        visible={showSearchModal}
+        conversationId={conversationId as string}
+        onClose={() => setShowSearchModal(false)}
+        onSelectMessage={(messageId) => {
+          // TODO: Scroll to message when implemented
+          console.log('Selected message:', messageId);
+        }}
+      />
+
+      <SummaryModal
+        visible={showSummaryModal}
+        conversationId={conversationId as string}
+        onClose={() => setShowSummaryModal(false)}
+      />
+
+      <ActionItemsModal
+        visible={showActionItemsModal}
+        conversationId={conversationId as string}
+        onClose={() => setShowActionItemsModal(false)}
+      />
+
+      <DecisionsModal
+        visible={showDecisionsModal}
+        conversationId={conversationId as string}
+        onClose={() => setShowDecisionsModal(false)}
       />
     </View>
   );
