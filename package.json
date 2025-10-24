@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "expo start --go",
+    "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -25,7 +25,6 @@
     "@react-navigation/native": "^7.1.8",
     "expo": "~54.0.17",
     "expo-constants": "~18.0.9",
-    "expo-dev-client": "~6.0.16",
     "expo-font": "~14.0.9",
     "expo-haptics": "~15.0.7",
     "expo-image": "~3.0.10",
