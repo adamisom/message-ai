@@ -57,9 +57,13 @@ See `/docs/PHASE_0_SETUP.md` for detailed Firebase setup.
 
 ### 4. Deploy Firestore Rules
 
-Copy rules from `/firestore.rules` to Firebase Console → Firestore → Rules → Publish
+```bash
+firebase deploy --only firestore:rules
+```
 
-**MVP Note:** Currently using test mode rules (any authenticated user can read/write). See `/docs/POST_MVP.md` for restoring proper permissions.
+Or copy rules from `/firestore.rules` to Firebase Console → Firestore → Rules → Publish
+
+**Security:** Production-grade rules with participant-based access control. Only conversation participants can read/write messages.
 
 ### 5. Run the App
 
@@ -129,7 +133,6 @@ docs/         # Documentation and phase guides
 - No message editing/deletion
 - No media uploads (text-only)
 - Last 100 messages per conversation
-- Test mode Firestore rules
 
 See `/docs/POST_MVP.md` for full list and roadmap.
 
