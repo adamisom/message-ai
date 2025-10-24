@@ -21,7 +21,7 @@ import { ActionItemsModal } from '../../components/ActionItemsModal';
 import { DecisionsModal } from '../../components/DecisionsModal';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
 import MessageInput from '../../components/MessageInput';
-import MessageList from '../../components/MessageList';
+import MessageList, { MessageListRef } from '../../components/MessageList';
 import OfflineBanner from '../../components/OfflineBanner';
 import { SearchModal } from '../../components/SearchModal';
 import { SummaryModal } from '../../components/SummaryModal';
@@ -49,6 +49,10 @@ export default function ChatScreen() {
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [showActionItemsModal, setShowActionItemsModal] = useState(false);
   const [showDecisionsModal, setShowDecisionsModal] = useState(false);
+  
+  // Jump to message functionality
+  const messageListRef = useRef<MessageListRef>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   
   // Phase 5: Typing indicators
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
@@ -371,6 +375,26 @@ export default function ChatScreen() {
     );
   };
 
+  // Jump to message from search results
+  const handleJumpToMessage = (messageId: string) => {
+    console.log('🎯 [ChatScreen] Jumping to message:', messageId);
+    
+    const index = messages.findIndex(m => m.id === messageId);
+    if (index !== -1) {
+      messageListRef.current?.scrollToIndex({
+        index,
+        animated: true,
+        viewPosition: 0.5, // Center the message in viewport
+      });
+      
+      // Highlight the message for 2 seconds
+      setHighlightedMessageId(messageId);
+      setTimeout(() => setHighlightedMessageId(null), 2000);
+    } else {
+      console.warn('⚠️ [ChatScreen] Message not found in current messages list');
+    }
+  };
+
   // Phase 5: Typing indicator handlers
   const handleTyping = async () => {
     if (!conversationId || typeof conversationId !== 'string' || !user) return;
@@ -494,10 +518,12 @@ export default function ChatScreen() {
     <View style={styles.container}>
       <OfflineBanner />
       <MessageList
+        ref={messageListRef}
         messages={messages}
         currentUserId={user?.uid || ''}
         conversationType={conversation.type}
         getReadStatus={getReadStatus}
+        highlightedMessageId={highlightedMessageId}
       />
       <TypingIndicator typingUsers={typingUsers} />
       <MessageInput
@@ -535,10 +561,7 @@ export default function ChatScreen() {
         visible={showSearchModal}
         conversationId={conversationId as string}
         onClose={() => setShowSearchModal(false)}
-        onSelectMessage={(messageId) => {
-          // TODO: Scroll to message when implemented
-          console.log('Selected message:', messageId);
-        }}
+        onSelectMessage={handleJumpToMessage}
       />
 
       <SummaryModal

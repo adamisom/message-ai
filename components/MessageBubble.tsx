@@ -7,13 +7,15 @@ interface MessageBubbleProps {
   isOwnMessage: boolean;
   showSenderName?: boolean; // For group chats
   readStatus?: '✓' | '✓✓' | null; // For read receipts (Phase 5)
+  isHighlighted?: boolean; // For search result highlighting
 }
 
 export default function MessageBubble({ 
   message, 
   isOwnMessage, 
   showSenderName = false,
-  readStatus
+  readStatus,
+  isHighlighted = false
 }: MessageBubbleProps) {
   const getTimestamp = () => {
     if (!message.createdAt) return 'Sending...';
@@ -40,7 +42,8 @@ export default function MessageBubble({
   return (
     <View style={[
       styles.container, 
-      isOwnMessage ? styles.ownMessage : styles.otherMessage
+      isOwnMessage ? styles.ownMessage : styles.otherMessage,
+      isHighlighted && styles.highlightedContainer
     ]}>
       {/* Show sender name for group chats (received messages only) */}
       {showSenderName && !isOwnMessage && (
@@ -49,7 +52,8 @@ export default function MessageBubble({
       
       <View style={[
         styles.bubble,
-        isOwnMessage ? styles.ownBubble : styles.otherBubble
+        isOwnMessage ? styles.ownBubble : styles.otherBubble,
+        isHighlighted && styles.highlightedBubble
       ]}>
         <View style={styles.textContainer}>
           <Text style={[
@@ -95,6 +99,12 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     marginHorizontal: 12,
   },
+  highlightedContainer: {
+    backgroundColor: 'rgba(255, 235, 59, 0.2)', // Light yellow highlight
+    borderRadius: 8,
+    padding: 4,
+    marginVertical: 2,
+  },
   ownMessage: {
     alignItems: 'flex-end',
   },
@@ -121,6 +131,10 @@ const styles = StyleSheet.create({
   otherBubble: {
     backgroundColor: '#E5E5EA',
     borderBottomLeftRadius: 4,
+  },
+  highlightedBubble: {
+    borderWidth: 2,
+    borderColor: '#FFD700', // Gold border for highlighted message
   },
   textContainer: {
     flexDirection: 'row',
