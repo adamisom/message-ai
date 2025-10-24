@@ -190,8 +190,73 @@ async function fetchTestUsers() {
   return users;
 }
 
+async function deleteAllConversations() {
+  console.log('🗑️  Deleting all existing conversations...');
+  
+  const conversationsSnapshot = await db.collection('conversations').get();
+  
+  if (conversationsSnapshot.empty) {
+    console.log('   No existing conversations to delete\n');
+    return;
+  }
+  
+  console.log(`   Found ${conversationsSnapshot.size} conversations to delete`);
+  
+  let deleteCount = 0;
+  let messageCount = 0;
+  
+  // Delete each conversation and its messages
+  for (const doc of conversationsSnapshot.docs) {
+    // Delete all messages in this conversation
+    const messagesSnapshot = await doc.ref.collection('messages').get();
+    
+    if (!messagesSnapshot.empty) {
+      const messageBatch = db.batch();
+      messagesSnapshot.docs.forEach((msgDoc) => {
+        messageBatch.delete(msgDoc.ref);
+      });
+      await messageBatch.commit();
+      messageCount += messagesSnapshot.size;
+    }
+    
+    // Delete the conversation document itself
+    await doc.ref.delete();
+    deleteCount++;
+    
+    process.stdout.write('.');
+  }
+  
+  console.log(`\n   ✅ Deleted ${deleteCount} conversations and ${messageCount} messages\n`);
+}
+
+async function promptForDeletion() {
+  const readline = require('readline').createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  
+  return new Promise((resolve) => {
+    readline.question(
+      '⚠️  Do you want to DELETE ALL existing conversations before creating test data? (y/N): ',
+      (answer) => {
+        readline.close();
+        resolve(answer.toLowerCase() === 'y');
+      }
+    );
+  });
+}
+
 async function main() {
   console.log('🚀 Starting test data population...\n');
+  
+  // Ask user if they want to delete existing conversations
+  const shouldDelete = await promptForDeletion();
+  
+  if (shouldDelete) {
+    await deleteAllConversations();
+  } else {
+    console.log('⏭️  Skipping deletion, keeping existing conversations\n');
+  }
   
   // Fetch real users from Firestore
   TEST_USERS = await fetchTestUsers();
