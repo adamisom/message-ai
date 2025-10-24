@@ -9,14 +9,13 @@
  */
 
 import {
-  verifyConversationAccess,
-  filterSearchResults,
+    filterSearchResults,
+    verifyConversationAccess,
 } from '../../utils/security';
 import {
-  db,
-  clearFirestore,
-  createTestUser,
-  createTestConversation,
+    clearFirestore,
+    createTestConversation,
+    createTestUser,
 } from './setup';
 
 describe('Security & Access Control Integration Tests', () => {
