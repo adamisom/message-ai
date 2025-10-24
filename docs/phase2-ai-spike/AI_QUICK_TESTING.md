@@ -41,6 +41,16 @@
    - Expo Go will install automatically on first run
    - The app should load in Expo Go on the emulator
 
+   **To restart emulator if stuck:**
+
+   `~/Library/Android/sdk/platform-tools/adb emu kill` # stop emulator, then run the start command again (see above)
+  
+   **To reload app in emulator:**
+
+   - Press `r` in Expo terminal to reload
+   - Or press `Cmd + M` in emulator to open dev menu → Reload
+   - Or restart Expo with `npx expo start --tunnel --clear`
+
 6. **Open on iPhone:**
    - Scan the QR code from terminal with your iPhone camera
    - Opens in Expo Go app
