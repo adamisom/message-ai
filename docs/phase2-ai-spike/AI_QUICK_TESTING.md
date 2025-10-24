@@ -32,8 +32,8 @@
 5. **Start Android Emulator (optional):**
 
    ```bash
-   # Starts the first available Android emulator
-   ~/Library/Android/sdk/emulator/emulator -avd $(~/Library/Android/sdk/emulator/emulator -list-avds | head -n 1) &
+   # Starts the first available Android emulator (backgrounds, hides logs)
+   ~/Library/Android/sdk/emulator/emulator -avd $(~/Library/Android/sdk/emulator/emulator -list-avds | head -n 1) > /dev/null 2>&1 &
    ```
 
    **Then in Expo terminal:**
