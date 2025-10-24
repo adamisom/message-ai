@@ -3,6 +3,8 @@ import * as admin from 'firebase-admin';
 admin.initializeApp();
 
 // Export Cloud Functions
+
+// Phase 0: Embeddings
 export {
   batchEmbedMessages,
   retryFailedEmbeddings,
@@ -10,10 +12,10 @@ export {
   incrementMessageCounter,
 } from './ai/embeddings';
 
-// These will be added in Phase 1:
-// export { generateSummary } from './ai/summarization';
-// export { extractActionItems } from './ai/actionItems';
-// export { semanticSearch } from './ai/search';
-// export { quickPriorityCheck, batchAnalyzePriority } from './ai/priority';
-// export { trackDecisions } from './ai/decisions';
+// Phase 1: AI Features
+export {semanticSearch} from './ai/search';
+export {quickPriorityCheckTrigger, batchAnalyzePriority} from './ai/priority';
+export {generateSummary} from './ai/summarization';
+export {extractActionItems} from './ai/actionItems';
+export {trackDecisions} from './ai/decisions';
 
