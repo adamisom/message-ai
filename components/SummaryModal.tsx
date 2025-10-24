@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import {
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useAIFeature } from '../hooks/useAIFeature';
 import { generateSummary } from '../services/aiService';
@@ -36,9 +36,10 @@ export function SummaryModal({
     dependencies: [messageCount],
   });
   
-  const { data: summary, loading, error, reload } = result as {
+  const { data: summary, loading, loadingSlowly, error, reload } = result as {
     data: any;
     loading: boolean;
+    loadingSlowly: boolean;
     error: string;
     reload: () => Promise<void>;
   };
@@ -88,7 +89,7 @@ export function SummaryModal({
         {loading && (
           <LoadingState
             message={`Analyzing ${messageCount} messages...`}
-            submessage="This may take a few seconds"
+            submessage={loadingSlowly ? "Still working on it, thanks for your patience..." : "This may take a few seconds"}
           />
         )}
 

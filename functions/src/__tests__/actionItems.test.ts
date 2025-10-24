@@ -113,20 +113,5 @@ describe('Action Item Extraction', () => {
     });
   });
 
-  describe('Priority validation', () => {
-    it('should accept valid priorities', () => {
-      const validPriorities = ['high', 'medium', 'low'];
-      validPriorities.forEach((priority) => {
-        expect(['high', 'medium', 'low']).toContain(priority);
-      });
-    });
-
-    it('should reject invalid priorities', () => {
-      const invalidPriorities = ['urgent', 'super-high', 'critical', ''];
-      invalidPriorities.forEach((priority) => {
-        expect(['high', 'medium', 'low']).not.toContain(priority);
-      });
-    });
-  });
 });
 

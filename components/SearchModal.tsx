@@ -1,14 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    FlatList,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { searchMessages } from '../services/aiService';
 import { commonModalStyles } from '../styles/commonModalStyles';
@@ -35,7 +35,9 @@ export function SearchModal({
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingSlowly, setLoadingSlowly] = useState(false);
   const [error, setError] = useState('');
+  const slowLoadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSearch = async () => {
     if (!query.trim()) {
@@ -44,7 +46,13 @@ export function SearchModal({
     }
 
     setLoading(true);
+    setLoadingSlowly(false);
     setError('');
+
+    // Set "loading slowly" state after 3 seconds
+    slowLoadingTimerRef.current = setTimeout(() => {
+      setLoadingSlowly(true);
+    }, 3000);
 
     try {
       const response = await searchMessages(query, conversationId) as any;
@@ -56,9 +64,32 @@ export function SearchModal({
       console.error('Search error:', err);
       setError(err.message || 'Search failed. Please try again.');
     } finally {
+      // Clear the slow loading timer
+      if (slowLoadingTimerRef.current) {
+        clearTimeout(slowLoadingTimerRef.current);
+        slowLoadingTimerRef.current = null;
+      }
       setLoading(false);
+      setLoadingSlowly(false);
     }
   };
+
+  // Cleanup timer on unmount or when modal closes
+  useEffect(() => {
+    if (!visible && slowLoadingTimerRef.current) {
+      clearTimeout(slowLoadingTimerRef.current);
+      slowLoadingTimerRef.current = null;
+      setLoadingSlowly(false);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    return () => {
+      if (slowLoadingTimerRef.current) {
+        clearTimeout(slowLoadingTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleClose = () => {
     setQuery('');
@@ -103,7 +134,12 @@ export function SearchModal({
         </View>
 
         {/* Loading State */}
-        {loading && <LoadingState message="Searching..." />}
+        {loading && (
+          <LoadingState
+            message="Searching..."
+            submessage={loadingSlowly ? "Still working on it, thanks for your patience..." : undefined}
+          />
+        )}
 
         {/* Error State */}
         {error && !loading && (

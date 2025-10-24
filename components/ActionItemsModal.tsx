@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import {
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    FlatList,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useAIFeature } from '../hooks/useAIFeature';
 import { extractActionItems, toggleActionItemStatus } from '../services/aiService';
@@ -32,7 +32,7 @@ export function ActionItemsModal({
 }: ActionItemsModalProps) {
   const [items, setItems] = useState<ActionItem[]>([]);
   
-  const { data, loading, error, reload } = useAIFeature({
+  const { data, loading, loadingSlowly, error, reload } = useAIFeature({
     visible,
     conversationId,
     fetchFunction: extractActionItems,
@@ -83,7 +83,12 @@ export function ActionItemsModal({
         <ModalHeader title="Action Items" onClose={handleClose} />
 
         {/* Loading State */}
-        {loading && <LoadingState message="Scanning for action items..." />}
+        {loading && (
+          <LoadingState
+            message="Scanning for action items..."
+            submessage={loadingSlowly ? "Still working on it, thanks for your patience..." : undefined}
+          />
+        )}
 
         {/* Error State */}
         {error && !loading && (

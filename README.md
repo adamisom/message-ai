@@ -12,6 +12,7 @@ Real-time messaging app built with React Native (Expo) and Firebase.
 - Read receipts
 - Local notifications
 - Offline support
+- **AI Features:** Semantic search, thread summarization, action items, priority detection, decision tracking
 
 ## Tech Stack
 
@@ -71,11 +72,36 @@ npx expo start --tunnel
 ## Development
 
 ```bash
-npm run validate  # Run lint, type-check, and all tests
-npm test          # Run tests only
-npm run lint      # ESLint check
-npm run type-check # TypeScript check
+npm run validate        # Run lint, type-check, and all tests
+npm test                # Run unit tests only
+npm run test:integration # Run integration tests (requires Firebase emulator)
+npm run lint            # ESLint check
+npm run type-check      # TypeScript check
 ```
+
+### Integration Tests
+
+Integration tests verify critical backend logic (rate limiting, caching, security) against a real Firebase emulator. These tests are **not** run as part of the standard `npm test` command.
+
+**Prerequisites:**
+- Firebase CLI installed: `npm install -g firebase-tools`
+- Firebase emulator running: `firebase emulators:start`
+
+**Running Integration Tests:**
+```bash
+# Terminal 1: Start Firebase emulator
+firebase emulators:start
+
+# Terminal 2: Run integration tests
+npm run test:integration
+```
+
+**What's Tested:**
+- Rate limiting (concurrent requests, hourly/monthly limits, hour resets)
+- Caching (cache hits/misses, age-based invalidation, message-count invalidation)
+- Security (access control, participant verification, search result filtering)
+
+See `docs/phase2-ai-spike/INTEGRATION_TESTS.md` for details.
 
 ## Project Structure
 
@@ -91,6 +117,7 @@ docs/         # Documentation and phase guides
 ## Documentation
 
 - **New Developer Setup:** [`/docs/DEVELOPER_SETUP.md`](/docs/DEVELOPER_SETUP.md)
+- **AI Features Testing:** [`/docs/phase2-ai-spike/AI_SMOKE_TESTS.md`](/docs/phase2-ai-spike/AI_SMOKE_TESTS.md) ⚡ Quick smoke tests (~10 min)
 - **Architecture:** `/docs/architecture.md`
 - **Manual Testing:** `/docs/MULTI_DEVICE_TESTING.md`
 - **Phase Guides:** `/docs/PHASE_0_*.md` through `/docs/PHASE_7_*.md`

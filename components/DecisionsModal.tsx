@@ -1,9 +1,9 @@
 import {
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  View,
+    FlatList,
+    Modal,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import { useAIFeature } from '../hooks/useAIFeature';
 import { trackDecisions } from '../services/aiService';
@@ -27,7 +27,7 @@ export function DecisionsModal({
   conversationId,
   onClose,
 }: DecisionsModalProps) {
-  const { data, loading, error, reload } = useAIFeature({
+  const { data, loading, loadingSlowly, error, reload } = useAIFeature({
     visible,
     conversationId,
     fetchFunction: (convId) => trackDecisions(convId),
@@ -50,7 +50,12 @@ export function DecisionsModal({
         <ModalHeader title="Decisions" onClose={handleClose} />
 
         {/* Loading State */}
-        {loading && <LoadingState message="Analyzing decisions..." />}
+        {loading && (
+          <LoadingState
+            message="Analyzing decisions..."
+            submessage={loadingSlowly ? "Still working on it, thanks for your patience..." : undefined}
+          />
+        )}
 
         {/* Error State */}
         {error && !loading && (

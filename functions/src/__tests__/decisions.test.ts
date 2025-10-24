@@ -38,18 +38,6 @@ describe('Decision Tracking', () => {
       expect(parsed).toHaveLength(2);
     });
 
-    it('should require source messages', () => {
-      const response = JSON.stringify({
-        decision: 'We decided something',
-        context: 'Context here',
-        participantIds: ['user1'],
-        sourceMessageIds: [],
-        confidence: 0.8,
-      });
-
-      const parsed = JSON.parse(response);
-      expect(parsed.sourceMessageIds).toHaveLength(0);
-    });
   });
 
   describe('Confidence filtering', () => {
@@ -82,42 +70,5 @@ describe('Decision Tracking', () => {
     });
   });
 
-  describe('Decision validation', () => {
-    it('should validate confidence is between 0 and 1', () => {
-      const validConfidences = [0, 0.5, 1];
-      validConfidences.forEach((conf) => {
-        expect(conf).toBeGreaterThanOrEqual(0);
-        expect(conf).toBeLessThanOrEqual(1);
-      });
-    });
-
-    it('should reject confidence outside 0-1 range', () => {
-      const invalidConfidences = [-0.1, 1.5, 2.0];
-      invalidConfidences.forEach((conf) => {
-        expect(conf < 0 || conf > 1).toBe(true);
-      });
-    });
-
-    it('should require non-empty decision text', () => {
-      const decision = {
-        decision: 'Valid decision text',
-        context: 'Some context',
-      };
-      expect(decision.decision.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Context validation', () => {
-    it('should accept valid context', () => {
-      const context =
-        'Team discussed multiple options and reached consensus after considering timeline and budget constraints.';
-      expect(context.length).toBeGreaterThan(10);
-    });
-
-    it('should identify insufficient context', () => {
-      const shortContext = 'Brief';
-      expect(shortContext.length).toBeLessThan(20);
-    });
-  });
 });
 
