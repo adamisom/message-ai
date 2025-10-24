@@ -121,7 +121,7 @@ export default function ConversationItem({
           )}
         </View>
         <Text style={[styles.lastMessage, isUnread && styles.unreadText]} numberOfLines={1}>
-          {conversation.lastMessage || 'No messages yet'}
+          {conversation.lastMessage?.text || 'No messages yet'}
         </Text>
       </View>
     </TouchableOpacity>
