@@ -1,14 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
-    ActivityIndicator,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { useAIFeature } from '../hooks/useAIFeature';
 import { generateSummary } from '../services/aiService';
+import { commonModalStyles } from '../styles/commonModalStyles';
+import { Colors } from '../utils/colors';
+import { EmptyState } from './modals/EmptyState';
+import { ErrorState } from './modals/ErrorState';
+import { LoadingState } from './modals/LoadingState';
+import { ModalHeader } from './modals/ModalHeader';
 
 interface SummaryModalProps {
   visible: boolean;
@@ -21,36 +27,23 @@ export function SummaryModal({
   conversationId,
   onClose,
 }: SummaryModalProps) {
-  const [summary, setSummary] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [messageCount, setMessageCount] = useState(50);
-
-  useEffect(() => {
-    if (visible) {
-      loadSummary();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, messageCount]);
-
-  const loadSummary = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const result = await generateSummary(conversationId, messageCount);
-      setSummary(result);
-    } catch (err: any) {
-      console.error('Summary error:', err);
-      setError(err.message || 'Failed to generate summary');
-    } finally {
-      setLoading(false);
-    }
+  
+  const result = useAIFeature({
+    visible,
+    conversationId,
+    fetchFunction: (convId) => generateSummary(convId, messageCount),
+    dependencies: [messageCount],
+  });
+  
+  const { data: summary, loading, error, reload } = result as {
+    data: any;
+    loading: boolean;
+    error: string;
+    reload: () => Promise<void>;
   };
 
   const handleClose = () => {
-    setSummary(null);
-    setError('');
     onClose();
   };
 
@@ -61,14 +54,8 @@ export function SummaryModal({
       presentationStyle="pageSheet"
       onRequestClose={handleClose}
     >
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Thread Summary</Text>
-          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>✕</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={commonModalStyles.container}>
+        <ModalHeader title="Thread Summary" onClose={handleClose} />
 
         {/* Message Count Selector */}
         <View style={styles.selectorContainer}>
@@ -99,23 +86,15 @@ export function SummaryModal({
 
         {/* Loading State */}
         {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
-            <Text style={styles.loadingText}>
-              Analyzing {messageCount} messages...
-            </Text>
-            <Text style={styles.loadingSubtext}>This may take a few seconds</Text>
-          </View>
+          <LoadingState
+            message={`Analyzing ${messageCount} messages...`}
+            submessage="This may take a few seconds"
+          />
         )}
 
         {/* Error State */}
         {error && !loading && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity onPress={loadSummary} style={styles.retryButton}>
-              <Text style={styles.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
+          <ErrorState message={error} onRetry={reload} />
         )}
 
         {/* Summary Content */}
@@ -124,24 +103,28 @@ export function SummaryModal({
             style={styles.content}
             contentContainerStyle={styles.contentContainer}
           >
-            <View style={styles.summarySection}>
-              <Text style={styles.sectionTitle}>Summary</Text>
-              <Text style={styles.summaryText}>{summary.summary}</Text>
-            </View>
+            {(summary as any).summary && (
+              <View style={styles.summarySection}>
+                <Text style={styles.sectionTitle}>Summary</Text>
+                <Text style={styles.summaryText}>{(summary as any).summary}</Text>
+              </View>
+            )}
 
-            <View style={styles.keyPointsSection}>
-              <Text style={styles.sectionTitle}>Key Points</Text>
-              {summary.keyPoints.map((point: string, index: number) => (
-                <View key={`keypoint-${index}`} style={styles.keyPointItem}>
-                  <Text style={styles.bullet}>•</Text>
-                  <Text style={styles.keyPointText}>{point}</Text>
-                </View>
-              ))}
-            </View>
+            {((summary as any).keyPoints && Array.isArray((summary as any).keyPoints)) && (
+              <View style={styles.keyPointsSection}>
+                <Text style={styles.sectionTitle}>Key Points</Text>
+                {(summary as any).keyPoints.map((point: string, index: number) => (
+                  <View key={`keypoint-${index}`} style={styles.keyPointItem}>
+                    <Text style={styles.bullet}>•</Text>
+                    <Text style={styles.keyPointText}>{point}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>
-                Summary generated from {summary.messageCount || messageCount}{' '}
+                Summary generated from {(summary as any).messageCount || messageCount}{' '}
                 messages
               </Text>
             </View>
@@ -150,12 +133,10 @@ export function SummaryModal({
 
         {/* Empty State */}
         {!loading && !error && !summary && (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📝</Text>
-            <Text style={styles.emptyText}>
-              Get an AI-powered summary of this conversation
-            </Text>
-          </View>
+          <EmptyState
+            icon="📝"
+            message="Get an AI-powered summary of this conversation"
+          />
         )}
       </View>
     </Modal>
@@ -163,38 +144,14 @@ export function SummaryModal({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  closeButtonText: {
-    fontSize: 24,
-    color: '#666',
-  },
   selectorContainer: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: Colors.borderLight,
   },
   selectorLabel: {
     fontSize: 14,
-    color: '#666',
+    color: Colors.textMedium,
     marginBottom: 8,
   },
   selectorButtons: {
@@ -205,59 +162,20 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.backgroundLight,
     borderRadius: 8,
     alignItems: 'center',
   },
   selectorButtonActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: Colors.primary,
   },
   selectorButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
+    color: Colors.textDark,
   },
   selectorButtonTextActive: {
-    color: '#fff',
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#333',
-  },
-  loadingSubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#999',
-  },
-  errorContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  errorText: {
-    color: '#c00',
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  retryButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+    color: Colors.textWhite,
   },
   content: {
     flex: 1,
@@ -271,13 +189,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: Colors.textDark,
     marginBottom: 12,
   },
   summaryText: {
     fontSize: 16,
     lineHeight: 24,
-    color: '#666',
+    color: Colors.textMedium,
   },
   keyPointsSection: {
     marginBottom: 24,
@@ -288,7 +206,7 @@ const styles = StyleSheet.create({
   },
   bullet: {
     fontSize: 16,
-    color: '#007AFF',
+    color: Colors.primary,
     marginRight: 8,
     marginTop: 2,
   },
@@ -296,32 +214,16 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     lineHeight: 20,
-    color: '#666',
+    color: Colors.textMedium,
   },
   footer: {
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: Colors.borderLight,
   },
   footerText: {
     fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
+    color: Colors.textLight,
     textAlign: 'center',
   },
 });
-

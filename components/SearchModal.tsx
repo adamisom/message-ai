@@ -1,18 +1,23 @@
 import { useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { searchMessages } from '../services/aiService';
+import { commonModalStyles } from '../styles/commonModalStyles';
 import type { SearchResult } from '../types';
+import { Colors } from '../utils/colors';
+import { formatDate } from '../utils/dateFormat';
+import { EmptyState } from './modals/EmptyState';
+import { LoadingState } from './modals/LoadingState';
+import { ModalHeader } from './modals/ModalHeader';
 
 interface SearchModalProps {
   visible: boolean;
@@ -62,13 +67,6 @@ export function SearchModal({
     onClose();
   };
 
-  const formatDate = (timestamp: any) => {
-    if (!timestamp) return '';
-    const date =
-      timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString();
-  };
-
   return (
     <Modal
       visible={visible}
@@ -77,16 +75,10 @@ export function SearchModal({
       onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
-        style={styles.container}
+        style={commonModalStyles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Search Messages</Text>
-          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>✕</Text>
-          </TouchableOpacity>
-        </View>
+        <ModalHeader title="Search Messages" onClose={handleClose} />
 
         {/* Search Input */}
         <View style={styles.searchContainer}>
@@ -111,17 +103,12 @@ export function SearchModal({
         </View>
 
         {/* Loading State */}
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
-            <Text style={styles.loadingText}>Searching...</Text>
-          </View>
-        )}
+        {loading && <LoadingState message="Searching..." />}
 
         {/* Error State */}
         {error && !loading && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorBannerText}>{error}</Text>
           </View>
         )}
 
@@ -165,15 +152,11 @@ export function SearchModal({
 
         {/* Empty State */}
         {!loading && !error && results.length === 0 && query.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🔍</Text>
-            <Text style={styles.emptyText}>
-              Search for messages in this conversation
-            </Text>
-            <Text style={styles.emptySubtext}>
-              Try searching for keywords, topics, or names
-            </Text>
-          </View>
+          <EmptyState
+            icon="🔍"
+            message="Search for messages in this conversation"
+            submessage="Try searching for keywords, topics, or names"
+          />
         )}
       </KeyboardAvoidingView>
     </Modal>
@@ -181,30 +164,6 @@ export function SearchModal({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  closeButtonText: {
-    fontSize: 24,
-    color: '#666',
-  },
   searchContainer: {
     flexDirection: 'row',
     padding: 16,
@@ -214,7 +173,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: Colors.border,
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 16,
@@ -222,7 +181,7 @@ const styles = StyleSheet.create({
   searchButton: {
     width: 44,
     height: 44,
-    backgroundColor: '#007AFF',
+    backgroundColor: Colors.primary,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -230,25 +189,14 @@ const styles = StyleSheet.create({
   searchButtonText: {
     fontSize: 20,
   },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
+  errorBanner: {
     padding: 16,
-    backgroundColor: '#fee',
+    backgroundColor: Colors.errorBackground,
     marginHorizontal: 16,
     borderRadius: 8,
   },
-  errorText: {
-    color: '#c00',
+  errorBannerText: {
+    color: Colors.error,
     fontSize: 14,
   },
   resultsList: {
@@ -257,7 +205,7 @@ const styles = StyleSheet.create({
   resultItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: Colors.borderLight,
   },
   resultHeader: {
     flexDirection: 'row',
@@ -268,15 +216,15 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: Colors.textDark,
   },
   resultDate: {
     fontSize: 12,
-    color: '#999',
+    color: Colors.textLight,
   },
   messageText: {
     fontSize: 14,
-    color: '#666',
+    color: Colors.textMedium,
     marginBottom: 4,
   },
   resultFooter: {
@@ -286,32 +234,10 @@ const styles = StyleSheet.create({
   },
   sourceIndicator: {
     fontSize: 12,
-    color: '#999',
+    color: Colors.textLight,
   },
   scoreText: {
     fontSize: 12,
-    color: '#007AFF',
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
+    color: Colors.primary,
   },
 });
-

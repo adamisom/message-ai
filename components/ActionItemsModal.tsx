@@ -1,15 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { useAIFeature } from '../hooks/useAIFeature';
 import { extractActionItems, toggleActionItemStatus } from '../services/aiService';
+import { commonModalStyles } from '../styles/commonModalStyles';
 import type { ActionItem } from '../types';
+import { getPriorityColor } from '../utils/colorHelpers';
+import { Colors } from '../utils/colors';
+import { formatDateString } from '../utils/dateFormat';
+import { EmptyState } from './modals/EmptyState';
+import { ErrorState } from './modals/ErrorState';
+import { LoadingState } from './modals/LoadingState';
+import { ModalHeader } from './modals/ModalHeader';
 
 interface ActionItemsModalProps {
   visible: boolean;
@@ -23,29 +31,17 @@ export function ActionItemsModal({
   onClose,
 }: ActionItemsModalProps) {
   const [items, setItems] = useState<ActionItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  
+  const { data, loading, error, reload } = useAIFeature({
+    visible,
+    conversationId,
+    fetchFunction: extractActionItems,
+  });
 
-  useEffect(() => {
-    if (visible) {
-      loadActionItems();
-    }
-  }, [visible, conversationId]);
-
-  const loadActionItems = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const result = await extractActionItems(conversationId) as any;
-      setItems(result.items || []);
-    } catch (err: any) {
-      console.error('Action items error:', err);
-      setError(err.message || 'Failed to extract action items');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Update local state when data changes
+  if (data && items !== (data as any).items) {
+    setItems((data as any).items || []);
+  }
 
   const handleToggleStatus = async (itemId: string, currentStatus: string) => {
     const newStatus: 'pending' | 'completed' = currentStatus === 'pending' ? 'completed' : 'pending';
@@ -71,28 +67,8 @@ export function ActionItemsModal({
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return '#ff4444';
-      case 'medium':
-        return '#ffaa00';
-      case 'low':
-        return '#44ff44';
-      default:
-        return '#999999';
-    }
-  };
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
-  };
-
   const handleClose = () => {
     setItems([]);
-    setError('');
     onClose();
   };
 
@@ -103,36 +79,15 @@ export function ActionItemsModal({
       presentationStyle="pageSheet"
       onRequestClose={handleClose}
     >
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Action Items</Text>
-          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>✕</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={commonModalStyles.container}>
+        <ModalHeader title="Action Items" onClose={handleClose} />
 
         {/* Loading State */}
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
-            <Text style={styles.loadingText}>
-              Scanning for action items...
-            </Text>
-          </View>
-        )}
+        {loading && <LoadingState message="Scanning for action items..." />}
 
         {/* Error State */}
         {error && !loading && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity
-              onPress={loadActionItems}
-              style={styles.retryButton}
-            >
-              <Text style={styles.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
+          <ErrorState message={error} onRetry={reload} />
         )}
 
         {/* Action Items List */}
@@ -180,7 +135,7 @@ export function ActionItemsModal({
                       <View style={styles.dueDateContainer}>
                         <Text style={styles.dueDateIcon}>📅</Text>
                         <Text style={styles.dueDateText}>
-                          Due: {formatDate(item.dueDate)}
+                          Due: {formatDateString(item.dueDate)}
                         </Text>
                       </View>
                     )}
@@ -202,13 +157,11 @@ export function ActionItemsModal({
             )}
             ListEmptyComponent={
               !loading && !error ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>✓</Text>
-                  <Text style={styles.emptyText}>No action items found</Text>
-              <Text style={styles.emptySubtext}>
-                AI didn&apos;t detect any tasks or to-dos in this conversation
-              </Text>
-                </View>
+                <EmptyState
+                  icon="✓"
+                  message="No action items found"
+                  submessage="AI didn't detect any tasks or to-dos in this conversation"
+                />
               ) : null
             }
             contentContainerStyle={[
@@ -223,64 +176,6 @@ export function ActionItemsModal({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  closeButtonText: {
-    fontSize: 24,
-    color: '#666',
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  errorText: {
-    color: '#c00',
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  retryButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
   listContent: {
     padding: 16,
   },
@@ -288,7 +183,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemCard: {
-    backgroundColor: '#f8f8f8',
+    backgroundColor: Colors.backgroundGray,
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
@@ -302,8 +197,8 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#007AFF',
-    backgroundColor: '#fff',
+    borderColor: Colors.primary,
+    backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -311,7 +206,7 @@ const styles = StyleSheet.create({
   },
   checkboxText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: Colors.primary,
     fontWeight: '600',
   },
   itemContent: {
@@ -319,12 +214,12 @@ const styles = StyleSheet.create({
   },
   itemText: {
     fontSize: 16,
-    color: '#333',
+    color: Colors.textDark,
     marginBottom: 8,
   },
   itemTextCompleted: {
     textDecorationLine: 'line-through',
-    color: '#999',
+    color: Colors.textLight,
   },
   assigneeContainer: {
     flexDirection: 'row',
@@ -337,7 +232,7 @@ const styles = StyleSheet.create({
   },
   assigneeText: {
     fontSize: 14,
-    color: '#666',
+    color: Colors.textMedium,
   },
   dueDateContainer: {
     flexDirection: 'row',
@@ -350,7 +245,7 @@ const styles = StyleSheet.create({
   },
   dueDateText: {
     fontSize: 14,
-    color: '#666',
+    color: Colors.textMedium,
   },
   priorityBadge: {
     flexDirection: 'row',
@@ -366,28 +261,6 @@ const styles = StyleSheet.create({
   priorityText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#999',
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
+    color: Colors.textLight,
   },
 });
-

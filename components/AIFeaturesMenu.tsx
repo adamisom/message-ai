@@ -1,10 +1,11 @@
 import {
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { Colors } from '../utils/colors';
 
 interface AIFeaturesMenuProps {
   visible: boolean;
@@ -119,7 +120,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   menu: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.background,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingBottom: 32,
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: Colors.borderLight,
     marginBottom: 8,
   },
   menuItem: {
@@ -140,7 +141,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: Colors.borderLight,
   },
   menuIcon: {
     fontSize: 24,
@@ -152,12 +153,12 @@ const styles = StyleSheet.create({
   menuTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#000',
+    color: Colors.textDark,
     marginBottom: 2,
   },
   menuDescription: {
     fontSize: 13,
-    color: '#666',
+    color: Colors.textMedium,
   },
   cancelButton: {
     borderBottomWidth: 0,
@@ -168,7 +169,7 @@ const styles = StyleSheet.create({
   cancelText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#007AFF',
+    color: Colors.primary,
     textAlign: 'center',
   },
 });
