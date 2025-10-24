@@ -13,11 +13,13 @@
  *   node scripts/populateTestData.js
  */
 
+/* eslint-env node */
 const admin = require('firebase-admin');
 const path = require('path');
 
 // Initialize Firebase Admin
 const serviceAccountPath = path.resolve(
+  // eslint-disable-next-line no-undef
   __dirname,
   '../functions/serviceAccountKey.json'
 );
@@ -37,6 +39,10 @@ const MESSAGE_TEMPLATES = {
     'ASAP - Client needs response by end of day',
     'EMERGENCY: Budget approval deadline is today',
     'This is critical - production bug affecting users',
+    'URGENT: Payment system failing, losing revenue',
+    'HIGH PRIORITY: Security vulnerability detected',
+    'CRITICAL: Database backup failed last night',
+    'ASAP: CEO needs presentation slides before 2pm',
   ],
   casual: [
     'lol',
@@ -45,6 +51,12 @@ const MESSAGE_TEMPLATES = {
     'ok cool',
     'haha nice',
     'good morning',
+    'np',
+    'awesome',
+    'got it',
+    'will do',
+    'sure thing',
+    'makes sense',
   ],
   actionItems: [
     'Alice, can you review the budget by Friday?',
@@ -52,6 +64,11 @@ const MESSAGE_TEMPLATES = {
     'Charlie, please send the report to diana@example.com',
     'Diana needs to approve the design by end of week',
     'Someone should schedule a follow-up meeting for next Tuesday',
+    'Alice needs to finalize the contract by Monday',
+    'Bob, can you prepare the quarterly report?',
+    'Charlie should reach out to the vendor about pricing',
+    'Diana, please review the security audit findings',
+    'Someone needs to book the conference room for next week',
   ],
   decisions: [
     'We all agree - let\'s go with option A for the Q4 strategy',
@@ -59,6 +76,11 @@ const MESSAGE_TEMPLATES = {
     'Budget approved at $50,000 for the marketing campaign',
     'Charlie will be the project lead starting next month',
     'Meeting rescheduled to 3pm Friday, everyone confirmed',
+    'Team consensus: we\'re moving to the new office in January',
+    'Decided: hiring freeze until Q2 next year',
+    'Agreement reached: weekly standups at 10am Mondays',
+    'Final decision: going with vendor B for the contract',
+    'Confirmed: product launch date is March 15th',
   ],
   normal: [
     'What does everyone think about the proposal?',
@@ -68,6 +90,29 @@ const MESSAGE_TEMPLATES = {
     'Let me check with the team and get back to you',
     'The timeline seems reasonable to me',
     'Good point, I hadn\'t considered that angle',
+    'I think we should loop in the stakeholders',
+    'Has anyone heard back from the client yet?',
+    'The metrics look promising this quarter',
+    'We might need to adjust our approach here',
+    'I can work on that this afternoon',
+    'Does anyone have bandwidth to help with this?',
+    'The deadline is tight but doable',
+    'I\'ll follow up with them tomorrow morning',
+    'We should document this decision for future reference',
+    'That aligns well with our overall strategy',
+    'I appreciate everyone\'s input on this',
+    'Let\'s touch base after the weekend',
+    'The feedback from users has been positive',
+    'We need to prioritize this for next sprint',
+    'I\'ll create a ticket for tracking this',
+    'Does this work for everyone\'s schedule?',
+    'We should run this by legal first',
+    'I\'m seeing some potential risks here',
+    'The cost-benefit analysis looks favorable',
+    'We can iterate on this in the next version',
+    'I think we\'re on the right track',
+    'Let me know if you need any clarification',
+    'This is a great starting point',
   ],
 };
 
