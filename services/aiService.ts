@@ -64,6 +64,9 @@ async function callAIFeatureWithTimeout<T>(
     return (result as any).data as T;
   } catch (error: any) {
     console.error(`[aiService] ${functionName} error:`, error);
+    console.error(`[aiService] Error code:`, error.code);
+    console.error(`[aiService] Error message:`, error.message);
+    console.error(`[aiService] Full error:`, JSON.stringify(error, null, 2));
     throw new Error(getErrorMessage(error));
   }
 }

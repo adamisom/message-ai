@@ -1,9 +1,9 @@
-import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import {generateEmbedding} from '../utils/openai';
-import {queryVectors} from '../utils/pinecone';
-import {verifyConversationAccess, filterSearchResults} from '../utils/security';
-import {checkAIRateLimit} from '../utils/rateLimit';
+import * as functions from 'firebase-functions';
+import { generateEmbedding } from '../utils/openai';
+import { queryVectors } from '../utils/pinecone';
+import { checkAIRateLimit } from '../utils/rateLimit';
+import { filterSearchResults, verifyConversationAccess } from '../utils/security';
 
 const db = admin.firestore();
 
@@ -24,8 +24,11 @@ interface SearchResult {
   score?: number;
 }
 
-export const semanticSearch = functions.https.onCall(
-  async (data: SearchRequest, context) => {
+export const semanticSearch = functions
+  .runWith({
+    secrets: ['OPENAI_API_KEY', 'PINECONE_API_KEY'],
+  })
+  .https.onCall(async (data: SearchRequest, context) => {
     // 1. Auth check
     if (!context.auth) {
       throw new functions.https.HttpsError(
@@ -43,6 +46,9 @@ export const semanticSearch = functions.https.onCall(
       );
     }
 
+    // 3. Validate limit
+    const limit = Math.min(data.limit || 10, 50); // Cap at 50 results
+
     // 3. If conversationId provided, verify access
     if (data.conversationId) {
       await verifyConversationAccess(context.auth.uid, data.conversationId);
@@ -54,15 +60,15 @@ export const semanticSearch = functions.https.onCall(
     // 5. Query Pinecone (get 2x results for security filtering)
     const pineconeResults = await queryVectors(
       queryEmbedding,
-      data.conversationId || '',
-      data.limit * 2
+      data.conversationId || null,
+      limit * 2
     );
 
     // 6. Security filter: only messages where user is participant
     const secureResults = filterSearchResults(
       pineconeResults.matches,
       context.auth.uid
-    ).slice(0, data.limit);
+    ).slice(0, limit);
 
     // 7. Fetch full message documents from Firestore
     const messages = await fetchMessagesByIds(secureResults);
@@ -83,7 +89,15 @@ async function fetchMessagesByIds(
 
   for (const match of pineconeMatches) {
     // Pinecone ID format: conversationId_messageId
-    const [conversationId, messageId] = match.id.split('_');
+    const parts = match.id.split('_');
+    
+    // Validate ID format
+    if (parts.length !== 2) {
+      console.warn(`Invalid Pinecone ID format: ${match.id}`);
+      continue;
+    }
+    
+    const [conversationId, messageId] = parts;
 
     try {
       const messageDoc = await db

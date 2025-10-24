@@ -1,9 +1,15 @@
-import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import {callClaude} from '../utils/anthropic';
-import {verifyConversationAccess} from '../utils/security';
-import {checkAIRateLimit} from '../utils/rateLimit';
-import {getCachedResult} from '../utils/caching';
+import * as functions from 'firebase-functions';
+import { callClaude } from '../utils/anthropic';
+import { getCachedResult } from '../utils/caching';
+import {
+    extractJsonFromAIResponse,
+    formatParticipantsForPrompt,
+    getConversationOrThrow,
+    getMessagesForAI,
+} from '../utils/conversationHelpers';
+import { checkAIRateLimit } from '../utils/rateLimit';
+import { verifyConversationAccess } from '../utils/security';
 
 const db = admin.firestore();
 
@@ -12,8 +18,11 @@ interface ActionItemRequest {
   messageRange?: {start: any; end: any};
 }
 
-export const extractActionItems = functions.https.onCall(
-  async (data: ActionItemRequest, context) => {
+export const extractActionItems = functions
+  .runWith({
+    secrets: ['ANTHROPIC_API_KEY'],
+  })
+  .https.onCall(async (data: ActionItemRequest, context) => {
     // 1-3. Auth, access, rate limit
     if (!context.auth) {
       throw new functions.https.HttpsError(
@@ -35,7 +44,7 @@ export const extractActionItems = functions.https.onCall(
     // 4. Check cache
     const cache = await getCachedResult<any>(
       data.conversationId,
-      `conversations/${data.conversationId}/ai_action_items_cache`,
+      `conversations/${data.conversationId}/ai_cache/action_items`,
       86400000, // 24 hours
       10 // max 10 new messages
     );
@@ -46,42 +55,24 @@ export const extractActionItems = functions.https.onCall(
     }
 
     // 5. Get conversation and messages
-    const conversation = await db
-      .doc(`conversations/${data.conversationId}`)
-      .get();
-    const conversationData = conversation.data()!;
+    const {data: conversationData, messageCount} = await getConversationOrThrow(
+      data.conversationId
+    );
 
-    let messagesQuery = db
-      .collection(`conversations/${data.conversationId}/messages`)
-      .orderBy('createdAt', 'desc')
-      .limit(100);
+    const {messages, formatted: formattedMessages} = await getMessagesForAI(
+      data.conversationId,
+      {limit: 100, messageRange: data.messageRange}
+    );
 
-    if (data.messageRange) {
-      messagesQuery = messagesQuery
-        .where('createdAt', '>=', data.messageRange.start)
-        .where('createdAt', '<=', data.messageRange.end);
+    // Return early if no messages
+    if (messages.length === 0) {
+      return {items: []};
     }
 
-    const messagesSnapshot = await messagesQuery.get();
-    const messages = messagesSnapshot.docs.reverse().map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
-    // 6. Format messages for Claude
-    const formattedMessages = messages
-      .map((m: any) => `[${m.senderName}]: ${m.text}`)
-      .join('\n');
-
-    // Format participants for Claude
-    const participantsList = Object.entries(
+    // 6. Format participants for Claude
+    const participantsList = formatParticipantsForPrompt(
       conversationData.participantDetails
-    )
-      .map(
-        ([uid, details]: [string, any]) =>
-          `- ${details.displayName} (${details.email})`
-      )
-      .join('\n');
+    );
 
     // 7. Build prompt
     const prompt = `
@@ -121,16 +112,13 @@ Priority rules:
     // 9. Validate response (expecting array)
     let actionItemsArray;
     try {
-      let json = rawResponse.trim();
-      if (json.startsWith('```')) {
-        json = json.replace(/^```json?\n/, '').replace(/\n```$/, '');
-      }
-      actionItemsArray = JSON.parse(json);
+      actionItemsArray = extractJsonFromAIResponse<any[]>(rawResponse);
 
       if (!Array.isArray(actionItemsArray)) {
         throw new Error('Response is not an array');
       }
     } catch (error) {
+      console.error('Failed to parse Claude response:', rawResponse);
       throw new functions.https.HttpsError(
         'internal',
         `Failed to parse action items: ${(error as Error).message}`
@@ -171,35 +159,44 @@ Priority rules:
     });
     await batch.commit();
 
-    // 12. Store in cache
+    // 12. Store in cache (convert serverTimestamp to actual timestamp for array storage)
+    const now = admin.firestore.Timestamp.now();
+    const itemsForCache = resolvedItems.map((item) => ({
+      ...item,
+      extractedAt: now,
+    }));
     await db
-      .doc(`conversations/${data.conversationId}/ai_action_items_cache`)
+      .doc(`conversations/${data.conversationId}/ai_cache/action_items`)
       .set({
-        items: resolvedItems,
-        messageCountAtGeneration: conversationData.messageCount,
-        generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        items: itemsForCache,
+        messageCountAtGeneration: messageCount,
+        generatedAt: now,
       });
 
-    return {items: resolvedItems};
+    return {items: itemsForCache};
   }
 );
 
-async function resolveAssignee(
+export async function resolveAssignee(
   identifier: string | null,
   participantDetails: any
 ): Promise<{uid: string; displayName: string; email: string} | null> {
-  if (!identifier) return null;
+  if (!identifier || !participantDetails) return null;
 
   const isEmail = identifier.includes('@');
 
   if (isEmail) {
     // Find by email
     for (const [uid, details] of Object.entries(participantDetails)) {
-      if ((details as any).email.toLowerCase() === identifier.toLowerCase()) {
+      const detailsObj = details as any;
+      if (
+        detailsObj.email &&
+        detailsObj.email.toLowerCase() === identifier.toLowerCase()
+      ) {
         return {
           uid,
-          displayName: (details as any).displayName,
-          email: (details as any).email,
+          displayName: detailsObj.displayName || '',
+          email: detailsObj.email,
         };
       }
     }
@@ -207,13 +204,15 @@ async function resolveAssignee(
     // Find by display name
     const matches = [];
     for (const [uid, details] of Object.entries(participantDetails)) {
+      const detailsObj = details as any;
       if (
-        (details as any).displayName.toLowerCase() === identifier.toLowerCase()
+        detailsObj.displayName &&
+        detailsObj.displayName.toLowerCase() === identifier.toLowerCase()
       ) {
         matches.push({
           uid,
-          displayName: (details as any).displayName,
-          email: (details as any).email,
+          displayName: detailsObj.displayName,
+          email: detailsObj.email || '',
         });
       }
     }

@@ -1,14 +1,22 @@
-import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import {callClaude} from '../utils/anthropic';
-import {verifyConversationAccess} from '../utils/security';
-import {checkAIRateLimit} from '../utils/rateLimit';
-import {getCachedResult} from '../utils/caching';
+import * as functions from 'firebase-functions';
+import { callClaude } from '../utils/anthropic';
+import { getCachedResult } from '../utils/caching';
+import {
+    extractJsonFromAIResponse,
+    getConversationOrThrow,
+    getMessagesForAI,
+} from '../utils/conversationHelpers';
+import { checkAIRateLimit } from '../utils/rateLimit';
+import { verifyConversationAccess } from '../utils/security';
 
 const db = admin.firestore();
 
-export const trackDecisions = functions.https.onCall(
-  async (data: {conversationId: string}, context) => {
+export const trackDecisions = functions
+  .runWith({
+    secrets: ['ANTHROPIC_API_KEY'],
+  })
+  .https.onCall(async (data: {conversationId: string}, context) => {
     // Auth, access, rate limit checks
     if (!context.auth) {
       throw new functions.https.HttpsError(
@@ -30,7 +38,7 @@ export const trackDecisions = functions.https.onCall(
     // Check cache (24 hours, 10 new messages)
     const cache = await getCachedResult<any>(
       data.conversationId,
-      `conversations/${data.conversationId}/ai_decisions_cache`,
+      `conversations/${data.conversationId}/ai_cache/decisions`,
       86400000,
       10
     );
@@ -40,30 +48,26 @@ export const trackDecisions = functions.https.onCall(
     }
 
     // Get conversation and messages
-    const conversation = await db
-      .doc(`conversations/${data.conversationId}`)
-      .get();
-    const conversationData = conversation.data()!;
+    const {data: conversationData, messageCount} = await getConversationOrThrow(
+      data.conversationId
+    );
 
-    const messagesSnapshot = await db
-      .collection(`conversations/${data.conversationId}/messages`)
-      .orderBy('createdAt', 'desc')
-      .limit(100)
-      .get();
+    const {messages, formatted: formattedMessages} = await getMessagesForAI(
+      data.conversationId,
+      {limit: 100}
+    );
 
-    const messages = messagesSnapshot.docs.reverse().map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    // Return early if no messages
+    if (messages.length === 0) {
+      return {decisions: []};
+    }
 
-    // Format for Claude
-    const formattedMessages = messages
-      .map((m: any) => `[${m.senderName}]: ${m.text}`)
-      .join('\n');
-
-    const participantNames = Object.values(conversationData.participantDetails)
-      .map((p: any) => p.displayName)
-      .join(', ');
+    // Format participant names
+    const participantNames = conversationData.participantDetails
+      ? Object.values(conversationData.participantDetails)
+          .map((p: any) => p?.displayName || 'Unknown')
+          .join(', ')
+      : 'Unknown';
 
     // Build prompt
     const prompt = `
@@ -98,11 +102,7 @@ Examples of decisions:
     // Parse and validate
     let decisionsArray;
     try {
-      let json = rawResponse.trim();
-      if (json.startsWith('```')) {
-        json = json.replace(/^```json?\n/, '').replace(/\n```$/, '');
-      }
-      decisionsArray = JSON.parse(json);
+      decisionsArray = extractJsonFromAIResponse<any[]>(rawResponse);
 
       if (!Array.isArray(decisionsArray)) {
         throw new Error('Response is not an array');
@@ -111,6 +111,7 @@ Examples of decisions:
       // Filter by confidence
       decisionsArray = decisionsArray.filter((d) => d.confidence > 0.7);
     } catch (error) {
+      console.error('Failed to parse Claude response:', rawResponse);
       throw new functions.https.HttpsError(
         'internal',
         `Failed to parse decisions: ${(error as Error).message}`
@@ -135,13 +136,14 @@ Examples of decisions:
     });
     await batch.commit();
 
-    // Cache
+    // Cache (use actual timestamp instead of serverTimestamp for array storage)
+    const now = admin.firestore.Timestamp.now();
     await db
-      .doc(`conversations/${data.conversationId}/ai_decisions_cache`)
+      .doc(`conversations/${data.conversationId}/ai_cache/decisions`)
       .set({
         decisions: decisionsArray,
-        messageCountAtGeneration: conversationData.messageCount,
-        generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        messageCountAtGeneration: messageCount,
+        generatedAt: now,
       });
 
     return {decisions: decisionsArray};

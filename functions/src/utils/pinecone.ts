@@ -1,4 +1,4 @@
-import {Pinecone} from '@pinecone-database/pinecone';
+import { Pinecone } from '@pinecone-database/pinecone';
 import * as functions from 'firebase-functions';
 
 let pineconeClient: Pinecone | null = null;
@@ -42,15 +42,22 @@ export async function upsertVectors(vectors: MessageVector[]): Promise<void> {
 
 export async function queryVectors(
   queryVector: number[],
-  conversationId: string,
+  conversationId: string | null,
   topK: number = 10
 ) {
   const index = getPineconeIndex();
-  return await index.query({
+  
+  const queryOptions: any = {
     vector: queryVector,
-    filter: {conversationId},
     topK,
     includeMetadata: true,
-  });
+  };
+  
+  // Only apply filter if conversationId is provided
+  if (conversationId) {
+    queryOptions.filter = {conversationId};
+  }
+  
+  return await index.query(queryOptions);
 }
 

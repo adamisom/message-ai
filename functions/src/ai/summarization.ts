@@ -1,10 +1,11 @@
-import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import {callClaude} from '../utils/anthropic';
-import {parseAIResponse, SummarySchema} from '../utils/validation';
-import {verifyConversationAccess} from '../utils/security';
-import {checkAIRateLimit} from '../utils/rateLimit';
-import {getCachedResult} from '../utils/caching';
+import * as functions from 'firebase-functions';
+import { callClaude } from '../utils/anthropic';
+import { getCachedResult } from '../utils/caching';
+import { getConversationOrThrow, getMessagesForAI } from '../utils/conversationHelpers';
+import { checkAIRateLimit } from '../utils/rateLimit';
+import { verifyConversationAccess } from '../utils/security';
+import { parseAIResponse, SummarySchema } from '../utils/validation';
 
 const db = admin.firestore();
 
@@ -13,8 +14,11 @@ interface SummarizeRequest {
   messageCount: number; // 25, 50, 100, or -1 for all
 }
 
-export const generateSummary = functions.https.onCall(
-  async (data: SummarizeRequest, context) => {
+export const generateSummary = functions
+  .runWith({
+    secrets: ['ANTHROPIC_API_KEY'],
+  })
+  .https.onCall(async (data: SummarizeRequest, context) => {
     // 1. Auth check
     if (!context.auth) {
       throw new functions.https.HttpsError(
@@ -38,7 +42,7 @@ export const generateSummary = functions.https.onCall(
     // 4. Check cache
     const cache = await getCachedResult<any>(
       data.conversationId,
-      `conversations/${data.conversationId}/ai_summaries/latest`,
+      `conversations/${data.conversationId}/ai_cache/summary_latest`,
       3600000, // 1 hour
       5 // max 5 new messages
     );
@@ -49,37 +53,36 @@ export const generateSummary = functions.https.onCall(
     }
 
     // 5. Query messages
-    const conversation = await db
-      .doc(`conversations/${data.conversationId}`)
-      .get();
-    const conversationData = conversation.data()!;
+    const {data: conversationData, messageCount} = await getConversationOrThrow(
+      data.conversationId
+    );
 
-    let messagesQuery = db
-      .collection(`conversations/${data.conversationId}/messages`)
-      .orderBy('createdAt', 'desc');
+    const limit = data.messageCount > 0 ? data.messageCount : undefined;
+    const {messages, formatted: formattedMessages} = await getMessagesForAI(
+      data.conversationId,
+      {limit}
+    );
 
-    if (data.messageCount > 0) {
-      messagesQuery = messagesQuery.limit(data.messageCount);
+    // Return early if no messages
+    if (messages.length === 0) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'No messages found in conversation'
+      );
     }
 
-    const messagesSnapshot = await messagesQuery.get();
-    const messages = messagesSnapshot.docs.reverse().map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
-    // 6. Format messages for Claude
-    const formattedMessages = messages
-      .map((m: any) => `[${m.senderName}]: ${m.text}`)
-      .join('\n');
+    // Format participant names
+    const participantNames = conversationData.participantDetails
+      ? Object.values(conversationData.participantDetails)
+          .map((p: any) => p?.displayName || 'Unknown')
+          .join(', ')
+      : 'Unknown';
 
     // 7. Build prompt
     const prompt = `
-You are summarizing a ${conversationData.type} conversation with ${conversationData.participants.length} participants.
+You are summarizing a ${conversationData.type} conversation with ${conversationData.participants?.length || 0} participants.
 
-Participants: ${Object.values(conversationData.participantDetails)
-      .map((p: any) => p.displayName)
-      .join(', ')}
+Participants: ${participantNames}
 
 Messages (${messages.length} total):
 ${formattedMessages}
@@ -101,15 +104,15 @@ Focus on: main topics discussed, important decisions, action items, and key info
 
     // 10. Store in cache
     await db
-      .doc(`conversations/${data.conversationId}/ai_summaries/latest`)
+      .doc(`conversations/${data.conversationId}/ai_cache/summary_latest`)
       .set({
         ...validatedSummary,
         messageCount: messages.length,
-        messageCountAtGeneration: conversationData.messageCount,
-        startMessageId: messages[0].id,
-        endMessageId: messages[messages.length - 1].id,
-        startTimestamp: (messages[0] as any).createdAt,
-        endTimestamp: (messages[messages.length - 1] as any).createdAt,
+        messageCountAtGeneration: messageCount,
+        startMessageId: messages[0]?.id || null,
+        endMessageId: messages[messages.length - 1]?.id || null,
+        startTimestamp: (messages[0] as any)?.createdAt || null,
+        endTimestamp: (messages[messages.length - 1] as any)?.createdAt || null,
         generatedAt: admin.firestore.FieldValue.serverTimestamp(),
         generatedBy: context.auth.uid,
         model: 'claude-sonnet-4',
