@@ -62,182 +62,59 @@
 
 ## Feature Tests (10 minutes)
 
+**Test in this order (easiest → complex):**
+
 ### 1. Priority Detection ⚡ (Auto-runs)
 
-**Test:** Send messages with different priorities
+Send messages with different priorities:
 
-1. Send: `URGENT: Server is down!!!`
-   - [ ] **Instantly** see 🔴 red badge next to message
-
-2. Send: `lol thanks`
-   - [ ] **No badge** (low priority, expected)
-
-3. Send: `Meeting at 3pm today`
-   - [ ] **No badge** or 🟡 yellow badge (medium/unknown)
-
-**✅ Pass:** High priority shows red badge, low priority shows nothing
+- Send: `URGENT: Server is down!!!` → [ ] See 🔴 red badge instantly
+- Send: `lol thanks` → [ ] No badge (low priority, expected)
 
 ---
 
-### 2. Semantic Search 🔍
+### 2. Action Items ✅
 
-**Open:** AI menu (✨ sparkles icon) → Search Messages
+**Open:** AI menu (✨ sparkles icon) → Action Items
 
-**Test 1: Basic Search**
-
-- Type: `urgent` → Search
-  - [ ] Results appear in < 3 seconds
-  - [ ] Shows messages with "urgent" or similar
-  - [ ] Each result shows: sender, date, preview, match %
-
-**Test 2: No Results**
-
-- Type: `xyzabc123notfound` → Search
-  - [ ] Shows "No messages found" (no crash)
-
-**Test 3: Recent Message (Local Search)**
-
-- Send new message: `elephantTest123`
-- Immediately search for: `elephantTest123`
-  - [ ] Result appears with "📍 Recent" badge
-
-**Test 4: Jump to Message**
-
-- Search for any message → Tap result
-  - [ ] Modal closes, scrolls to message, highlights it for 2 seconds
-
-**✅ Pass:** Search works, handles errors, jump-to-message works
+- [ ] Items extract in < 30 seconds
+- [ ] Tap checkbox → fills instantly, text strikes through
+- [ ] Close/reopen modal → status persists
 
 ---
 
 ### 3. Thread Summarization 📝
 
-**Open:** AI menu → Summarize Thread
+**Open:** AI menu → Summarize Thread → Select **50 messages**
 
-**Test 1: Generate Summary**
-
-- Select **50 messages** → Wait
-  - [ ] Loading: "Analyzing 50 messages..."
-  - [ ] After 3 seconds: "Still working on it..." (progressive loading)
-  - [ ] Summary appears in < 30 seconds
-  - [ ] Shows 2-4 sentence summary
-  - [ ] Shows 3-10 key points
-  - [ ] Footer: "Summary generated from 50 messages"
-
-**Test 2: Caching**
-
-- Close modal → Reopen → Select **50 messages**
-  - [ ] Summary appears **instantly** (< 1 second, cached)
-
-**Test 3: Different Message Count**
-
-- Select **25 messages** → Wait
-  - [ ] New summary generated (different from 50-message summary)
-
-**✅ Pass:** Summary generates, caching works, different counts work
+- [ ] Summary appears in < 30 seconds with key points
+- [ ] Close/reopen → Summary appears **instantly** (cached)
 
 ---
 
-### 4. Action Items ✅
+### 4. Decisions 💡 (Group Chats Only)
 
-**Open:** AI menu → Action Items
+**Open:** AI menu → Decisions (only in group chat with 3+ people)
 
-**Test 1: Extraction**
-
-- Wait for extraction
-  - [ ] Loading: "Scanning for action items..."
-  - [ ] Items appear in < 30 seconds
-  - [ ] Each item shows: text, checkbox, priority color, assignee (if any)
-
-**Test 2: Toggle Completion**
-
-- Tap checkbox on pending item
-  - [ ] Checkbox fills instantly (optimistic update)
-  - [ ] Text gets strikethrough
-  - [ ] Color changes to gray
-
-**Test 3: Persistence**
-
-- Close modal → Reopen
-  - [ ] Completed item still shows as completed
-  - [ ] Status persisted to Firestore
-
-**Test 4: Uncomplete**
-
-- Tap checkbox on completed item
-  - [ ] Checkbox empties, strikethrough removed
-
-**Test 5: Empty State**
-
-- Use conversation with no action items (e.g., "Casual Weekend Chat")
-  - [ ] Shows ✓ icon, "No action items found"
-
-**✅ Pass:** Items extracted, checkboxes work, persistence works
+- [ ] Decisions extract in < 30 seconds with timeline UI
+- [ ] Each shows date, text, confidence %, participant count
 
 ---
 
-### 5. Decisions 💡 (Group Chats Only)
+### 5. Semantic Search 🔍 (Requires 10-min wait for embeddings)
 
-**Open:** AI menu → Decisions
+**Open:** AI menu → Search Messages
 
-**Test 1: Visibility**
-
-- In **direct chat**: Menu shows 4 items (no Decisions)
-- In **group chat**: Menu shows 5 items (includes Decisions)
-
-**Test 2: Extraction (Group Chat)**
-
-- Open Decisions in group chat
-  - [ ] Loading: "Analyzing decisions..."
-  - [ ] Decisions appear in < 30 seconds
-  - [ ] Each shows: date, decision text, context, confidence %, participant count
-  - [ ] Timeline UI (dots and lines) visible
-  - [ ] Confidence colors: 90%+=green, 80-89%=light green, <80%=orange
-
-**Test 3: Empty State**
-
-- Use conversation with no clear decisions
-  - [ ] Shows 💡 icon, "No decisions found"
-
-**✅ Pass:** Only in group chats, extracts correctly, timeline displays
+- Type: `urgent` → [ ] Results appear in < 3 seconds
+- Send new message `elephantTest123`, search it → [ ] Shows "📍 Recent" badge
 
 ---
 
 ## Error Handling (2 minutes)
 
-### Network Errors
-
-1. Turn on **Airplane Mode**
-2. Try any AI feature
-   - [ ] Error: "Network error. Please check your connection..."
-   - [ ] **Retry button** appears
-3. Turn off Airplane Mode → Tap Retry
-   - [ ] Feature works
-
-**✅ Pass:** Errors handled gracefully with retry
-
----
-
-### Progressive Loading
-
-1. Open **Summarize Thread** (with slow/normal connection)
-   - [ ] 0-3 seconds: "This may take a few seconds"
-   - [ ] 3+ seconds: "Still working on it, thanks for your patience..."
-
-**✅ Pass:** Loading message updates after 3 seconds
-
----
-
-### Modal Behavior
-
-1. Open AI menu → Tap Search
-   - [ ] Menu closes, Search opens (no overlap)
-2. Close Search → Open AI menu → Tap Cancel
-   - [ ] Menu closes smoothly
-3. Rapidly open/close modals
-   - [ ] No crashes or UI glitches
-
-**✅ Pass:** Modals transition smoothly
+- **Airplane mode test:** Enable airplane mode → Try AI feature → [ ] Shows error with retry button
+- **Progressive loading:** Open Summary → [ ] Loading message updates after 3 seconds  
+- **Modal behavior:** Rapidly open/close modals → [ ] No crashes or UI glitches
 
 ---
 
