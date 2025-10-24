@@ -1,4 +1,4 @@
-import {parseAIResponse, SummarySchema} from '../utils/validation';
+import { parseAIResponse, SummarySchema } from '../utils/validation';
 
 describe('Thread Summarization', () => {
   describe('Summary validation', () => {
