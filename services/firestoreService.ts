@@ -102,6 +102,7 @@ export const createOrOpenConversation = async (
       lastMessageAt: null,
       lastMessage: null,
       lastRead: {},
+      messageCount: 0, // For AI cache invalidation
     });
     console.log('✅ [firestoreService] New conversation created');
   } else {
@@ -152,6 +153,7 @@ export const createGroupConversation = async (
     lastMessageAt: null,
     lastMessage: null,
     lastRead: {},
+    messageCount: 0, // For AI cache invalidation
   });
 
   console.log('✅ [firestoreService] Group conversation created:', conversationRef.id);
@@ -185,6 +187,7 @@ export const sendMessage = async (
       senderName,
       participants, // Denormalized for security rules
       createdAt: serverTimestamp(),
+      embedded: false, // For AI embedding pipeline
     }
   );
 

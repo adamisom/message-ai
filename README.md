@@ -24,13 +24,22 @@ Real-time messaging app built with React Native (Expo) and Firebase.
 
 > **New to this stack?** See [`/docs/DEVELOPER_SETUP.md`](/docs/DEVELOPER_SETUP.md) for comprehensive setup guide including emulator configuration and troubleshooting.
 
-### 1. Install Dependencies
+### 1. Set Node Version
+
+This project requires **Node 20**. If you have `nvm` installed:
+
+```bash
+nvm use
+# If Node 20 isn't installed: nvm install 20
+```
+
+### 2. Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Configure Firebase
+### 3. Configure Firebase
 
 Create `.env` in project root with your Firebase credentials:
 
@@ -45,13 +54,13 @@ EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
 
 See `/docs/PHASE_0_SETUP.md` for detailed Firebase setup.
 
-### 3. Deploy Firestore Rules
+### 4. Deploy Firestore Rules
 
 Copy rules from `/firestore.rules` to Firebase Console → Firestore → Rules → Publish
 
 **MVP Note:** Currently using test mode rules (any authenticated user can read/write). See `/docs/POST_MVP.md` for restoring proper permissions.
 
-### 4. Run the App
+### 5. Run the App
 
 ```bash
 npx expo start --tunnel
