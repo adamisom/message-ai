@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Message } from '../types';
+import { FEATURE_FLAGS } from '../utils/featureFlags';
 import { formatMessageTime } from '../utils/timeFormat';
 
 interface MessageBubbleProps {
@@ -32,8 +33,15 @@ export default function MessageBubble({
   };
 
   const getPriorityBadge = () => {
+    // Check feature flag
+    if (!FEATURE_FLAGS.PRIORITY_BADGES_ENABLED) {
+      return null;
+    }
+    
+    // Only show high priority (red badge)
     if (message.priority === 'high') return '🔴';
-    if (message.priority === 'medium') return '🟡';
+    
+    // Don't show medium or low priority badges
     return null;
   };
 
@@ -55,17 +63,15 @@ export default function MessageBubble({
         isOwnMessage ? styles.ownBubble : styles.otherBubble,
         isHighlighted && styles.highlightedBubble
       ]}>
-        <View style={styles.textContainer}>
-          <Text style={[
-            styles.text,
-            isOwnMessage ? styles.ownText : styles.otherText
-          ]}>
-            {message.text}
-          </Text>
-          {priorityBadge && (
-            <Text style={styles.priorityBadge}>{priorityBadge}</Text>
-          )}
-        </View>
+        <Text style={[
+          styles.text,
+          isOwnMessage ? styles.ownText : styles.otherText
+        ]}>
+          {message.text}
+        </Text>
+        {priorityBadge && (
+          <Text style={styles.priorityBadge}>{priorityBadge}</Text>
+        )}
         
         <View style={styles.footer}>
           <Text style={[
@@ -136,18 +142,13 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FFD700', // Gold border for highlighted message
   },
-  textContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   text: {
     fontSize: 16,
     lineHeight: 20,
-    flex: 1,
   },
   priorityBadge: {
     fontSize: 16,
+    marginLeft: 8,
   },
   ownText: {
     color: '#fff',
