@@ -40,6 +40,7 @@
    - Press `a` to open app on Android
    - Expo Go will install automatically on first run
    - The app should load in Expo Go on the emulator
+   - **If stuck loading:** Close Expo Go, return to home screen, reopen Expo Go manually, and enter the `exp://` URL directly (shown in Expo terminal) instead of using `a` - more reliable with tunnel due to WebSocket/adb issues
 
    **To restart emulator if stuck:**
 

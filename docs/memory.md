@@ -4,6 +4,10 @@
 
 ## Reverse Chronological Notes by Developer
 
+### Friday 10/24
+
+3:20pm Learned that Android emulator is flaky with ngrok aka `--tunnel` but this worked to get around it: close open Expo Go apps, re-open then open MessageAI 'manually' with the `exp://` URL.
+
 ### Tuesday 10/21
 
 11:14pm All MVP work done, see POST_MVP.md
