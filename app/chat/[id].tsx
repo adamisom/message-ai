@@ -306,6 +306,7 @@ export default function ChatScreen() {
           senderName,
           participants: conversation.participants,
           createdAt: serverTimestamp(),
+          embedded: false, // For AI embedding pipeline
         }
       );
 
@@ -322,6 +323,7 @@ export default function ChatScreen() {
       await updateDoc(doc(db, 'conversations', conversationId), {
         lastMessage: text.substring(0, 100),
         lastMessageAt: serverTimestamp(),
+        lastMessageSenderId: user.uid, // Track who sent the last message (for notifications)
         [`lastReadAt.${user.uid}`]: serverTimestamp(), // Mark as read by sender immediately
       });
 
