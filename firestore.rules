@@ -67,23 +67,19 @@ service cloud.firestore {
       allow write: if false;
     }
     
-    // AI Cache Documents - only conversation participants can read
-    match /conversations/{conversationId}/ai_summaries_cache {
+    // AI Cache Documents (subcollection: /conversations/{id}/ai_cache/{docId})
+    // TEMPORARY (Phase 3): Allow participants to delete cache for invalidation
+    // TODO Phase 4: Restrict cache deletion to workspace admins only
+    match /conversations/{conversationId}/ai_cache/{cacheDocId} {
       allow read: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
-      allow write: if false;
-    }
-    
-    match /conversations/{conversationId}/ai_action_items_cache {
-      allow read: if request.auth != null && 
+      
+      // Allow participants to delete (invalidate) cache when manually updating AI features
+      allow delete: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
-      allow write: if false;
-    }
-    
-    match /conversations/{conversationId}/ai_decisions_cache {
-      allow read: if request.auth != null && 
-        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
-      allow write: if false;
+      
+      // Only Cloud Functions can create/update
+      allow create, update: if false;
     }
   }
 }
