@@ -8,6 +8,10 @@ interface MessageBubbleProps {
   isOwnMessage: boolean;
   showSenderName?: boolean; // For group chats
   readStatus?: '✓' | '✓✓' | null; // For read receipts (Phase 5)
+  readDetails?: { // Phase 3: Detailed read receipts for group chats
+    readBy: Array<{ uid: string; displayName: string }>;
+    unreadBy: Array<{ uid: string; displayName: string }>;
+  } | null;
   isHighlighted?: boolean; // For search result highlighting
 }
 
@@ -16,6 +20,7 @@ export default function MessageBubble({
   isOwnMessage, 
   showSenderName = false,
   readStatus,
+  readDetails,
   isHighlighted = false
 }: MessageBubbleProps) {
   const getTimestamp = () => {
@@ -96,6 +101,15 @@ export default function MessageBubble({
           )}
         </View>
       </View>
+      
+      {/* Phase 3: Detailed read receipts for group chats */}
+      {isOwnMessage && readDetails && readDetails.readBy.length > 0 && (
+        <View style={styles.readDetailsContainer}>
+          <Text style={styles.readDetailsText}>
+            Read by {readDetails.readBy.map(r => r.displayName).join(', ')}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -178,6 +192,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.7)',
     marginLeft: 4,
+  },
+  readDetailsContainer: {
+    marginTop: 4,
+    marginRight: 12,
+  },
+  readDetailsText: {
+    fontSize: 11,
+    color: '#8E8E93',
+    fontStyle: 'italic',
   },
 });
 

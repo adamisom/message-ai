@@ -8,6 +8,10 @@ interface MessageListProps {
   currentUserId: string;
   conversationType: 'direct' | 'group';
   getReadStatus?: (message: Message) => '✓' | '✓✓' | null;
+  getReadDetails?: (message: Message) => {
+    readBy: Array<{ uid: string; displayName: string }>;
+    unreadBy: Array<{ uid: string; displayName: string }>;
+  } | null;
   highlightedMessageId?: string | null;
 }
 
@@ -20,6 +24,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
   currentUserId, 
   conversationType,
   getReadStatus,
+  getReadDetails,
   highlightedMessageId
 }, ref) => {
   const flatListRef = useRef<FlatList>(null);
@@ -53,6 +58,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
           isOwnMessage={item.senderId === currentUserId}
           showSenderName={conversationType === 'group'}
           readStatus={getReadStatus ? getReadStatus(item) : null}
+          readDetails={getReadDetails ? getReadDetails(item) : null}
           isHighlighted={highlightedMessageId === item.id}
         />
       )}

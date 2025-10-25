@@ -504,6 +504,50 @@ export default function ChatScreen() {
     }
   };
 
+  // Phase 3: Read details for group chats (shows WHO has read)
+  interface ReadDetails {
+    readBy: Array<{ uid: string; displayName: string }>;
+    unreadBy: Array<{ uid: string; displayName: string }>;
+  }
+
+  const getReadDetails = (message: Message): ReadDetails | null => {
+    // Only for group chats and own messages
+    if (!conversation || conversation.type !== 'group' || message.senderId !== user?.uid) {
+      return null;
+    }
+
+    const otherParticipants = conversation.participants.filter(id => id !== user.uid);
+    const readBy: Array<{ uid: string; displayName: string }> = [];
+    const unreadBy: Array<{ uid: string; displayName: string }> = [];
+
+    otherParticipants.forEach(participantId => {
+      const participantDetails = conversation.participantDetails[participantId];
+      const displayName = participantDetails?.displayName || 'Unknown';
+
+      const lastRead = conversation.lastRead?.[participantId];
+      
+      if (lastRead) {
+        const lastReadMsg = messages.find(m => m.id === lastRead);
+        if (lastReadMsg) {
+          const messageTime = getMessageTime(message);
+          const lastReadTime = getMessageTime(lastReadMsg);
+
+          if (messageTime && lastReadTime && messageTime <= lastReadTime) {
+            readBy.push({ uid: participantId, displayName });
+          } else {
+            unreadBy.push({ uid: participantId, displayName });
+          }
+        } else {
+          unreadBy.push({ uid: participantId, displayName });
+        }
+      } else {
+        unreadBy.push({ uid: participantId, displayName });
+      }
+    });
+
+    return { readBy, unreadBy };
+  };
+
   // Cleanup all timeouts on unmount
   useEffect(() => {
     const timeouts = timeoutRefs.current;
@@ -540,6 +584,7 @@ export default function ChatScreen() {
         currentUserId={user?.uid || ''}
         conversationType={conversation.type}
         getReadStatus={getReadStatus}
+        getReadDetails={getReadDetails}
         highlightedMessageId={highlightedMessageId}
       />
       <TypingIndicator typingUsers={typingUsers} />
