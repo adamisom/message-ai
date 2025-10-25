@@ -155,6 +155,27 @@ export async function trackDecisions(conversationId: string) {
 }
 
 /**
+ * Meeting Scheduler (Advanced AI Capability) - Suggest optimal meeting times
+ * @param conversationId - Conversation to analyze
+ * @param messageCount - Number of recent messages to analyze (default: 50)
+ * @throws Error with user-friendly message
+ */
+export async function suggestMeetingTimes(
+  conversationId: string,
+  messageCount: number = 50
+) {
+  try {
+    return await callAIFeatureWithTimeout(
+      'analyzeMeetingScheduling',
+      {conversationId, messageCount},
+      10000 // 10 second timeout (shorter than others for better UX)
+    );
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+/**
  * Action Item Status Toggle - Mark action item as completed or pending
  * @param conversationId - Conversation containing the action item
  * @param itemId - Action item ID

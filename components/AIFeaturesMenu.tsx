@@ -14,6 +14,7 @@ interface AIFeaturesMenuProps {
   onOpenSummary: () => void;
   onOpenActionItems: () => void;
   onOpenDecisions: () => void;
+  onOpenMeetingScheduler: () => void;
   isGroupChat: boolean;
 }
 
@@ -24,6 +25,7 @@ export function AIFeaturesMenu({
   onOpenSummary,
   onOpenActionItems,
   onOpenDecisions,
+  onOpenMeetingScheduler,
   isGroupChat,
 }: AIFeaturesMenuProps) {
   const handleFeature = (callback: () => void) => {
@@ -100,6 +102,19 @@ export function AIFeaturesMenu({
               </View>
             </TouchableOpacity>
           )}
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => handleFeature(onOpenMeetingScheduler)}
+          >
+            <Text style={styles.menuIcon}>📅</Text>
+            <View style={styles.menuTextContainer}>
+              <Text style={styles.menuTitle}>Suggest Meeting Times</Text>
+              <Text style={styles.menuDescription}>
+                AI-powered scheduling assistant
+              </Text>
+            </View>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.menuItem, styles.cancelButton]}

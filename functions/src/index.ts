@@ -19,3 +19,6 @@ export {generateSummary} from './ai/summarization';
 export {extractActionItems} from './ai/actionItems';
 export {trackDecisions} from './ai/decisions';
 
+// Phase 3: Advanced AI Capability
+export {analyzeMeetingScheduling} from './ai/proactiveMeeting';
+

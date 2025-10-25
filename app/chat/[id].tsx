@@ -20,6 +20,7 @@ import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
 import { DecisionsModal } from '../../components/DecisionsModal';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
+import { MeetingSchedulerModal } from '../../components/MeetingSchedulerModal';
 import MessageInput from '../../components/MessageInput';
 import MessageList, { MessageListRef } from '../../components/MessageList';
 import OfflineBanner from '../../components/OfflineBanner';
@@ -49,6 +50,7 @@ export default function ChatScreen() {
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [showActionItemsModal, setShowActionItemsModal] = useState(false);
   const [showDecisionsModal, setShowDecisionsModal] = useState(false);
+  const [showMeetingSchedulerModal, setShowMeetingSchedulerModal] = useState(false);
   
   // Jump to message functionality
   const messageListRef = useRef<MessageListRef>(null);
@@ -568,6 +570,7 @@ export default function ChatScreen() {
         onOpenSummary={() => setShowSummaryModal(true)}
         onOpenActionItems={() => setShowActionItemsModal(true)}
         onOpenDecisions={() => setShowDecisionsModal(true)}
+        onOpenMeetingScheduler={() => setShowMeetingSchedulerModal(true)}
         isGroupChat={conversation.type === 'group'}
       />
 
@@ -595,6 +598,12 @@ export default function ChatScreen() {
         visible={showDecisionsModal}
         conversationId={conversationId as string}
         onClose={() => setShowDecisionsModal(false)}
+      />
+
+      <MeetingSchedulerModal
+        visible={showMeetingSchedulerModal}
+        conversationId={conversationId as string}
+        onClose={() => setShowMeetingSchedulerModal(false)}
       />
     </View>
   );
