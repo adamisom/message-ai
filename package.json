@@ -13,8 +13,10 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:functions": "cd functions && npm test",
     "test:integration": "cd functions && npm run test:integration",
-    "validate": "npm run lint && npm run type-check && npm test"
+    "validate": "npm run lint && npm run type-check && npm test",
+    "validate:all": "npm run lint && npm run type-check && npm test && npm run test:functions"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
