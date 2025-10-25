@@ -73,11 +73,11 @@ export function ActionItemsModal({
         
         if (convSnap.exists()) {
           const convData = convSnap.data();
-          const participantsMap = convData.participants || {};
-          const participantsList: Participant[] = Object.entries(participantsMap).map(
+          const participantDetails = convData.participantDetails || {};
+          const participantsList: Participant[] = Object.entries(participantDetails).map(
             ([uid, data]: [string, any]) => ({
               uid,
-              displayName: data.displayName || 'Unknown',
+              displayName: data.displayName || data.email || 'Unknown',
             })
           );
           setParticipants(participantsList);

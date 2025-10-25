@@ -165,28 +165,20 @@ export function SearchModal({
                   <Text style={styles.senderName}>{item.senderName}</Text>
                   <Text style={styles.resultDate}>
                     {(() => {
+                      if (!item.createdAt) return '';
                       try {
-                        if (!item.createdAt) return 'N/A';
-                        // Handle Firestore Timestamp
-                        if (item.createdAt.toDate && typeof item.createdAt.toDate === 'function') {
-                          return formatDate(item.createdAt.toDate());
+                        // Firestore Timestamp has toDate() method
+                        if (item.createdAt.toDate) {
+                          return formatDate(item.createdAt);
                         }
-                        // Handle Date object
+                        // Already a Date
                         if (item.createdAt instanceof Date) {
                           return formatDate(item.createdAt);
                         }
-                        // Handle number (milliseconds)
-                        if (typeof item.createdAt === 'number') {
-                          return formatDate(new Date(item.createdAt));
-                        }
-                        // Handle string
-                        if (typeof item.createdAt === 'string') {
-                          return formatDate(new Date(item.createdAt));
-                        }
-                        return 'N/A';
+                        // Fallback
+                        return formatDate(new Date(item.createdAt));
                       } catch (e) {
-                        console.error('Date formatting error:', e);
-                        return 'N/A';
+                        return '';
                       }
                     })()}
                   </Text>
