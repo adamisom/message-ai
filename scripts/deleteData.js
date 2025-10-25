@@ -23,10 +23,16 @@ const path = require('path');
 // Try to load Pinecone (only available if installed)
 let Pinecone;
 try {
-  Pinecone = require('@pinecone-database/pinecone').Pinecone;
+  // Try functions directory first (where it's actually installed)
+  Pinecone = require('../functions/node_modules/@pinecone-database/pinecone').Pinecone;
 } catch (error) {
-  // Pinecone not installed - that's okay, we'll skip vector cleanup
-  Pinecone = null;
+  try {
+    // Fallback to root node_modules
+    Pinecone = require('@pinecone-database/pinecone').Pinecone;
+  } catch (error2) {
+    // Pinecone not installed - that's okay, we'll skip vector cleanup
+    Pinecone = null;
+  }
 }
 
 // Initialize Firebase Admin (only if not already initialized)
@@ -44,14 +50,18 @@ const db = admin.firestore();
 
 // Initialize Pinecone (only if API key is available and package is installed)
 let pineconeIndex = null;
-const INDEX_NAME = 'message-ai-messages';
+const INDEX_NAME = 'message-ai-embeddings';
 
 function initPinecone() {
   if (!Pinecone) {
     return false; // Package not installed
   }
   
-  if (process.env.PINECONE_API_KEY && !pineconeIndex) {
+  if (!process.env.PINECONE_API_KEY) {
+    return false;
+  }
+  
+  if (!pineconeIndex) {
     const pinecone = new Pinecone({
       apiKey: process.env.PINECONE_API_KEY,
     });

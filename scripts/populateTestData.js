@@ -257,9 +257,21 @@ async function main() {
   const shouldDelete = await promptForDeletion();
   
   if (shouldDelete) {
-    await deleteAllConversations();
+    const result = await deleteAllConversations();
+    
+    // Check if deletion actually happened
+    if (result.conversations === 0 && result.messages === 0) {
+      console.log('✅ No existing data to delete, proceeding with creation...\n');
+    } else if (result.conversations > 0 || result.messages > 0) {
+      console.log(`✅ Successfully deleted ${result.conversations} conversations and ${result.messages} messages\n`);
+    } else {
+      console.error('❌ Deletion may have failed. Check logs above.');
+      console.log('⚠️  Cannot proceed with data creation until old data is cleared.\n');
+      process.exit(1);
+    }
   } else {
     console.log('⏭️  Skipping deletion, keeping existing conversations\n');
+    console.log('⚠️  Warning: This may create duplicate conversations\n');
   }
   
   // Fetch real users from Firestore
