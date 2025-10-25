@@ -62,7 +62,7 @@ export const batchEmbedMessages = functions
         const participants = conversationMap.get(conversationId) || [];
         
         return {
-          id: doc.id,
+          id: `${conversationId}_${doc.id}`, // Format: conversationId_messageId
           values: embeddings[idx],
           metadata: {
             conversationId,
@@ -202,7 +202,7 @@ export const retryFailedEmbeddings = functions
 
           // Upsert to Pinecone
           const vector: MessageVector = {
-            id: messageId,
+            id: `${conversationId}_${messageId}`, // Format: conversationId_messageId
             values: embeddings[0],
             metadata: {
               conversationId,

@@ -63,15 +63,22 @@ export const semanticSearch = functions
       data.conversationId || null,
       limit * 2
     );
+    console.log(`[DEBUG] Pinecone returned ${pineconeResults.matches?.length || 0} matches`);
+    if (pineconeResults.matches?.length > 0) {
+      console.log(`[DEBUG] First match metadata:`, JSON.stringify(pineconeResults.matches[0].metadata));
+    }
 
     // 6. Security filter: only messages where user is participant
     const secureResults = filterSearchResults(
       pineconeResults.matches,
       context.auth.uid
     ).slice(0, limit);
+    console.log(`[DEBUG] After security filter: ${secureResults.length} results`);
+    console.log(`[DEBUG] User ID: ${context.auth.uid}`);
 
     // 7. Fetch full message documents from Firestore
     const messages = await fetchMessagesByIds(secureResults);
+    console.log(`[DEBUG] Final messages fetched: ${messages.length}`);
 
     // 8. Return results with metadata
     return {
