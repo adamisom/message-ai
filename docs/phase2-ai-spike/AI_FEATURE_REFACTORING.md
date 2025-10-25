@@ -1,8 +1,10 @@
 # AI Feature Refactoring: Tool Use Implementation
 
 **Date:** October 25, 2025  
-**Status:** Planning  
+**Status:** ✅ COMPLETED  
 **Goal:** Refactor all AI features to use Anthropic's Tool Use API instead of text-based prompting with manual JSON parsing
+
+> **Implementation completed on October 25, 2025.** All four Claude-based AI features (summarization, action items, decisions, priority detection) now use the Tool Use API for structured outputs. Manual JSON parsing and Zod validation removed. See commits on `ai-spike` branch for details.
 
 ---
 

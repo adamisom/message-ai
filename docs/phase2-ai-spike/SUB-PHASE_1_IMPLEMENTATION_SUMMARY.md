@@ -3,6 +3,8 @@
 **Date:** October 24, 2025  
 **Status:** Backend + Frontend built, awaiting user testing
 
+> **Note:** After initial implementation, all Claude-based features were refactored on October 25, 2025 to use Anthropic's Tool Use API for more reliable structured outputs. See `AI_FEATURE_REFACTORING.md` for details.
+
 ---
 
 ## Summary

@@ -129,11 +129,9 @@ DATA FLOW KEY:
 
 | Service | Purpose |
 |---------|---------|
-| **Anthropic Claude Sonnet 4** | LLM for summarization, action items, decisions, priority analysis |
+| **Anthropic Claude Sonnet 4** | LLM for summarization, action items, decisions, priority analysis (with Tool Use API) |
 | **OpenAI text-embedding-3-small** | Generate 1536-dim embeddings for semantic search |
 | **Pinecone** | Vector database for storing and querying message embeddings |
-| **Vercel AI SDK** | AI orchestration framework (optional) |
-| **Zod** | Schema validation for AI responses |
 
 ---
 
@@ -464,9 +462,9 @@ User clicks "Summarize Thread"
     ↓
 5. Cache miss: Query Firestore for messages
     ↓
-6. Send to Claude API with structured prompt
+6. Send to Claude API with Tool Use
     ↓
-7. Validate response with Zod schema
+7. Extract structured response (validated by Anthropic)
     ↓
 8. Store in cache with messageCountAtGeneration
     ↓
@@ -489,8 +487,8 @@ User sends message
 [Batch path - AI Refinement]
 6. Batch analyzer runs every 10 minutes
 7. Query messages where priorityNeedsAnalysis: true
-8. Send to Claude for accurate analysis
-9. Update message with final priority
+8. Send to Claude with Tool Use (analyze_message_priority tool)
+9. Update message with final priority (already validated by Anthropic)
 10. If downgraded from "high": Send notification to user
 ```
 
@@ -563,19 +561,18 @@ Client calls extractActionItems Cloud Function with 8s timeout
 │ 5. Get conversation participant details                             │
 │    - conversation.participantDetails: { [uid]: { displayName, email }}│
 │    ↓                                                                 │
-│ 6. Send to Claude API                                               │
-│    - Prompt: "Extract action items from conversation..."            │
-│    - Include: participant list, formatted messages                  │
-│    - Request structured JSON output                                 │
-│    - Max tokens: 2000                                               │
-│    ↓                                                                 │
-│ 7. Validate Claude response with Zod                                │
-│    - Schema: ActionItemSchema (text, assignee, dueDate, priority)   │
-│    - Strip markdown code blocks if present                          │
-│    - Parse JSON and validate                                        │
-│    - If invalid: log error, throw 'internal' error                  │
-│    ↓                                                                 │
-│ 8. Resolve assignees                                                │
+│ 6. Send to Claude API with Tool Use                             │
+│    - Model: claude-sonnet-4-20250514                             │
+│    - Tool: extract_action_items (defined in aiTools.ts)         │
+│    - Tool enforces JSON schema server-side (no parsing needed)  │
+│    - Max tokens: 2000                                            │
+│    ↓                                                              │
+│ 7. Validate and process Tool Use response                       │
+│    - Extract structured data from tool_use block                │
+│    - Already parsed and validated by Anthropic                  │
+│    - No JSON.parse() or Zod validation needed                   │
+│    ↓                                                              │
+│ 8. Resolve assignees                                             │
 │    - For each item with assigneeIdentifier:                         │
 │      a. If email: match to participant by email                     │
 │      b. If display name: match to participant                       │
@@ -615,14 +612,15 @@ Client calls trackDecisions Cloud Function with 10s timeout
 │    ↓                                                                 │
 │ 2. Cache miss: Query messages (last 100 or custom range)            │
 │    ↓                                                                 │
-│ 3. Send to Claude API                                               │
-│    - Prompt: "Identify decisions made in this conversation..."      │
-│    - Request: decision, context, participantIds, sourceMessageIds   │
-│    - Include confidence score (only return if > 0.7)                │
-│    ↓                                                                 │
-│ 4. Validate response with Zod (DecisionSchema)                      │
-│    - Parse JSON, validate structure                                 │
-│    - Filter: only include decisions with confidence > 0.7           │
+│ 3. Send to Claude API with Tool Use                              │
+│    - Tool: track_decisions (defined in aiTools.ts)              │
+│    - Tool enforces JSON schema server-side                      │
+│    - Request: decision, context, confidence, participantIds     │
+│    - Only returns decisions with confidence > 0.7               │
+│    ↓                                                              │
+│ 4. Process Tool Use response                                     │
+│    - Extract structured data (already validated by Anthropic)   │
+│    - Filter already applied by confidence threshold in tool     │
 │    ↓                                                                 │
 │ 5. Write decisions to Firestore                                     │
 │    - /conversations/{id}/ai_decisions/{decisionId}                  │
@@ -743,13 +741,12 @@ exports.generateSummary = functions.https.onCall(async (data, context) => {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [ANTHROPIC CLAUDE API - External Service]
     ↓
-  // STEP 7: Send to Claude (2-5 seconds)
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1500,
-    messages: [{ role: "user", content: prompt }]
+  // STEP 7: Send to Claude with Tool Use (2-5 seconds)
+  const response = await callClaudeWithTool(prompt, generateSummaryTool, {
+    maxTokens: 1500
   });
-    ↓ (4) JSON response
+  // Response is already parsed JSON (no JSON.parse needed!)
+    ↓ (4) Structured JSON response
   {
     "summary": "The team discussed Q4 budget allocation...",
     "keyPoints": [
@@ -761,10 +758,9 @@ exports.generateSummary = functions.https.onCall(async (data, context) => {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [FIREBASE CLOUD FUNCTION - Continued]
     ↓
-  // STEP 8: Parse & validate with Zod (< 1ms)
-  const rawText = response.content[0].text;
-  const validatedSummary = parseAIResponse(rawText, SummarySchema);
-  // If validation fails: throw error, client sees "Failed to generate summary"
+  // STEP 8: Response is already validated by Anthropic (< 1ms)
+  const validatedSummary = response; // Already structured and type-safe
+  // Tool Use guarantees schema compliance - no manual validation needed
     ↓
   // STEP 9: Store in cache (100ms - Firestore write)
   await db.doc(`conversations/${data.conversationId}/ai_summaries/latest`).set({
@@ -1318,9 +1314,10 @@ console.log('User logged in:', user.uid);
 3. Never upgrade pinned dependencies
 4. Test offline behavior thoroughly
 5. Always initialize messages with `embedded: false`
-6. Always validate AI responses with Zod before storing
+6. Always use Anthropic Tool Use API for Claude (no manual JSON parsing)
 7. Always apply security filters to Pinecone results in application code
 8. Always handle AI API failures gracefully (don't break core messaging)
+9. Always use `conversationId_messageId` format for Pinecone vector IDs
 
 ---
 
@@ -1335,7 +1332,7 @@ console.log('User logged in:', user.uid);
 - 5 AI features: Thread Summarization, Action Item Extraction, Smart Search, Priority Message Detection, Decision Tracking
 - Architecture: Batch embedding pipeline (every 5 min), hybrid priority detection, per-conversation caching
 - External dependencies: Anthropic Claude Sonnet 4, OpenAI text-embedding-3-small, Pinecone vector database
-- Security: Defense-in-depth filtering, rate limiting (50/hour, 1000/month per user), Zod validation
+- Security: Defense-in-depth filtering, rate limiting (50/hour, 1000/month per user), Tool Use API validation
 - Cost: ~$0.90/user/month + $70/month Pinecone + Firebase Cloud Functions pay-as-you-go
 
 See `ai-prd.md` for complete details including troubleshooting guides and manual testing procedures.

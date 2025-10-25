@@ -3,7 +3,12 @@ import {
   formatParticipantsForPrompt,
 } from '../utils/conversationHelpers';
 
-describe('extractJsonFromAIResponse', () => {
+// NOTE: extractJsonFromAIResponse is DEPRECATED after Tool Use refactoring.
+// It remains for backward compatibility and potential non-Claude use cases,
+// but all Claude-based features now use Tool Use API which returns structured data directly.
+// These tests remain to ensure the legacy function works if needed.
+
+describe('extractJsonFromAIResponse (DEPRECATED)', () => {
   describe('Valid JSON extraction', () => {
     it('should parse plain JSON array', () => {
       const response = '[{"text": "Item 1"}, {"text": "Item 2"}]';
