@@ -198,14 +198,9 @@ async function createTestConversation(participants, name, messageCount = 30) {
   // Update conversation with last message
   const lastMessage = allMessages[Math.min(messageCount, allMessages.length) - 1];
   await conversationRef.update({
-    lastMessage: {
-      text: lastMessage,
-      senderId: participants[(messageCount - 1) % participants.length].uid,
-      senderName:
-        participants[(messageCount - 1) % participants.length].displayName,
-      createdAt: new Date(createdAt + (messageCount - 1) * 60000),
-    },
+    lastMessage: lastMessage.substring(0, 100), // Simple string preview
     lastMessageAt: new Date(createdAt + (messageCount - 1) * 60000),
+    lastMessageSenderId: participants[(messageCount - 1) % participants.length].uid,
     messageCount,
   });
 
