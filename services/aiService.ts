@@ -168,7 +168,7 @@ export async function suggestMeetingTimes(
     return await callAIFeatureWithTimeout(
       'analyzeMeetingScheduling',
       {conversationId, messageCount},
-      10000 // 10 second timeout (shorter than others for better UX)
+      30000 // 30 second timeout (matching other AI features, allows for cold start)
     );
   } catch (error: any) {
     throw error;
