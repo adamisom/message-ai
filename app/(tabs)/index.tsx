@@ -58,8 +58,8 @@ export default function ConversationsList() {
           const isFirstLoad = !(convo.id in previousConversationsRef.current);
           
           // Compare by text content to avoid object reference issues
-          const previousText = previousLastMessage?.text || '';
-          const currentText = currentLastMessage?.text || '';
+          const previousText = previousLastMessage || '';
+          const currentText = currentLastMessage || '';
           
           // Only notify if:
           // 1. There's a current last message

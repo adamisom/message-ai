@@ -1,11 +1,11 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import { callClaude } from '../utils/anthropic';
-import { getCachedResult } from '../utils/caching';
-import { getConversationOrThrow, getMessagesForAI } from '../utils/conversationHelpers';
-import { checkAIRateLimit } from '../utils/rateLimit';
-import { verifyConversationAccess } from '../utils/security';
-import { parseAIResponse, SummarySchema } from '../utils/validation';
+import {callClaudeWithTool} from '../utils/anthropic';
+import {generateSummaryTool} from '../utils/aiTools';
+import {getCachedResult} from '../utils/caching';
+import {getConversationOrThrow, getMessagesForAI} from '../utils/conversationHelpers';
+import {checkAIRateLimit} from '../utils/rateLimit';
+import {verifyConversationAccess} from '../utils/security';
 
 const db = admin.firestore();
 
@@ -80,33 +80,30 @@ export const generateSummary = functions
 
     // 7. Build prompt
     const prompt = `
-You are summarizing a ${conversationData.type} conversation with ${conversationData.participants?.length || 0} participants.
+Summarize this ${conversationData.type} conversation.
 
 Participants: ${participantNames}
 
 Messages (${messages.length} total):
 ${formattedMessages}
 
-Provide a summary in the following JSON format:
-{
-  "summary": "3-5 sentence overview of the conversation",
-  "keyPoints": ["point 1", "point 2", "point 3"]
-}
-
 Focus on: main topics discussed, important decisions, action items, and key information shared.
 `;
 
-    // 8. Call Claude
-    const rawResponse = await callClaude(prompt, 1500);
+    // 8. Call Claude with Tool Use
+    const summaryData = await callClaudeWithTool<{summary: string; keyPoints: string[]}>(
+      prompt,
+      generateSummaryTool,
+      {maxTokens: 1500}
+    );
 
-    // 9. Validate response
-    const validatedSummary = parseAIResponse(rawResponse, SummarySchema);
+    // Already have validated structured data - no parsing needed!
 
     // 10. Store in cache
     await db
       .doc(`conversations/${data.conversationId}/ai_cache/summary_latest`)
       .set({
-        ...validatedSummary,
+        ...summaryData,
         messageCount: messages.length,
         messageCountAtGeneration: messageCount,
         startMessageId: messages[0]?.id || null,
@@ -119,7 +116,7 @@ Focus on: main topics discussed, important decisions, action items, and key info
       });
 
     // 11. Return summary
-    return validatedSummary;
+    return summaryData;
   }
 );
 

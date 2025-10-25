@@ -1,12 +1,16 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 
-const db = admin.firestore();
+// Lazy initialization to avoid breaking tests
+function getDb() {
+  return admin.firestore();
+}
 
 export async function verifyConversationAccess(
   userId: string,
   conversationId: string
 ): Promise<boolean> {
+  const db = getDb();
   const conversationDoc = await db
     .doc(`conversations/${conversationId}`)
     .get();

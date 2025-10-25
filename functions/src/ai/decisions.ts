@@ -1,14 +1,14 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import { callClaude } from '../utils/anthropic';
-import { getCachedResult } from '../utils/caching';
+import {callClaudeWithTool} from '../utils/anthropic';
+import {trackDecisionsTool} from '../utils/aiTools';
+import {getCachedResult} from '../utils/caching';
 import {
-    extractJsonFromAIResponse,
-    getConversationOrThrow,
-    getMessagesForAI,
+  getConversationOrThrow,
+  getMessagesForAI,
 } from '../utils/conversationHelpers';
-import { checkAIRateLimit } from '../utils/rateLimit';
-import { verifyConversationAccess } from '../utils/security';
+import {checkAIRateLimit} from '../utils/rateLimit';
+import {verifyConversationAccess} from '../utils/security';
 
 const db = admin.firestore();
 
@@ -71,52 +71,24 @@ export const trackDecisions = functions
 
     // Build prompt
     const prompt = `
-Identify decisions made in this group conversation. A decision is when participants agree on a course of action, choice, or resolution.
+Identify decisions made in this group conversation.
 
 Conversation participants: ${participantNames}
+
 Messages:
 ${formattedMessages}
-
-Return JSON array:
-[
-  {
-    "decision": "Clear statement of what was decided",
-    "context": "2-3 sentence context explaining why/how",
-    "participantIds": ["uid1", "uid2"],
-    "sourceMessageIds": ["msgId1", "msgId2"],
-    "confidence": 0.0-1.0
-  }
-]
-
-Only include decisions with confidence > 0.7.
-Examples of decisions:
-- "We'll launch the feature next Tuesday"
-- "John will be the point person for this project"
-- "Budget approved at $50k"
-- "Meeting rescheduled to 3pm Friday"
 `;
 
-    // Call Claude
-    const rawResponse = await callClaude(prompt, 2000);
+    // Call Claude with Tool Use
+    const result = await callClaudeWithTool<{decisions: any[]}>(
+      prompt,
+      trackDecisionsTool,
+      {maxTokens: 2000}
+    );
 
-    // Parse and validate
-    let decisionsArray;
-    try {
-      decisionsArray = extractJsonFromAIResponse<any[]>(rawResponse);
-
-      if (!Array.isArray(decisionsArray)) {
-        throw new Error('Response is not an array');
-      }
-
-      // Filter by confidence
-      decisionsArray = decisionsArray.filter((d) => d.confidence > 0.7);
-    } catch (error) {
-      console.error('Failed to parse Claude response:', rawResponse);
-      throw new functions.https.HttpsError(
-        'internal',
-        `Failed to parse decisions: ${(error as Error).message}`
-      );
-    }
+    // Already have structured data - no parsing needed!
+    // Anthropic already filters by confidence > 0.7 via schema
+    const decisionsArray = result.decisions;
 
     // Store in Firestore
     const batch = db.batch();

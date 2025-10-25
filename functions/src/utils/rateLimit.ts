@@ -1,7 +1,11 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 
-const db = admin.firestore();
+// Lazy initialization to avoid breaking tests
+function getDb() {
+  return admin.firestore();
+}
+
 const config = functions.config();
 
 const HOURLY_LIMIT = parseInt(config.ai?.hourly_limit || '50');
@@ -11,6 +15,7 @@ export async function checkAIRateLimit(
   userId: string,
   feature: string
 ): Promise<boolean> {
+  const db = getDb();
   const month = new Date().toISOString().slice(0, 7);
   const usageRef = db.doc(`users/${userId}/ai_usage/${month}`);
 

@@ -1,8 +1,8 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import { callClaude } from '../utils/anthropic';
-import { quickPriorityCheck } from '../utils/priorityHeuristics';
-import { parseAIResponse, PrioritySchema } from '../utils/validation';
+import {callClaudeWithTool} from '../utils/anthropic';
+import {analyzeMessagePriorityTool} from '../utils/aiTools';
+import {quickPriorityCheck} from '../utils/priorityHeuristics';
 
 const db = admin.firestore();
 
@@ -90,18 +90,15 @@ async function analyzeMessagePriorityWithAI(text: string): Promise<string> {
 Analyze this message and determine its priority level.
 
 Message: "${text}"
-
-Respond with JSON:
-{ "priority": "high" | "medium" | "low", "reason": "brief explanation" }
-
-Priority guidelines:
-- HIGH: Urgent matters, time-sensitive requests, emergencies, critical decisions
-- MEDIUM: Important but not urgent, questions needing response, scheduled items
-- LOW: Casual conversation, acknowledgments, social messages
 `;
 
-  const rawResponse = await callClaude(prompt, 150);
-  const result = parseAIResponse(rawResponse, PrioritySchema);
+  const result = await callClaudeWithTool<{priority: string; reason: string}>(
+    prompt,
+    analyzeMessagePriorityTool,
+    {maxTokens: 150}
+  );
+
+  // Already have validated structured data - no parsing needed!
   return result.priority;
 }
 

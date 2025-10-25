@@ -1,6 +1,9 @@
 import * as admin from 'firebase-admin';
 
-const db = admin.firestore();
+// Lazy initialization to avoid breaking tests
+function getDb() {
+  return admin.firestore();
+}
 
 export async function getCachedResult<T>(
   conversationId: string,
@@ -8,6 +11,7 @@ export async function getCachedResult<T>(
   maxAge: number,
   maxNewMessages: number
 ): Promise<T | null> {
+  const db = getDb();
   const [cache, conversation] = await Promise.all([
     db.doc(cacheDocPath).get(),
     db.doc(`conversations/${conversationId}`).get(),

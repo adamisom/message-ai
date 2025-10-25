@@ -1,17 +1,20 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import { callClaude } from '../utils/anthropic';
-import { getCachedResult } from '../utils/caching';
+import {callClaudeWithTool} from '../utils/anthropic';
+import {extractActionItemsTool} from '../utils/aiTools';
+import {getCachedResult} from '../utils/caching';
 import {
-  extractJsonFromAIResponse,
   formatParticipantsForPrompt,
   getConversationOrThrow,
   getMessagesForAI,
 } from '../utils/conversationHelpers';
-import { checkAIRateLimit } from '../utils/rateLimit';
-import { verifyConversationAccess } from '../utils/security';
+import {checkAIRateLimit} from '../utils/rateLimit';
+import {verifyConversationAccess} from '../utils/security';
 
-const db = admin.firestore();
+// Lazy initialization to avoid breaking tests
+function getDb() {
+  return admin.firestore();
+}
 
 interface ActionItemRequest {
   conversationId: string;
@@ -76,7 +79,7 @@ export const extractActionItems = functions
 
     // 7. Build prompt
     const prompt = `
-Extract action items from this conversation. An action item is a task, commitment, or to-do mentioned by any participant.
+Extract action items from this conversation.
 
 Participants:
 ${participantsList}
@@ -84,84 +87,28 @@ ${participantsList}
 Messages:
 ${formattedMessages}
 
-Return JSON array:
-[
-  {
-    "text": "Description of the action item",
-    "assigneeIdentifier": "Display name OR email if specified",
-    "dueDate": "ISO timestamp (if mentioned, otherwise null)",
-    "priority": "high|medium|low",
-    "sourceMessageId": "ID of message containing this item"
-  }
-]
-
 Assignment rules:
-- Use display name if mentioned unambiguously (e.g., "John should review")
-- Use email if explicitly mentioned (e.g., "john@company.com should review")
-- Leave null if assignee is unclear or not mentioned
+- Use display name if mentioned unambiguously
+- Use email if explicitly mentioned
+- Leave null if assignee is unclear
 
 Priority rules:
-- High priority: uses urgent language, has near deadline
-- Medium priority: standard tasks with timeframes
-- Low priority: suggestions or optional items
+- High: urgent language or near deadline
+- Medium: standard tasks with timeframes
+- Low: suggestions or optional items
 `;
 
-    // 8. Call Claude
-    const rawResponse = await callClaude(prompt, 2000);
-    console.error('📝 Got Claude response, length:', rawResponse.length);
-    console.error('📝 Response starts with:', rawResponse.substring(0, 100));
+    // 8. Call Claude with Tool Use
+    const result = await callClaudeWithTool<{items: any[]}>(
+      prompt,
+      extractActionItemsTool,
+      {maxTokens: 2000}
+    );
 
-    // 🔍 DEBUG: Write raw response to Firestore for inspection
-    const debugLogRef = db.collection('debug_logs').doc();
-    await debugLogRef.set({
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      conversationId: data.conversationId,
-      userId: context.auth?.uid || 'unknown',
-      feature: 'extractActionItems',
-      rawResponseLength: rawResponse.length,
-      rawResponseFull: rawResponse,
-      rawResponsePreview: rawResponse.substring(0, 1000),
-      rawResponseEnd: rawResponse.substring(Math.max(0, rawResponse.length - 500)),
-      // Character codes of first 300 chars to detect hidden characters
-      firstCharsAsCodes: rawResponse.substring(0, 300).split('').map(c => c.charCodeAt(0)),
-    });
-    console.error('🔍 Debug log written to:', debugLogRef.id);
+    // Already have structured data - no parsing needed!
+    const actionItemsArray = result.items;
 
-    // 9. Validate response (expecting array)
-    let actionItemsArray;
-    try {
-      console.error('🔍 About to call extractJsonFromAIResponse');
-      actionItemsArray = extractJsonFromAIResponse<any[]>(rawResponse);
-      console.error('✅ Successfully extracted JSON array');
-
-      if (!Array.isArray(actionItemsArray)) {
-        throw new Error('Response is not an array');
-      }
-    } catch (error) {
-      console.error('❌ Failed to parse action items:', (error as Error).message);
-      console.error('❌ Response length:', rawResponse.length);
-      console.error('❌ First 500 chars:', rawResponse.substring(0, 500));
-      console.error('❌ Last 200 chars:', rawResponse.substring(rawResponse.length - 200));
-      
-      // 🔍 DEBUG: Write error details to Firestore
-      await db.collection('debug_logs').add({
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        conversationId: data.conversationId,
-        userId: context.auth?.uid || 'unknown',
-        feature: 'extractActionItems',
-        status: 'PARSING_ERROR',
-        errorMessage: (error as Error).message,
-        errorStack: (error as Error).stack,
-        rawResponseLength: rawResponse.length,
-      });
-      
-      throw new functions.https.HttpsError(
-        'internal',
-        `Failed to parse action items: ${(error as Error).message}`
-      );
-    }
-
-    // 10. Resolve assignees
+    // 9. Resolve assignees
     const resolvedItems = await Promise.all(
       actionItemsArray.map(async (item) => {
         const assignee = await resolveAssignee(
@@ -186,6 +133,7 @@ Priority rules:
     );
 
     // 11. Store in Firestore
+    const db = getDb();
     const batch = db.batch();
     resolvedItems.forEach((item) => {
       const itemRef = db

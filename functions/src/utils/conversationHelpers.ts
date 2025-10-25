@@ -1,7 +1,10 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 
-const db = admin.firestore();
+// Lazy initialization to avoid breaking tests
+function getDb() {
+  return admin.firestore();
+}
 
 /**
  * Fetches a conversation document and validates it exists
@@ -10,6 +13,7 @@ const db = admin.firestore();
 export async function getConversationOrThrow(
   conversationId: string
 ): Promise<{data: FirebaseFirestore.DocumentData; messageCount: number}> {
+  const db = getDb();
   const conversation = await db
     .doc(`conversations/${conversationId}`)
     .get();
@@ -33,17 +37,27 @@ export async function getConversationOrThrow(
  * Finds first and last brace/bracket to extract valid JSON
  */
 export function extractJsonFromAIResponse<T>(rawResponse: string): T {
-  console.error('[extractJsonFromAIResponse] Raw response length:', rawResponse.length);
-  
   let json = rawResponse.trim();
 
   // Remove markdown code blocks completely - strip everything before first { or [
   // and everything after last } or ]
-  const firstBrace = Math.max(json.indexOf('['), json.indexOf('{'));
-  const lastBrace = Math.max(json.lastIndexOf(']'), json.lastIndexOf('}'));
+  const openBracketIndex = json.indexOf('[');
+  const openBraceIndex = json.indexOf('{');
+  const closeBracketIndex = json.lastIndexOf(']');
+  const closeBraceIndex = json.lastIndexOf('}');
 
-  console.error('[extractJsonFromAIResponse] First brace at:', firstBrace);
-  console.error('[extractJsonFromAIResponse] Last brace at:', lastBrace);
+  // Find the first opening bracket (array or object)
+  let firstBrace = -1;
+  if (openBracketIndex !== -1 && openBraceIndex !== -1) {
+    firstBrace = Math.min(openBracketIndex, openBraceIndex);
+  } else if (openBracketIndex !== -1) {
+    firstBrace = openBracketIndex;
+  } else if (openBraceIndex !== -1) {
+    firstBrace = openBraceIndex;
+  }
+
+  // Find the last closing bracket (array or object)
+  const lastBrace = Math.max(closeBracketIndex, closeBraceIndex);
 
   if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
     throw new Error('No valid JSON structure found in response');
@@ -53,23 +67,6 @@ export function extractJsonFromAIResponse<T>(rawResponse: string): T {
 
   // Trim whitespace and any trailing characters after extraction
   json = json.trim();
-
-  console.error('[extractJsonFromAIResponse] Final JSON length:', json.length);
-  console.error('[extractJsonFromAIResponse] First 200 chars:', json.substring(0, 200));
-
-  // 🔍 DEBUG: Check for hidden characters in extracted JSON
-  let hiddenCharsFound = false;
-  for (let i = 0; i < Math.min(json.length, 500); i++) {
-    const code = json.charCodeAt(i);
-    // Allow printable chars, space, tab, newline, carriage return
-    if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
-      console.error(`[extractJsonFromAIResponse] ⚠️ Hidden char at position ${i}: code ${code}`);
-      hiddenCharsFound = true;
-    }
-  }
-  if (!hiddenCharsFound) {
-    console.error('[extractJsonFromAIResponse] No hidden characters detected in first 500 chars');
-  }
 
   return JSON.parse(json);
 }
@@ -117,6 +114,7 @@ export async function getMessagesForAI(
   conversationId: string,
   options: MessageQueryOptions = {}
 ): Promise<FormattedMessages> {
+  const db = getDb();
   let messagesQuery = db
     .collection(`conversations/${conversationId}/messages`)
     .orderBy('createdAt', 'desc');
