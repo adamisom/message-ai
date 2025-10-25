@@ -136,12 +136,47 @@ time firebase deploy --only functions:extractActionItems
 
 Expected deploy time: ~30-60 seconds
 
-##Status
+## Status
 
 - ✅ Root cause identified (missing IDs)
 - ✅ Fix implemented and compiled
 - ✅ Compiled tests passing
-- ⏳ Needs deployment
+- ✅ **Cloud Function deployed** (extractActionItems)
+- ✅ **Firestore security rules updated** (TEMPORARY - allows all participants to assign)
 - ⏳ Needs manual testing
+
+## Firestore Security Rules - TEMPORARY UPDATE
+
+**File:** `firestore.rules` (lines 45-60)
+
+**Change:** Updated `ai_action_items` rules to allow participants to update assignment fields:
+- `assigneeUid`
+- `assigneeDisplayName`
+- `assignedAt`
+
+**Note:** This is a **TEMPORARY Phase 3 solution** to unblock action item assignment testing. In **Phase 4 (Workspaces & Paid Tier)**, these rules will be restricted to workspace admins only.
+
+**TODO Phase 4:** Update security rules to:
+```javascript
+// Phase 4: Only workspace admins can assign
+allow update: if request.auth != null && 
+  isWorkspaceAdmin(conversationId) &&
+  request.resource.data.diff(resource.data).affectedKeys()
+    .hasOnly(['assigneeUid', 'assigneeDisplayName', 'assignedAt']);
+```
+
+## Deployment Commands Used
+
+```bash
+# Deploy security rules
+cd /Users/adamisom/Desktop/message-ai
+time firebase deploy --only firestore:rules
+# Completed in ~3 seconds
+
+# Build and deploy Cloud Function
+cd functions && npm run build
+cd .. && time firebase deploy --only functions:extractActionItems
+# Completed in ~2 minutes 43 seconds
+```
 
 

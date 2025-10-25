@@ -42,15 +42,18 @@ service cloud.firestore {
       allow write: if false;
     }
     
-    // AI Action Items - participants can read and update status
+    // AI Action Items - participants can read and update
     match /conversations/{conversationId}/ai_action_items/{itemId} {
       allow read: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
       
-      // Users can mark action items as complete (status, completedAt only)
+      // TEMPORARY (Phase 3): Allow participants to update action items for assignment
+      // TODO Phase 4: Restrict assignment to workspace admins only
+      // Users can mark complete (status, completedAt) OR assign (assigneeUid, assigneeDisplayName, assignedAt)
       allow update: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedAt']);
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'completedAt', 'assigneeUid', 'assigneeDisplayName', 'assignedAt']);
       
       // Only Cloud Functions can create/delete
       allow create, delete: if false;
