@@ -12,6 +12,7 @@ import {
 import { db } from '../firebase.config';
 import { useAIFeature } from '../hooks/useAIFeature';
 import { assignActionItem, extractActionItems, toggleActionItemStatus } from '../services/aiService';
+import { invalidateActionItemsCache } from '../services/aiCacheService';
 import { commonModalStyles } from '../styles/commonModalStyles';
 import type { ActionItem } from '../types';
 import { getPriorityColor } from '../utils/colorHelpers';
@@ -102,7 +103,11 @@ export function ActionItemsModal({
     );
 
     try {
+      // 1. Update Firestore document
       await toggleActionItemStatus(conversationId, itemId, newStatus);
+      
+      // 2. Invalidate cache so next open fetches fresh data
+      await invalidateActionItemsCache(conversationId);
     } catch (err: any) {
       console.error('Toggle status error:', err);
       // Revert on error
@@ -149,8 +154,17 @@ export function ActionItemsModal({
     console.log('[ActionItemsModal] Calling assignActionItem API');
 
     try {
+      // 1. Update Firestore document
       await assignActionItem(conversationId, itemId, participant.uid, participant.displayName);
       console.log('[ActionItemsModal] Assignment successful');
+      
+      // 2. Invalidate cache so next open fetches fresh data
+      await invalidateActionItemsCache(conversationId);
+      console.log('[ActionItemsModal] Cache invalidated');
+      
+      // 3. Reload from Firestore (rebuilds cache)
+      await reload();
+      console.log('[ActionItemsModal] Data reloaded with fresh cache');
     } catch (err: any) {
       console.error('[ActionItemsModal] Assign error:', err);
       Alert.alert('Error', 'Failed to assign task. Please try again.');
