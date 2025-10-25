@@ -352,12 +352,7 @@ export default function ChatScreen() {
 
       // Update conversation's lastMessage
       await updateDoc(doc(db, 'conversations', conversationId), {
-        lastMessage: {
-          text,
-          senderId: user.uid,
-          senderName,
-          createdAt: serverTimestamp(),
-        },
+        lastMessage: text.substring(0, 100), // Simple string preview (consistent with firestoreService)
         lastMessageAt: serverTimestamp(),
         lastMessageSenderId: user.uid, // Track who sent the last message (for notifications)
         [`lastReadAt.${user.uid}`]: serverTimestamp(), // Mark as read by sender immediately

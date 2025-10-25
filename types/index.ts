@@ -31,7 +31,7 @@ export interface Conversation {
   participants: string[];
   participantDetails: Record<string, {displayName: string; email: string}>;
   lastMessageAt?: any;
-  lastMessage?: string | {text: string; senderId: string; senderName: string; createdAt: any} | null;
+  lastMessage?: string | null;
   lastRead?: Record<string, string>; // Phase 5: uid -> messageId for read receipts
   lastReadAt?: Record<string, any>; // Phase 5: uid -> timestamp for unread indicators
   createdAt?: any;
