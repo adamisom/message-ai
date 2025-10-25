@@ -49,11 +49,11 @@ service cloud.firestore {
       
       // TEMPORARY (Phase 3): Allow participants to update action items for assignment
       // TODO Phase 4: Restrict assignment to workspace admins only
-      // Users can mark complete (status, completedAt) OR assign (assigneeUid, assigneeDisplayName, assignedAt)
+      // Users can mark complete (status, completedAt) OR assign (assigneeUid, assigneeDisplayName, assignedAt, updatedAt)
       allow update: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'completedAt', 'assigneeUid', 'assigneeDisplayName', 'assignedAt']);
+          .hasOnly(['status', 'completedAt', 'assigneeUid', 'assigneeDisplayName', 'assignedAt', 'updatedAt']);
       
       // Only Cloud Functions can create/delete
       allow create, delete: if false;
