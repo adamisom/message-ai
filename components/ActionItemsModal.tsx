@@ -1,13 +1,14 @@
 import { doc, getDoc } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { db } from '../firebase.config';
 import { useAIFeature } from '../hooks/useAIFeature';
@@ -42,6 +43,7 @@ export function ActionItemsModal({
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [itemToAssign, setItemToAssign] = useState<string | null>(null);
+  const itemToAssignRef = useRef<string | null>(null);
   
   const { data, loading, loadingSlowly, error, reload } = useAIFeature({
     visible,
@@ -115,34 +117,48 @@ export function ActionItemsModal({
   };
 
   const handleAssignPress = (itemId: string) => {
+    console.log('[ActionItemsModal] handleAssignPress called with:', itemId);
     setItemToAssign(itemId);
+    itemToAssignRef.current = itemId;
     setShowAssignPicker(true);
   };
 
-  const handleAssignToParticipant = async (participant: Participant) => {
-    if (!itemToAssign) return;
+  const handleAssignToParticipant = async (participant: Participant, itemId: string) => {
+    console.log('[ActionItemsModal] handleAssignToParticipant called:', participant.displayName, 'itemId:', itemId);
+    
+    if (!itemId) {
+      console.warn('[ActionItemsModal] No itemId provided');
+      return;
+    }
+
+    console.log('[ActionItemsModal] Starting optimistic update');
 
     // Optimistic update
     setItems((prev) =>
       prev.map((item) =>
-        item.id === itemToAssign
+        item.id === itemId
           ? { ...item, assigneeUid: participant.uid, assigneeDisplayName: participant.displayName }
           : item
       )
     );
 
+    // Close the picker and clear the ref AFTER optimistic update
     setShowAssignPicker(false);
     setItemToAssign(null);
+    itemToAssignRef.current = null;
+
+    console.log('[ActionItemsModal] Calling assignActionItem API');
 
     try {
-      await assignActionItem(conversationId, itemToAssign, participant.uid, participant.displayName);
+      await assignActionItem(conversationId, itemId, participant.uid, participant.displayName);
+      console.log('[ActionItemsModal] Assignment successful');
     } catch (err: any) {
-      console.error('Assign error:', err);
+      console.error('[ActionItemsModal] Assign error:', err);
       Alert.alert('Error', 'Failed to assign task. Please try again.');
       // Revert on error
       setItems((prev) =>
         prev.map((item) =>
-          item.id === itemToAssign
+          item.id === itemId
             ? { ...item, assigneeUid: null, assigneeDisplayName: null }
             : item
         )
@@ -155,6 +171,7 @@ export function ActionItemsModal({
     setParticipants([]);
     setShowAssignPicker(false);
     setItemToAssign(null);
+    itemToAssignRef.current = null;
     onClose();
   };
 
@@ -276,32 +293,44 @@ export function ActionItemsModal({
           animationType="fade"
           onRequestClose={() => setShowAssignPicker(false)}
         >
-          <TouchableOpacity
+          <Pressable
             style={styles.pickerOverlay}
-            activeOpacity={1}
             onPress={() => setShowAssignPicker(false)}
           >
-            <View style={styles.pickerContainer}>
-              <Text style={styles.pickerTitle}>Assign to:</Text>
-              {participants.map((participant) => (
-                <TouchableOpacity
-                  key={participant.uid}
-                  style={styles.pickerItem}
-                  onPress={() => handleAssignToParticipant(participant)}
+            <Pressable onPress={(e) => e.stopPropagation()}>
+              <View style={styles.pickerContainer} pointerEvents="box-none">
+                <Text style={styles.pickerTitle}>Assign to:</Text>
+                {participants.map((participant) => (
+                  <Pressable
+                    key={participant.uid}
+                    style={styles.pickerItem}
+                    onPress={() => {
+                      console.log('[ActionItemsModal] Pressable onPress fired for:', participant.displayName);
+                      console.log('[ActionItemsModal] itemToAssignRef.current:', itemToAssignRef.current);
+                      console.log('[ActionItemsModal] itemToAssign state:', itemToAssign);
+                      
+                      const currentItemId = itemToAssignRef.current;
+                      if (currentItemId) {
+                        handleAssignToParticipant(participant, currentItemId);
+                      } else {
+                        console.warn('[ActionItemsModal] itemToAssignRef.current is null');
+                      }
+                    }}
+                  >
+                    <Text style={styles.pickerItemText}>
+                      👤 {participant.displayName}
+                    </Text>
+                  </Pressable>
+                ))}
+                <Pressable
+                  style={styles.pickerCancelButton}
+                  onPress={() => setShowAssignPicker(false)}
                 >
-                  <Text style={styles.pickerItemText}>
-                    👤 {participant.displayName}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                style={styles.pickerCancelButton}
-                onPress={() => setShowAssignPicker(false)}
-              >
-                <Text style={styles.pickerCancelText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
+                  <Text style={styles.pickerCancelText}>Cancel</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
         </Modal>
       </View>
     </Modal>

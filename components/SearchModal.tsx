@@ -166,18 +166,39 @@ export function SearchModal({
                   <Text style={styles.resultDate}>
                     {(() => {
                       if (!item.createdAt) return '';
+                      
                       try {
-                        // Firestore Timestamp has toDate() method
-                        if (item.createdAt.toDate) {
-                          return formatDate(item.createdAt);
+                        // Firestore Timestamp object
+                        if (item.createdAt.toDate && typeof item.createdAt.toDate === 'function') {
+                          return formatDate(item.createdAt.toDate());
                         }
+                        
+                        // Firestore Timestamp serialized (has _seconds/_nanoseconds with underscores)
+                        if (item.createdAt._seconds !== undefined) {
+                          const date = new Date(item.createdAt._seconds * 1000);
+                          return formatDate(date);
+                        }
+                        
+                        // Firestore Timestamp serialized (has seconds/nanoseconds without underscores)
+                        if (item.createdAt.seconds !== undefined) {
+                          const date = new Date(item.createdAt.seconds * 1000);
+                          return formatDate(date);
+                        }
+                        
                         // Already a Date
                         if (item.createdAt instanceof Date) {
                           return formatDate(item.createdAt);
                         }
-                        // Fallback
-                        return formatDate(new Date(item.createdAt));
+                        
+                        // Timestamp as number
+                        if (typeof item.createdAt === 'number') {
+                          return formatDate(new Date(item.createdAt));
+                        }
+                        
+                        console.warn('[SearchModal] Unknown date format:', item.createdAt);
+                        return '';
                       } catch (e) {
+                        console.error('[SearchModal] Date error:', e, item.createdAt);
                         return '';
                       }
                     })()}
