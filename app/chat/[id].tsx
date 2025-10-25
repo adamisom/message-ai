@@ -257,17 +257,43 @@ export default function ChatScreen() {
 
     const typingRef = collection(db, 'conversations', conversationId, 'typingUsers');
     
+    // Map to track cleanup timers for each typing user
+    const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    
     const unsubscribe = onSnapshot(typingRef, (snapshot) => {
+      const now = Date.now();
       const typing = snapshot.docs
         .map(doc => ({ uid: doc.id, ...doc.data() }))
         .filter(t => t.uid !== user.uid) as TypingUser[];
       
       console.log('⌨️ [ChatScreen] Typing users:', typing.length);
+      
+      // For each typing user, set a cleanup timer
+      typing.forEach(typingUser => {
+        // Clear existing timer if any
+        const existingTimer = cleanupTimers.get(typingUser.uid);
+        if (existingTimer) {
+          clearTimeout(existingTimer);
+        }
+        
+        // Set new timer to remove this user after 3 seconds
+        const timer = setTimeout(() => {
+          console.log('⌨️ [ChatScreen] Cleaning up stale typing indicator for:', typingUser.displayName);
+          setTypingUsers(prev => prev.filter(t => t.uid !== typingUser.uid));
+          cleanupTimers.delete(typingUser.uid);
+        }, 3000); // 3 seconds persistence
+        
+        cleanupTimers.set(typingUser.uid, timer);
+      });
+      
       setTypingUsers(typing);
     });
 
     return () => {
       console.log('🔌 [ChatScreen] Cleaning up typing indicators listener');
+      // Clear all cleanup timers
+      cleanupTimers.forEach(timer => clearTimeout(timer));
+      cleanupTimers.clear();
       unsubscribe();
     };
   }, [conversationId, user]);

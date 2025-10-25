@@ -141,10 +141,34 @@
 
 ---
 
-## Phase 2: Group Chat Read Receipt Details
-**Time:** 1 hour
+## Phase 2: Core Messaging Polish
+**Time:** 1.5 hours
 
-### Task 2.1: Update Message Type Definition
+### Task 2.1: Fix Typing Indicator Persistence (UX Polish)
+**Files:** `app/chat/[id].tsx`  
+**Time:** 30 minutes
+
+**Problem:** Typing indicators flash briefly and disappear because stale Firestore documents aren't cleaned up.
+
+**Solution:** Client-side cleanup timer that removes typing indicators after 3 seconds of no updates.
+
+- [ ] Add cleanup logic in typing indicators listener (chat screen)
+- [ ] Track last update time for each typing user
+- [ ] Set 3-second timer to filter out stale indicators
+- [ ] Clear timers on component unmount
+- [ ] Test: User types → stops → indicator persists for ~3 seconds → disappears
+
+**Acceptance:**
+- Typing indicator shows while actively typing
+- Persists for 3 seconds after user stops typing
+- Gracefully handles multiple users typing
+- No stale indicators lingering
+
+---
+
+### Task 2.2: Add Group Chat Read Receipt Details
+**Files:** `app/chat/[id].tsx`, `components/MessageList.tsx`, `components/MessageBubble.tsx`  
+**Time:** 1 hour
 **File:** `types/index.ts`  
 **Time:** 5 minutes
 
