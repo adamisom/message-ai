@@ -1,3 +1,19 @@
+/**
+ * Sparkle Menu (✨)
+ * 
+ * Modal menu for accessing AI-powered features including:
+ * - Thread Summarization
+ * - Action Items Extraction
+ * - Smart Semantic Search
+ * - Decision Tracking
+ * - Proactive Meeting Scheduler
+ * 
+ * Access control:
+ * - Pro users: Full access everywhere
+ * - Free users in workspaces: Full access
+ * - Free users outside workspaces: Upgrade prompt
+ */
+
 import {
     Modal,
     StyleSheet,
@@ -18,6 +34,7 @@ interface AIFeaturesMenuProps {
   isGroupChat: boolean;
 }
 
+// Sparkle Menu Component
 export function AIFeaturesMenu({
   visible,
   onClose,
