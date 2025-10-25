@@ -3,10 +3,10 @@ import * as functions from 'firebase-functions';
 import { callClaude } from '../utils/anthropic';
 import { getCachedResult } from '../utils/caching';
 import {
-    extractJsonFromAIResponse,
-    formatParticipantsForPrompt,
-    getConversationOrThrow,
-    getMessagesForAI,
+  extractJsonFromAIResponse,
+  formatParticipantsForPrompt,
+  getConversationOrThrow,
+  getMessagesForAI,
 } from '../utils/conversationHelpers';
 import { checkAIRateLimit } from '../utils/rateLimit';
 import { verifyConversationAccess } from '../utils/security';
@@ -108,17 +108,24 @@ Priority rules:
 
     // 8. Call Claude
     const rawResponse = await callClaude(prompt, 2000);
+    console.error('📝 Got Claude response, length:', rawResponse.length);
+    console.error('📝 Response starts with:', rawResponse.substring(0, 100));
 
     // 9. Validate response (expecting array)
     let actionItemsArray;
     try {
+      console.error('🔍 About to call extractJsonFromAIResponse');
       actionItemsArray = extractJsonFromAIResponse<any[]>(rawResponse);
+      console.error('✅ Successfully extracted JSON array');
 
       if (!Array.isArray(actionItemsArray)) {
         throw new Error('Response is not an array');
       }
     } catch (error) {
-      console.error('Failed to parse Claude response:', rawResponse);
+      console.error('❌ Failed to parse action items:', (error as Error).message);
+      console.error('❌ Response length:', rawResponse.length);
+      console.error('❌ First 500 chars:', rawResponse.substring(0, 500));
+      console.error('❌ Last 200 chars:', rawResponse.substring(rawResponse.length - 200));
       throw new functions.https.HttpsError(
         'internal',
         `Failed to parse action items: ${(error as Error).message}`

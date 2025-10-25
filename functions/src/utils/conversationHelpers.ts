@@ -33,15 +33,26 @@ export async function getConversationOrThrow(
  * Finds first and last brace/bracket to extract valid JSON
  */
 export function extractJsonFromAIResponse<T>(rawResponse: string): T {
+  console.error('[extractJsonFromAIResponse] Raw response length:', rawResponse.length);
+  
   let json = rawResponse.trim();
 
-  // Extract JSON from markdown code blocks or plain text
+  // Remove markdown code blocks completely - strip everything before first { or [
+  // and everything after last } or ]
   const firstBrace = Math.max(json.indexOf('['), json.indexOf('{'));
   const lastBrace = Math.max(json.lastIndexOf(']'), json.lastIndexOf('}'));
 
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    json = json.substring(firstBrace, lastBrace + 1);
+  console.error('[extractJsonFromAIResponse] First brace at:', firstBrace);
+  console.error('[extractJsonFromAIResponse] Last brace at:', lastBrace);
+
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    throw new Error('No valid JSON structure found in response');
   }
+
+  json = json.substring(firstBrace, lastBrace + 1);
+
+  console.error('[extractJsonFromAIResponse] Final JSON length:', json.length);
+  console.error('[extractJsonFromAIResponse] First 200 chars:', json.substring(0, 200));
 
   return JSON.parse(json);
 }
