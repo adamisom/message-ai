@@ -1,4 +1,3 @@
-import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
 import {
     Alert,
@@ -9,6 +8,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useAIFeature } from '../hooks/useAIFeature';
 import { suggestMeetingTimes } from '../services/aiService';
 import { commonModalStyles } from '../styles/commonModalStyles';
@@ -47,7 +47,7 @@ export function MeetingSchedulerModal({
   const result = useAIFeature<MeetingSuggestion>({
     visible,
     conversationId,
-    fetchFunction: (convId) => suggestMeetingTimes(convId, messageCount),
+    fetchFunction: (convId) => suggestMeetingTimes(convId, messageCount) as Promise<MeetingSuggestion>,
     dependencies: [messageCount],
   });
   

@@ -21,6 +21,8 @@ export const Colors = {
   // Status
   error: '#c00',
   errorBackground: '#fee',
+  success: '#44ff44',
+  warning: '#ffaa00',
   
   // Priority colors
   priorityHigh: '#ff4444',
