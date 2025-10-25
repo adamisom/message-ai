@@ -16,6 +16,7 @@
 /* eslint-env node */
 const admin = require('firebase-admin');
 const path = require('path');
+const { deleteAllConversations } = require('./deleteData');
 
 // Initialize Firebase Admin
 const serviceAccountPath = path.resolve(
@@ -228,45 +229,6 @@ async function fetchTestUsers() {
   });
   
   return users;
-}
-
-async function deleteAllConversations() {
-  console.log('🗑️  Deleting all existing conversations...');
-  
-  const conversationsSnapshot = await db.collection('conversations').get();
-  
-  if (conversationsSnapshot.empty) {
-    console.log('   No existing conversations to delete\n');
-    return;
-  }
-  
-  console.log(`   Found ${conversationsSnapshot.size} conversations to delete`);
-  
-  let deleteCount = 0;
-  let messageCount = 0;
-  
-  // Delete each conversation and its messages
-  for (const doc of conversationsSnapshot.docs) {
-    // Delete all messages in this conversation
-    const messagesSnapshot = await doc.ref.collection('messages').get();
-    
-    if (!messagesSnapshot.empty) {
-      const messageBatch = db.batch();
-      messagesSnapshot.docs.forEach((msgDoc) => {
-        messageBatch.delete(msgDoc.ref);
-      });
-      await messageBatch.commit();
-      messageCount += messagesSnapshot.size;
-    }
-    
-    // Delete the conversation document itself
-    await doc.ref.delete();
-    deleteCount++;
-    
-    process.stdout.write('.');
-  }
-  
-  console.log(`\n   ✅ Deleted ${deleteCount} conversations and ${messageCount} messages\n`);
 }
 
 async function promptForDeletion() {
