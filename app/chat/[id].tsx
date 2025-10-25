@@ -257,43 +257,67 @@ export default function ChatScreen() {
 
     const typingRef = collection(db, 'conversations', conversationId, 'typingUsers');
     
-    // Map to track cleanup timers for each typing user
-    const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    // Track typing users with their last update time
+    const typingUsersMap = new Map<string, { user: TypingUser; lastUpdate: number; timer: ReturnType<typeof setTimeout> }>();
     
     const unsubscribe = onSnapshot(typingRef, (snapshot) => {
       const now = Date.now();
-      const typing = snapshot.docs
-        .map(doc => ({ uid: doc.id, ...doc.data() }))
-        .filter(t => t.uid !== user.uid) as TypingUser[];
       
-      console.log('⌨️ [ChatScreen] Typing users:', typing.length);
-      
-      // For each typing user, set a cleanup timer
-      typing.forEach(typingUser => {
+      // Process current typing users from Firestore
+      snapshot.docs.forEach(doc => {
+        const typingUser = { uid: doc.id, ...doc.data() } as TypingUser;
+        if (typingUser.uid === user.uid) return; // Skip own typing
+        
         // Clear existing timer if any
-        const existingTimer = cleanupTimers.get(typingUser.uid);
-        if (existingTimer) {
-          clearTimeout(existingTimer);
+        const existing = typingUsersMap.get(typingUser.uid);
+        if (existing?.timer) {
+          clearTimeout(existing.timer);
         }
         
-        // Set new timer to remove this user after 3 seconds
+        // Set new timer to remove after 2 seconds
         const timer = setTimeout(() => {
-          console.log('⌨️ [ChatScreen] Cleaning up stale typing indicator for:', typingUser.displayName);
-          setTypingUsers(prev => prev.filter(t => t.uid !== typingUser.uid));
-          cleanupTimers.delete(typingUser.uid);
-        }, 3000); // 3 seconds persistence
+          console.log('⌨️ [ChatScreen] Removing stale typing indicator:', typingUser.displayName);
+          typingUsersMap.delete(typingUser.uid);
+          updateTypingState();
+        }, 2000);
         
-        cleanupTimers.set(typingUser.uid, timer);
+        typingUsersMap.set(typingUser.uid, {
+          user: typingUser,
+          lastUpdate: now,
+          timer
+        });
       });
       
-      setTypingUsers(typing);
+      // Check for users who were removed from Firestore but should still show for a bit
+      // (This handles the case where sender stopped typing and deleted their doc)
+      typingUsersMap.forEach((data, uid) => {
+        const existsInSnapshot = snapshot.docs.some(doc => doc.id === uid);
+        if (!existsInSnapshot && now - data.lastUpdate < 2000) {
+          // User was removed from Firestore but was recently typing - keep showing for full 2 seconds
+          console.log('⌨️ [ChatScreen] Keeping recently removed typing indicator:', data.user.displayName);
+        } else if (!existsInSnapshot && now - data.lastUpdate >= 2000) {
+          // It's been 2 seconds, safe to remove
+          if (data.timer) clearTimeout(data.timer);
+          typingUsersMap.delete(uid);
+        }
+      });
+      
+      updateTypingState();
     });
+    
+    const updateTypingState = () => {
+      const currentlyTyping = Array.from(typingUsersMap.values()).map(data => data.user);
+      console.log('⌨️ [ChatScreen] Typing users:', currentlyTyping.length);
+      setTypingUsers(currentlyTyping);
+    };
 
     return () => {
       console.log('🔌 [ChatScreen] Cleaning up typing indicators listener');
-      // Clear all cleanup timers
-      cleanupTimers.forEach(timer => clearTimeout(timer));
-      cleanupTimers.clear();
+      // Clear all timers
+      typingUsersMap.forEach(data => {
+        if (data.timer) clearTimeout(data.timer);
+      });
+      typingUsersMap.clear();
       unsubscribe();
     };
   }, [conversationId, user]);
