@@ -164,7 +164,31 @@ export function SearchModal({
                 <View style={styles.resultHeader}>
                   <Text style={styles.senderName}>{item.senderName}</Text>
                   <Text style={styles.resultDate}>
-                    {item.createdAt?.toDate ? formatDate(item.createdAt.toDate()) : formatDate(item.createdAt)}
+                    {(() => {
+                      try {
+                        if (!item.createdAt) return 'N/A';
+                        // Handle Firestore Timestamp
+                        if (item.createdAt.toDate && typeof item.createdAt.toDate === 'function') {
+                          return formatDate(item.createdAt.toDate());
+                        }
+                        // Handle Date object
+                        if (item.createdAt instanceof Date) {
+                          return formatDate(item.createdAt);
+                        }
+                        // Handle number (milliseconds)
+                        if (typeof item.createdAt === 'number') {
+                          return formatDate(new Date(item.createdAt));
+                        }
+                        // Handle string
+                        if (typeof item.createdAt === 'string') {
+                          return formatDate(new Date(item.createdAt));
+                        }
+                        return 'N/A';
+                      } catch (e) {
+                        console.error('Date formatting error:', e);
+                        return 'N/A';
+                      }
+                    })()}
                   </Text>
                 </View>
                 <Text style={styles.messageText} numberOfLines={2}>

@@ -50,15 +50,17 @@ export function ActionItemsModal({
   });
 
   // Update local state when data changes
-  if (data && items !== (data as any).items) {
-    const fetchedItems = (data as any).items || [];
-    // Sort by priority: high → medium → low
-    const priorityOrder: { [key: string]: number } = { high: 0, medium: 1, low: 2 };
-    const sortedItems = [...fetchedItems].sort((a: ActionItem, b: ActionItem) => {
-      return priorityOrder[a.priority] - priorityOrder[b.priority];
-    });
-    setItems(sortedItems);
-  }
+  useEffect(() => {
+    if (data && (data as any).items) {
+      const fetchedItems = (data as any).items || [];
+      // Sort by priority: high → medium → low
+      const priorityOrder: { [key: string]: number } = { high: 0, medium: 1, low: 2 };
+      const sortedItems = [...fetchedItems].sort((a: ActionItem, b: ActionItem) => {
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      });
+      setItems(sortedItems);
+    }
+  }, [data]);
 
   // Fetch conversation participants
   useEffect(() => {
