@@ -23,6 +23,7 @@
 ## Executive Summary
 
 ### Current Approach (Problems)
+
 - ❌ Claude returns JSON wrapped in markdown code blocks (` ```json ... ``` `)
 - ❌ Complex, fragile parsing logic required
 - ❌ No schema validation on server side
@@ -30,6 +31,7 @@
 - ❌ Reinventing the wheel instead of using API features
 
 ### Proposed Approach (Solutions)
+
 - ✅ Use Anthropic's **Tool Use** feature (like OpenAI's function calling)
 - ✅ Server-side schema validation by Anthropic
 - ✅ No markdown wrapping - clean structured responses
@@ -37,6 +39,7 @@
 - ✅ Industry standard, battle-tested approach
 
 ### Impact
+
 - **Features affected:** 4 out of 5 AI features (Action Items, Decisions, Summarization, Priority Detection Batch)
 - **No impact:** Semantic Search (uses OpenAI only)
 - **Lines of code removed:** ~200 lines of parsing logic
@@ -50,23 +53,28 @@
 ### Current Issues
 
 **1. JSON Parsing Bugs**
+
 ```
 Error: Unexpected non-whitespace character after JSON at position 177
 ```
+
 - Root cause: Claude returns ` ```json\n[...]\n``` ` with trailing characters
 - Hours spent debugging extraction logic
 - Fragile solution that might break with different responses
 
 **2. No Schema Validation**
+
 - Claude can return invalid JSON that passes parsing but fails downstream
 - Example: Missing required fields, wrong types, invalid enum values
 - We only discover issues after parsing succeeds
 
 **3. Not Using API's Intended Features**
+
 - Anthropic provides Tool Use specifically for structured outputs
 - We're working against the API instead of with it
 
 **4. Comparison with OpenAI**
+
 - OpenAI has `response_format: { type: "json_object" }`
 - OpenAI enforces JSON, no markdown wrapping
 - We're at a disadvantage using Claude the wrong way
@@ -74,6 +82,7 @@ Error: Unexpected non-whitespace character after JSON at position 177
 ### Benefits of Tool Use
 
 **1. Server-Side Validation**
+
 ```typescript
 // Anthropic validates this schema BEFORE returning
 input_schema: {
@@ -95,6 +104,7 @@ input_schema: {
 ```
 
 **2. Already-Parsed Responses**
+
 ```typescript
 // Before (current):
 const rawResponse = await callClaude(prompt);
@@ -108,6 +118,7 @@ const items = toolUse.input.items; // Already parsed!
 ```
 
 **3. Better Prompts**
+
 - Anthropic automatically constructs system prompts for tools
 - We provide tool descriptions, Anthropic handles the rest
 - More consistent responses
@@ -234,6 +245,7 @@ const response = await anthropicClient.messages.create({
 ## Features to Refactor
 
 ### ✅ 1. Action Items Extraction
+
 **Current:** Text prompt → parse JSON from markdown  
 **New:** Tool Use with `extract_action_items` tool
 
@@ -243,6 +255,7 @@ const response = await anthropicClient.messages.create({
 ---
 
 ### ✅ 2. Decision Tracking
+
 **Current:** Text prompt → parse JSON from markdown  
 **New:** Tool Use with `track_decisions` tool
 
@@ -252,6 +265,7 @@ const response = await anthropicClient.messages.create({
 ---
 
 ### ✅ 3. Thread Summarization
+
 **Current:** Text prompt → parse JSON from markdown  
 **New:** Tool Use with `generate_summary` tool
 
@@ -261,6 +275,7 @@ const response = await anthropicClient.messages.create({
 ---
 
 ### ✅ 4. Priority Detection (Batch Analysis)
+
 **Current:** Heuristic (real-time) → Text prompt → parse JSON (batch)  
 **New:** Heuristic (real-time) → Tool Use with `analyze_message_priority` tool (batch)
 
@@ -272,6 +287,7 @@ const response = await anthropicClient.messages.create({
 ---
 
 ### ⚠️ 5. Semantic Search (No Change)
+
 **Current:** OpenAI embeddings + Pinecone  
 **Note:** Doesn't use Claude at all
 
@@ -284,6 +300,7 @@ const response = await anthropicClient.messages.create({
 #### 1.1 Refactor `anthropic.ts`
 
 **Current:**
+
 ```typescript
 export async function callClaude(
   prompt: string,
@@ -292,6 +309,7 @@ export async function callClaude(
 ```
 
 **New:**
+
 ```typescript
 // Keep old function for backward compatibility during migration
 export async function callClaudeText(
@@ -353,6 +371,7 @@ export async function callClaudeWithTool<T>(
 **Purpose:** Centralize all tool definitions
 
 **Content:**
+
 ```typescript
 import { Tool } from '@anthropic-ai/sdk/resources/messages';
 
@@ -583,6 +602,7 @@ Consider the language, tone, and content to determine priority.`,
 #### 2.1 Update `actionItems.ts`
 
 **Changes:**
+
 1. Import new tool and function from utils
 2. Replace `callClaude()` + parsing logic with `callClaudeWithTool()`
 3. Remove `extractJsonFromAIResponse()` call
@@ -590,6 +610,7 @@ Consider the language, tone, and content to determine priority.`,
 5. Keep existing logic: rate limiting, caching, assignee resolution, Firestore writes
 
 **Before (current):**
+
 ```typescript
 // Line ~110
 const rawResponse = await callClaude(prompt, 2000);
@@ -610,6 +631,7 @@ actionItemsArray = extractJsonFromAIResponse<any[]>(rawResponse);
 ```
 
 **After (refactored):**
+
 ```typescript
 import { callClaudeWithTool } from '../utils/anthropic';
 import { extractActionItemsTool } from '../utils/aiTools';
@@ -639,6 +661,7 @@ const actionItemsArray = actionItemsResult.items;
 **File:** `functions/src/utils/conversationHelpers.ts`
 
 **Remove:**
+
 - `extractJsonFromAIResponse()` function (lines 35-75)
 - Can keep it temporarily for Decisions refactor, then remove
 
@@ -653,12 +676,14 @@ const actionItemsArray = actionItemsResult.items;
 **File:** `functions/src/ai/decisions.ts`
 
 **Before:**
+
 ```typescript
 const rawResponse = await callClaude(prompt, 1500);
 const decisionsArray = extractJsonFromAIResponse<any[]>(rawResponse);
 ```
 
 **After:**
+
 ```typescript
 import { callClaudeWithTool } from '../utils/anthropic';
 import { trackDecisionsTool } from '../utils/aiTools';
@@ -681,6 +706,7 @@ const decisionsArray = decisionsResult.decisions;
 **File:** `functions/src/ai/summarization.ts`
 
 **Before:**
+
 ```typescript
 const rawResponse = await callClaude(prompt, 1500);
 
@@ -696,6 +722,7 @@ return {
 ```
 
 **After:**
+
 ```typescript
 import { callClaudeWithTool } from '../utils/anthropic';
 import { generateSummaryTool } from '../utils/aiTools';
@@ -718,13 +745,14 @@ return {
 
 ### Phase 4.5: Refactor Priority Detection Batch (30 minutes)
 
-####4.5.1 Update `priority.ts`
+#### 4.5.1 Update `priority.ts`
 
 **File:** `functions/src/ai/priority.ts`
 
 **Function:** `analyzeMessagePriorityWithAI` (called by `batchAnalyzePriority`)
 
 **Before:**
+
 ```typescript
 async function analyzeMessagePriorityWithAI(text: string): Promise<string> {
   const prompt = `
@@ -743,6 +771,7 @@ Respond with JSON:
 ```
 
 **After:**
+
 ```typescript
 import { callClaudeWithTool } from '../utils/anthropic';
 import { analyzeMessagePriorityTool } from '../utils/aiTools';
@@ -774,6 +803,7 @@ Message: "${text}"`;
 #### 5.1 Remove Debug Code
 
 **Files to clean:**
+
 - `functions/src/ai/actionItems.ts` - Remove Firestore debug logging (lines 114-128, 146-156)
 - `functions/src/utils/conversationHelpers.ts` - Remove `extractJsonFromAIResponse()` function
 - `scripts/viewDebugLogs.js` - Can keep for future debugging but no longer needed for this bug
@@ -784,6 +814,7 @@ Message: "${text}"`;
 #### 5.2 Update Documentation
 
 **Files to update:**
+
 - `docs/phase2-ai-spike/ACTION_ITEMS_JSON_PARSING_BUG.md` - Add resolution section
 - `docs/phase2-ai-spike/SUB-PHASE_1_IMPLEMENTATION_SUMMARY.md` - Note refactoring
 - `README.md` - Update if it mentions implementation details
@@ -795,12 +826,14 @@ Message: "${text}"`;
 #### 6.1 Update Test Files
 
 **Files:**
+
 - `functions/src/__tests__/actionItems.test.ts`
 - `functions/src/__tests__/decisions.test.ts`
 - `functions/src/__tests__/summarization.test.ts`
 - `functions/src/__tests__/priority.test.ts` (or `priorityHeuristics.test.ts`)
 
 **Changes needed:**
+
 - Update mocks to return tool use responses instead of text
 - Test tool schema validation
 - Remove parsing error test cases (no longer applicable)
@@ -809,6 +842,7 @@ Message: "${text}"`;
 **Example update:**
 
 **Before:**
+
 ```typescript
 // Mock callClaude to return JSON string
 jest.mock('../utils/anthropic', () => ({
@@ -819,6 +853,7 @@ jest.mock('../utils/anthropic', () => ({
 ```
 
 **After:**
+
 ```typescript
 // Mock callClaudeWithTool to return structured object
 jest.mock('../utils/anthropic', () => ({
@@ -833,11 +868,13 @@ jest.mock('../utils/anthropic', () => ({
 ## File Changes
 
 ### Files to Create
+
 | File | Purpose | Lines |
 |------|---------|-------|
 | `functions/src/utils/aiTools.ts` | Tool definitions for Claude | ~250 |
 
 ### Files to Modify
+
 | File | Changes | Lines Changed |
 |------|---------|---------------|
 | `functions/src/utils/anthropic.ts` | Add `callClaudeWithTool()` function | +40 |
@@ -853,6 +890,7 @@ jest.mock('../utils/anthropic', () => ({
 | `docs/phase2-ai-spike/ACTION_ITEMS_JSON_PARSING_BUG.md` | Document resolution | +30 |
 
 ### Files to Keep (Optional Cleanup)
+
 | File | Status | Note |
 |------|--------|------|
 | `scripts/viewDebugLogs.js` | Keep | Useful for future debugging |
@@ -864,22 +902,26 @@ jest.mock('../utils/anthropic', () => ({
 ## Testing Strategy
 
 ### Unit Tests
+
 1. **Test tool definitions** - Ensure schemas are valid JSON Schema
 2. **Test mock responses** - Verify structured responses match expected types
 3. **Test error handling** - What happens if Claude doesn't use tool?
 
 ### Integration Tests
+
 1. **Test with emulator** - Deploy to Firebase emulator, call functions
 2. **Test with real conversations** - Use existing test data
 3. **Compare outputs** - Old approach vs new approach (should be similar)
 
 ### Manual Testing
+
 1. **Action Items extraction** - Test on Operations Team conversation
 2. **Summarization** - Test on Project Team conversation
 3. **Decisions** - Test on group conversations
 4. **Edge cases** - Empty conversations, conversations with no action items/decisions
 
 ### Regression Testing
+
 1. **Verify existing features work** - Semantic Search, Priority Detection
 2. **Verify caching still works** - Second call should use cache
 3. **Verify rate limiting works** - Hit 50/hour limit
@@ -892,6 +934,7 @@ jest.mock('../utils/anthropic', () => ({
 ### If Refactoring Fails
 
 **Step 1: Revert Code Changes**
+
 ```bash
 git checkout -- functions/src/ai/actionItems.ts
 git checkout -- functions/src/ai/decisions.ts
@@ -900,11 +943,13 @@ git checkout -- functions/src/utils/anthropic.ts
 ```
 
 **Step 2: Redeploy Old Functions**
+
 ```bash
 firebase deploy --only functions:extractActionItems,functions:trackDecisions,functions:generateSummary
 ```
 
 **Step 3: Test Old Functions**
+
 - Verify action items extraction works
 - Verify summarization works
 - Verify decisions work
@@ -921,9 +966,11 @@ firebase deploy --only functions:extractActionItems,functions:trackDecisions,fun
 ## Open Questions
 
 ### Question 1: System Prompts
+
 **Q:** Should we add custom system prompts to give Claude more context?
 
 **Options:**
+
 - A) No system prompt - let Anthropic's auto-generated prompt handle it
 - B) Minimal system prompt: "You are analyzing a team conversation"
 - C) Detailed system prompt with examples and edge cases
@@ -933,11 +980,13 @@ firebase deploy --only functions:extractActionItems,functions:trackDecisions,fun
 ---
 
 ### Question 2: Multiple Tools vs Single Tool per Function
+
 **Q:** Should we allow Claude to choose between multiple tools, or force a specific tool per function?
 
 **Current plan:** Force specific tool using `tool_choice: { type: "tool", name: "..." }`
 
 **Reasoning:**
+
 - Each Cloud Function has a specific purpose (extract action items, generate summary, etc.)
 - No ambiguity - we know exactly what we want back
 - Simpler to test and debug
@@ -945,6 +994,7 @@ firebase deploy --only functions:extractActionItems,functions:trackDecisions,fun
 **Alternative:** Allow Claude to choose between tools (e.g., "extract_action_items" vs "no_action_items_found")
 
 **Trade-offs:**
+
 - More flexible but more complex
 - Need to handle multiple possible responses
 - Adds complexity without clear benefit
@@ -954,9 +1004,11 @@ firebase deploy --only functions:extractActionItems,functions:trackDecisions,fun
 ---
 
 ### Question 3: Validation After Tool Use
+
 **Q:** Should we still validate the structured response after Claude returns it?
 
 **Options:**
+
 - A) Trust Anthropic's schema validation completely
 - B) Add lightweight TypeScript type checking
 - C) Add full Zod validation like we do now
@@ -964,6 +1016,7 @@ firebase deploy --only functions:extractActionItems,functions:trackDecisions,fun
 **My recommendation:** Option B. Anthropic validates the JSON schema, but we should do TypeScript type checking to ensure our code is type-safe. Remove the complex Zod parsing (since Anthropic already validated the structure).
 
 Example:
+
 ```typescript
 const result = await callClaudeWithTool<{items: ActionItem[}>(...);
 
@@ -977,14 +1030,17 @@ if (!Array.isArray(result.items)) {
 ---
 
 ### Question 4: Prompt Adjustments
+
 **Q:** Should we adjust the prompts now that we're using Tool Use?
 
 **Current prompts:**
+
 - Include JSON format examples
 - Specify "Return JSON array: [...]"
 - Include formatting instructions
 
 **With Tool Use:**
+
 - Schema is defined in tool
 - Anthropic knows what structure to return
 - Prompts can focus on WHAT to extract, not HOW to format
@@ -992,6 +1048,7 @@ if (!Array.isArray(result.items)) {
 **My recommendation:** Simplify prompts significantly:
 
 **Before:**
+
 ```
 Extract action items from this conversation.
 
@@ -1009,6 +1066,7 @@ Assignment rules:
 ```
 
 **After:**
+
 ```
 Extract action items from this conversation.
 
@@ -1028,14 +1086,17 @@ The tool description and schema handle the structure. The prompt focuses on busi
 ---
 
 ### Question 5: Migration Strategy
+
 **Q:** Should we refactor all three features at once, or one at a time?
 
 **Options:**
+
 - A) All at once - one PR, one deployment
 - B) One at a time - separate PRs for Action Items, Decisions, Summarization
 - C) Action Items + Decisions together (both have parsing bug), then Summarization
 
 **My recommendation:** Option C
+
 - Action Items and Decisions likely have the same parsing issues
 - Fixing both together provides more confidence
 - Summarization is lower risk (simpler schema), can do separately
@@ -1044,9 +1105,11 @@ The tool description and schema handle the structure. The prompt focuses on busi
 ---
 
 ### Question 6: Error Handling
+
 **Q:** What errors can Tool Use throw that we need to handle?
 
 **Possible errors:**
+
 1. Claude doesn't use the tool (rare with forced tool choice)
 2. Claude returns invalid data (caught by Anthropic's validation)
 3. API timeout
@@ -1077,35 +1140,42 @@ try {
 ### Estimated Time: 9-13 hours total
 
 **Phase 1:** Update Utility Functions (1-2 hours)
+
 - Create `aiTools.ts` with all 4 tool definitions
 - Add `callClaudeWithTool()` to `anthropic.ts`
 
 **Phase 2:** Refactor Action Items (2-3 hours)
+
 - Update `actionItems.ts`
 - Test manually
 - Deploy and verify
 
 **Phase 3:** Refactor Decisions (1-2 hours)
+
 - Update `decisions.ts`
 - Test manually
 - Deploy and verify
 
 **Phase 4:** Refactor Summarization (1 hour)
+
 - Update `summarization.ts`
 - Test manually
 - Deploy and verify
 
 **Phase 4.5:** Refactor Priority Detection Batch (30 minutes)
+
 - Update `priority.ts` (only the AI analysis function)
 - Test manually
 - Deploy and verify
 
 **Phase 5:** Cleanup (30 minutes)
+
 - Remove debug code
 - Remove unused helper functions
 - Update documentation
 
 **Phase 6:** Update Unit Tests (2-3 hours)
+
 - Update test mocks
 - Update test cases
 - Run full test suite
@@ -1117,6 +1187,7 @@ try {
 ## Success Criteria
 
 ### Technical
+
 - ✅ All 4 Claude-based features (Action Items, Decisions, Summarization, Priority Batch) use Tool Use
 - ✅ No JSON parsing errors
 - ✅ All unit tests pass
@@ -1124,11 +1195,13 @@ try {
 - ✅ Manual testing successful
 
 ### Quality
+
 - ✅ Output quality same or better than before
 - ✅ Response times similar (within 20%)
 - ✅ No regressions in other features
 
 ### Code Quality
+
 - ✅ Reduced complexity (less parsing code)
 - ✅ Better type safety
 - ✅ Easier to maintain
@@ -1163,4 +1236,3 @@ try {
 
 **Document Status:** Ready for review  
 **Next Action:** Discuss open questions and get approval to proceed
-
