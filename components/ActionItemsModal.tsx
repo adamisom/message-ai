@@ -4,7 +4,6 @@ import {
   Alert,
   FlatList,
   Modal,
-  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -291,21 +290,36 @@ export function ActionItemsModal({
           visible={showAssignPicker}
           transparent
           animationType="fade"
-          onRequestClose={() => setShowAssignPicker(false)}
+          onRequestClose={() => {
+            setShowAssignPicker(false);
+            setItemToAssign(null);
+            itemToAssignRef.current = null;
+          }}
         >
-          <Pressable
+          <TouchableOpacity
             style={styles.pickerOverlay}
-            onPress={() => setShowAssignPicker(false)}
+            activeOpacity={1}
+            onPress={() => {
+              setShowAssignPicker(false);
+              setItemToAssign(null);
+              itemToAssignRef.current = null;
+            }}
           >
-            <Pressable onPress={(e) => e.stopPropagation()}>
-              <View style={styles.pickerContainer} pointerEvents="box-none">
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={(e) => {
+                // Stop propagation to prevent closing modal when clicking inside
+                e.stopPropagation();
+              }}
+            >
+              <View style={styles.pickerContainer}>
                 <Text style={styles.pickerTitle}>Assign to:</Text>
                 {participants.map((participant) => (
-                  <Pressable
+                  <TouchableOpacity
                     key={participant.uid}
                     style={styles.pickerItem}
                     onPress={() => {
-                      console.log('[ActionItemsModal] Pressable onPress fired for:', participant.displayName);
+                      console.log('[ActionItemsModal] TouchableOpacity onPress fired for:', participant.displayName);
                       console.log('[ActionItemsModal] itemToAssignRef.current:', itemToAssignRef.current);
                       console.log('[ActionItemsModal] itemToAssign state:', itemToAssign);
                       
@@ -320,17 +334,21 @@ export function ActionItemsModal({
                     <Text style={styles.pickerItemText}>
                       👤 {participant.displayName}
                     </Text>
-                  </Pressable>
+                  </TouchableOpacity>
                 ))}
-                <Pressable
+                <TouchableOpacity
                   style={styles.pickerCancelButton}
-                  onPress={() => setShowAssignPicker(false)}
+                  onPress={() => {
+                    setShowAssignPicker(false);
+                    setItemToAssign(null);
+                    itemToAssignRef.current = null;
+                  }}
                 >
                   <Text style={styles.pickerCancelText}>Cancel</Text>
-                </Pressable>
+                </TouchableOpacity>
               </View>
-            </Pressable>
-          </Pressable>
+            </TouchableOpacity>
+          </TouchableOpacity>
         </Modal>
       </View>
     </Modal>
