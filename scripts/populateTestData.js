@@ -18,15 +18,17 @@ const admin = require('firebase-admin');
 const path = require('path');
 const { deleteAllConversations } = require('./deleteData');
 
-// Initialize Firebase Admin
-const serviceAccountPath = path.resolve(
-  // eslint-disable-next-line no-undef
-  __dirname,
-  '../functions/serviceAccountKey.json'
-);
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccountPath),
-});
+// Initialize Firebase Admin (only if not already initialized)
+if (!admin.apps.length) {
+  const serviceAccountPath = path.resolve(
+    // eslint-disable-next-line no-undef
+    __dirname,
+    '../functions/serviceAccountKey.json'
+  );
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccountPath),
+  });
+}
 
 const db = admin.firestore();
 
