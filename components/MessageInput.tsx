@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { TYPING_CLEAR_DELAY_MS } from '../utils/constants';
 

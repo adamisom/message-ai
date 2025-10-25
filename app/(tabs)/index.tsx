@@ -53,15 +53,23 @@ export default function ConversationsList() {
           const previousLastMessage = previousConversationsRef.current[convo.id];
           const currentLastMessage = convo.lastMessage;
           
+          // Initialize the ref for this conversation if this is the first time we're seeing it
+          // This prevents notifications from triggering on app launch for existing messages
+          const isFirstLoad = !(convo.id in previousConversationsRef.current);
+          
+          // Compare by text content to avoid object reference issues
+          const previousText = previousLastMessage || '';
+          const currentText = currentLastMessage || '';
+          
           // Only notify if:
           // 1. There's a current last message
-          // 2. It's different from the previous one (or first time seeing this convo)
-          // 3. The message is not from the current user
-          // 4. We have seen this conversation before (previousLastMessage !== undefined)
+          // 2. This is NOT the first load (we've seen this conversation before)
+          // 3. The message text has changed from the previous one
+          // 4. The message is not from the current user
           if (
             currentLastMessage && 
-            previousLastMessage !== undefined &&
-            currentLastMessage !== previousLastMessage &&
+            !isFirstLoad &&
+            currentText !== previousText &&
             convo.lastMessageSenderId !== user.uid
           ) {
             console.log('🔔 [ConversationsList] New message in conversation:', convo.id);
@@ -71,7 +79,7 @@ export default function ConversationsList() {
             
             scheduleMessageNotification(
               senderName,
-              currentLastMessage,
+              currentText,
               convo.id
             );
           }

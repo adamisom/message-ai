@@ -16,10 +16,15 @@ import {
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
+import { ActionItemsModal } from '../../components/ActionItemsModal';
+import { DecisionsModal } from '../../components/DecisionsModal';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
 import MessageInput from '../../components/MessageInput';
-import MessageList from '../../components/MessageList';
+import MessageList, { MessageListRef } from '../../components/MessageList';
 import OfflineBanner from '../../components/OfflineBanner';
+import { SearchModal } from '../../components/SearchModal';
+import { SummaryModal } from '../../components/SummaryModal';
 import TypingIndicator from '../../components/TypingIndicator';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
@@ -37,6 +42,17 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  
+  // AI Features Modals
+  const [showAIMenu, setShowAIMenu] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [showActionItemsModal, setShowActionItemsModal] = useState(false);
+  const [showDecisionsModal, setShowDecisionsModal] = useState(false);
+  
+  // Jump to message functionality
+  const messageListRef = useRef<MessageListRef>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   
   // Phase 5: Typing indicators
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
@@ -104,6 +120,9 @@ export default function ChatScreen() {
                   showText={true}
                 />
               )}
+              <TouchableOpacity onPress={() => setShowAIMenu(true)}>
+                <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => setShowParticipantsModal(true)}>
                 <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
               </TouchableOpacity>
@@ -115,14 +134,16 @@ export default function ChatScreen() {
         const participantCount = conversation.participants.length;
         title = conversation.name || `Group (${participantCount} members)`;
         
-        // Add info button for group participants
+        // Add info button for group participants + AI features
         headerRight = () => (
-          <TouchableOpacity 
-            onPress={() => setShowParticipantsModal(true)}
-            style={{ marginRight: 16 }}
-          >
-            <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, gap: 12 }}>
+            <TouchableOpacity onPress={() => setShowAIMenu(true)}>
+              <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowParticipantsModal(true)}>
+              <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
         );
       }
       
@@ -195,6 +216,16 @@ export default function ChatScreen() {
         id: doc.id,
         ...doc.data(),
       })) as Message[];
+
+      // DEBUG: Log all message IDs to see if we have temp messages
+      console.log('🔍 [ChatScreen] Message IDs:', msgs.map(m => `${m.id.substring(0, 20)}... (${m.text?.substring(0, 10)}...)`));
+      
+      // Check for temp messages that should have been removed
+      const tempMessages = msgs.filter(m => m.id.startsWith('temp_'));
+      if (tempMessages.length > 0) {
+        console.warn('⚠️ [ChatScreen] Found', tempMessages.length, 'temp messages still in state!');
+        tempMessages.forEach(tm => console.warn('  - Temp:', tm.id, 'text:', tm.text));
+      }
 
       // Phase 6: No notification logic here - notifications happen in conversation list
       // when a message arrives for a chat that's NOT currently open
@@ -306,6 +337,7 @@ export default function ChatScreen() {
           senderName,
           participants: conversation.participants,
           createdAt: serverTimestamp(),
+          embedded: false, // For AI embedding pipeline
         }
       );
 
@@ -320,15 +352,21 @@ export default function ChatScreen() {
 
       // Update conversation's lastMessage
       await updateDoc(doc(db, 'conversations', conversationId), {
-        lastMessage: text.substring(0, 100),
+        lastMessage: text.substring(0, 100), // Simple string preview (consistent with firestoreService)
         lastMessageAt: serverTimestamp(),
+        lastMessageSenderId: user.uid, // Track who sent the last message (for notifications)
         [`lastReadAt.${user.uid}`]: serverTimestamp(), // Mark as read by sender immediately
       });
 
       console.log('✅ [ChatScreen] Conversation lastMessage updated');
 
       // Remove temp message (real one will appear via listener)
-      setMessages(prev => prev.filter(m => m.id !== tempId));
+      console.log('🗑️ [ChatScreen] Removing temp message:', tempId);
+      setMessages(prev => {
+        const filtered = prev.filter(m => m.id !== tempId);
+        console.log('📊 [ChatScreen] Messages after removal:', filtered.length, 'remaining');
+        return filtered;
+      });
 
     } catch (error) {
       console.error('❌ [ChatScreen] Send message error:', error);
@@ -350,6 +388,26 @@ export default function ChatScreen() {
     setMessages(prev => 
       prev.map(m => m.id === messageId ? { ...m, status } : m)
     );
+  };
+
+  // Jump to message from search results
+  const handleJumpToMessage = (messageId: string) => {
+    console.log('🎯 [ChatScreen] Jumping to message:', messageId);
+    
+    const index = messages.findIndex(m => m.id === messageId);
+    if (index !== -1) {
+      messageListRef.current?.scrollToIndex({
+        index,
+        animated: true,
+        viewPosition: 0.5, // Center the message in viewport
+      });
+      
+      // Highlight the message for 2 seconds
+      setHighlightedMessageId(messageId);
+      setTimeout(() => setHighlightedMessageId(null), 2000);
+    } else {
+      console.warn('⚠️ [ChatScreen] Message not found in current messages list');
+    }
   };
 
   // Phase 5: Typing indicator handlers
@@ -475,10 +533,12 @@ export default function ChatScreen() {
     <View style={styles.container}>
       <OfflineBanner />
       <MessageList
+        ref={messageListRef}
         messages={messages}
         currentUserId={user?.uid || ''}
         conversationType={conversation.type}
         getReadStatus={getReadStatus}
+        highlightedMessageId={highlightedMessageId}
       />
       <TypingIndicator typingUsers={typingUsers} />
       <MessageInput
@@ -498,6 +558,43 @@ export default function ChatScreen() {
         }))}
         currentUserId={user?.uid || ''}
         onClose={() => setShowParticipantsModal(false)}
+      />
+
+      {/* AI Features Menu */}
+      <AIFeaturesMenu
+        visible={showAIMenu}
+        onClose={() => setShowAIMenu(false)}
+        onOpenSearch={() => setShowSearchModal(true)}
+        onOpenSummary={() => setShowSummaryModal(true)}
+        onOpenActionItems={() => setShowActionItemsModal(true)}
+        onOpenDecisions={() => setShowDecisionsModal(true)}
+        isGroupChat={conversation.type === 'group'}
+      />
+
+      {/* AI Feature Modals */}
+      <SearchModal
+        visible={showSearchModal}
+        conversationId={conversationId as string}
+        onClose={() => setShowSearchModal(false)}
+        onSelectMessage={handleJumpToMessage}
+      />
+
+      <SummaryModal
+        visible={showSummaryModal}
+        conversationId={conversationId as string}
+        onClose={() => setShowSummaryModal(false)}
+      />
+
+      <ActionItemsModal
+        visible={showActionItemsModal}
+        conversationId={conversationId as string}
+        onClose={() => setShowActionItemsModal(false)}
+      />
+
+      <DecisionsModal
+        visible={showDecisionsModal}
+        conversationId={conversationId as string}
+        onClose={() => setShowDecisionsModal(false)}
       />
     </View>
   );

@@ -8,6 +8,7 @@ module.exports = {
     '/node_modules/',
     '/android/',
     '/ios/',
+    '/integration/', // Exclude integration tests from unit test runs
   ],
   collectCoverageFrom: [
     'utils/**/*.ts',

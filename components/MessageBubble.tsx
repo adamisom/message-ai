@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Message } from '../types';
+import { FEATURE_FLAGS } from '../utils/featureFlags';
 import { formatMessageTime } from '../utils/timeFormat';
 
 interface MessageBubbleProps {
@@ -7,13 +8,15 @@ interface MessageBubbleProps {
   isOwnMessage: boolean;
   showSenderName?: boolean; // For group chats
   readStatus?: '✓' | '✓✓' | null; // For read receipts (Phase 5)
+  isHighlighted?: boolean; // For search result highlighting
 }
 
 export default function MessageBubble({ 
   message, 
   isOwnMessage, 
   showSenderName = false,
-  readStatus
+  readStatus,
+  isHighlighted = false
 }: MessageBubbleProps) {
   const getTimestamp = () => {
     if (!message.createdAt) return 'Sending...';
@@ -29,10 +32,26 @@ export default function MessageBubble({
     return 'Sending...';
   };
 
+  const getPriorityBadge = () => {
+    // Check feature flag
+    if (!FEATURE_FLAGS.PRIORITY_BADGES_ENABLED) {
+      return null;
+    }
+    
+    // Only show high priority (red badge)
+    if (message.priority === 'high') return '🔴';
+    
+    // Don't show medium or low priority badges
+    return null;
+  };
+
+  const priorityBadge = getPriorityBadge();
+
   return (
     <View style={[
       styles.container, 
-      isOwnMessage ? styles.ownMessage : styles.otherMessage
+      isOwnMessage ? styles.ownMessage : styles.otherMessage,
+      isHighlighted && styles.highlightedContainer
     ]}>
       {/* Show sender name for group chats (received messages only) */}
       {showSenderName && !isOwnMessage && (
@@ -41,7 +60,8 @@ export default function MessageBubble({
       
       <View style={[
         styles.bubble,
-        isOwnMessage ? styles.ownBubble : styles.otherBubble
+        isOwnMessage ? styles.ownBubble : styles.otherBubble,
+        isHighlighted && styles.highlightedBubble
       ]}>
         <Text style={[
           styles.text,
@@ -49,6 +69,9 @@ export default function MessageBubble({
         ]}>
           {message.text}
         </Text>
+        {priorityBadge && (
+          <Text style={styles.priorityBadge}>{priorityBadge}</Text>
+        )}
         
         <View style={styles.footer}>
           <Text style={[
@@ -82,6 +105,12 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     marginHorizontal: 12,
   },
+  highlightedContainer: {
+    backgroundColor: 'rgba(255, 235, 59, 0.2)', // Light yellow highlight
+    borderRadius: 8,
+    padding: 4,
+    marginVertical: 2,
+  },
   ownMessage: {
     alignItems: 'flex-end',
   },
@@ -109,9 +138,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5EA',
     borderBottomLeftRadius: 4,
   },
+  highlightedBubble: {
+    borderWidth: 2,
+    borderColor: '#FFD700', // Gold border for highlighted message
+  },
   text: {
     fontSize: 16,
     lineHeight: 20,
+  },
+  priorityBadge: {
+    fontSize: 16,
+    marginLeft: 8,
   },
   ownText: {
     color: '#fff',
