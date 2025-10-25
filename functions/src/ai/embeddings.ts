@@ -44,18 +44,32 @@ export const batchEmbedMessages = functions
       const embeddings = await batchGenerateEmbeddings(texts);
       console.log(`Generated ${embeddings.length} embeddings`);
 
+      // Fetch conversation participants for each message (for security filtering)
+      const conversationIds = Array.from(new Set(
+        messageDocs.map(doc => doc.ref.parent.parent!.id)
+      ));
+      const conversationDocs = await Promise.all(
+        conversationIds.map(id => db.doc(`conversations/${id}`).get())
+      );
+      const conversationMap = new Map(
+        conversationDocs.map(doc => [doc.id, doc.data()?.participants || []])
+      );
+
       // Prepare vectors for Pinecone
       const vectors: MessageVector[] = messageDocs.map((doc, idx) => {
         const data = doc.data();
+        const conversationId = data.conversationId || doc.ref.parent.parent!.id;
+        const participants = conversationMap.get(conversationId) || [];
+        
         return {
           id: doc.id,
           values: embeddings[idx],
           metadata: {
-            conversationId: data.conversationId || doc.ref.parent.parent!.id,
+            conversationId,
             text: data.text,
             senderId: data.senderId,
             senderName: data.senderName,
-            participants: data.participants || [],
+            participants,
             createdAt: data.createdAt?.toMillis() || Date.now(),
           },
         };
@@ -177,6 +191,12 @@ export const retryFailedEmbeddings = functions
 
           const messageData = messageDoc.data()!;
 
+          // Fetch conversation participants
+          const conversationDoc = await db
+            .doc(`conversations/${conversationId}`)
+            .get();
+          const participants = conversationDoc.data()?.participants || [];
+
           // Generate embedding
           const embeddings = await batchGenerateEmbeddings([messageData.text]);
 
@@ -189,7 +209,7 @@ export const retryFailedEmbeddings = functions
               text: messageData.text,
               senderId: messageData.senderId,
               senderName: messageData.senderName,
-              participants: messageData.participants || [],
+              participants,
               createdAt: messageData.createdAt?.toMillis() || Date.now(),
             },
           };
