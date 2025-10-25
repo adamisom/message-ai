@@ -21,10 +21,22 @@ This is a **refined, actionable PRD** based on what's actually been built. The f
 1. ~~**Advanced AI Capability**~~ ✅ DONE - Proactive Meeting Scheduler implemented
 2. ~~**Group chat read receipt details**~~ ✅ DONE - Shows "Read by Alice, Bob"
 3. ~~**Typing indicator persistence**~~ ✅ DONE - Fixed to persist 2 seconds
-4. ~~**AI Feature UI issues**~~ ✅ DONE - Fixed search dates, sorted action items by priority, added manual assignment
+4. ~~**AI Feature UI issues**~~ ✅ DONE - Fixed search dates, sorted action items by priority
+   - ⚠️ **Manual assignment DEFERRED to Phase 4** (see note below)
 5. **Performance testing with 1000+ messages**
 6. **Performance benchmarking** (message delivery, app launch, scroll)
 7. **Documentation updates** (README, architecture diagrams)
+
+> **📝 Note on Action Item Assignment**
+> 
+> Manual assignment was initially implemented but has been **deferred to Phase 4 (Workspaces & Paid Tier)** because:
+> - Creates persistent state that requires proper management
+> - Needs workspace admin permissions (not yet implemented)
+> - Adds complexity that doesn't fit MVP scope
+> - Should be part of paid tier with proper access control
+> 
+> **Phase 3 Status:** Action items are **read-only** (transient AI-generated responses)  
+> **Phase 4 Plan:** Assignment will be implemented with workspace admin controls
 
 ### Timeline (Today)
 - ~~**Hours 1-4:** Implement Advanced AI Capability~~ ✅ DONE - Proactive Meeting Scheduler
@@ -33,7 +45,7 @@ This is a **refined, actionable PRD** based on what's actually been built. The f
   - ~~Fixed typing indicator persistence (2 seconds)~~
   - ~~Fixed search results "Invalid Date" bug~~
   - ~~Sorted action items by priority (high → medium → low)~~
-  - ~~Added manual assignment for unassigned action items~~
+  - ⚠️ Manual assignment deferred to Phase 4 (persistent state management)
 - **Hour 6:** Create test data (1000+ messages) + performance testing
 - **Hour 7:** Performance benchmarking + optimization
 - **Hour 8:** Documentation updates
