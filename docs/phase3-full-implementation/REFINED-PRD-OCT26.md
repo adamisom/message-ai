@@ -221,9 +221,21 @@ export const proactiveMeetingTrigger = functions.firestore
 - Can assign to any conversation participant
 - Updates persist and sync across devices
 
+**Issue 4: My Tasks View** (NEW FEATURE - PLANNED)
+- Dedicated screen to view all tasks assigned to current user across all conversations
+- Accessed from main navigation or home screen
+- Shows task text, priority, due date, conversation name, status
+- Can mark complete directly from this view
+- Filter by status (pending/completed), priority, or conversation
+- Provides centralized task management
+
 **Files Modified:**
 - `services/aiService.ts` - Added `assignActionItem()` function
 - `components/ActionItemsModal.tsx` - Sorting logic (assignment UI in progress)
+
+**Files To Be Created:**
+- `app/my-tasks.tsx` - New screen for My Tasks view
+- `services/taskService.ts` - Fetch all tasks for current user
 
 ---
 

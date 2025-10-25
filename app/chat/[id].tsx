@@ -556,8 +556,8 @@ export default function ChatScreen() {
 
   // Phase 3: Read details for group chats (shows WHO has read)
   interface ReadDetails {
-    readBy: Array<{ uid: string; displayName: string }>;
-    unreadBy: Array<{ uid: string; displayName: string }>;
+    readBy: { uid: string; displayName: string }[];
+    unreadBy: { uid: string; displayName: string }[];
   }
 
   const getReadDetails = (message: Message): ReadDetails | null => {
@@ -567,8 +567,8 @@ export default function ChatScreen() {
     }
 
     const otherParticipants = conversation.participants.filter(id => id !== user.uid);
-    const readBy: Array<{ uid: string; displayName: string }> = [];
-    const unreadBy: Array<{ uid: string; displayName: string }> = [];
+    const readBy: { uid: string; displayName: string }[] = [];
+    const unreadBy: { uid: string; displayName: string }[] = [];
 
     otherParticipants.forEach(participantId => {
       const participantDetails = conversation.participantDetails[participantId];

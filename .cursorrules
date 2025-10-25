@@ -23,6 +23,14 @@
 - Write succinct, clear commit messages
 - Only commit when code is working and tests pass
 
+### Testing Workflow
+
+- **Before asking user to test:** ALWAYS run `npm run validate` with `required_permissions: ['all']`
+- Must pass with 0 errors and 0 warnings before user testing
+- Fix ALL linting errors and warnings before presenting code for testing
+- Use `--fix` option where applicable to auto-fix style issues
+- Never ask user to test code that doesn't pass validation
+
 <!-- ### Progress Tracking
 
 - After completing a phase (or significant tasks within a phase), update and check off items in `/docs/PROGRESS_TRACKER.md`

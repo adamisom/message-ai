@@ -237,11 +237,4 @@ export async function assignActionItem(
     throw new Error(error.message || 'Failed to assign action item');
   }
 }
-      completedAt: newStatus === 'completed' ? serverTimestamp() : null,
-    });
-  } catch (error: any) {
-    console.error('[aiService] toggleActionItemStatus error:', error);
-    throw new Error(getErrorMessage(error));
-  }
-}
 

@@ -1,13 +1,16 @@
 # MessageAI - Final Sprint Task List
+
 **Due:** October 26, 2025 (Today!)  
 **Total Estimated Time:** 8.5 hours
 
 ---
 
 ## Phase 1: Advanced AI Capability (CRITICAL - 10 points)
+
 **Time:** 3-4 hours
 
 ### Task 1.1: Create Cloud Function for Proactive Meeting Scheduler
+
 **File:** `functions/src/ai/proactiveMeeting.ts`  
 **Time:** 2 hours
 
@@ -36,6 +39,7 @@
 - [ ] Export function in `functions/src/index.ts`
 
 **Acceptance:**
+
 - Function compiles without errors
 - Returns structured meeting suggestions
 - Handles all error cases
@@ -44,20 +48,24 @@
 ---
 
 ### Task 1.2: Add Meeting Scheduler to Client AI Service
+
 **File:** `services/aiService.ts`  
 **Time:** 15 minutes
 
 - [ ] Add new exported function:
+
   ```typescript
   export async function suggestMeetingTimes(
     conversationId: string
   ): Promise<MeetingSuggestion>
   ```
+
 - [ ] Use existing `callAIFeatureWithTimeout` wrapper
 - [ ] Timeout: 10 seconds
 - [ ] Add TypeScript types for response
 
 **Acceptance:**
+
 - Function exports correctly
 - Error handling works
 - Timeout triggers at 10 seconds
@@ -65,6 +73,7 @@
 ---
 
 ### Task 1.3: Create Meeting Scheduler Modal Component
+
 **File:** `components/MeetingSchedulerModal.tsx`  
 **Time:** 45 minutes
 
@@ -85,6 +94,7 @@
 - [ ] Add animations for modal appearance
 
 **Acceptance:**
+
 - Modal renders correctly
 - Loading/error/success states work
 - Suggestions display clearly
@@ -94,22 +104,26 @@
 ---
 
 ### Task 1.4: Integrate Meeting Scheduler into AI Features Menu
+
 **Files:** `components/AIFeaturesMenu.tsx`, `app/chat/[id].tsx`  
 **Time:** 30 minutes
 
 **AIFeaturesMenu.tsx:**
+
 - [ ] Add new button: "Suggest Meeting Times"
 - [ ] Icon: calendar or clock icon
 - [ ] Add prop: `onOpenMeetingScheduler`
 - [ ] Position after "Decisions" button
 
 **app/chat/[id].tsx:**
+
 - [ ] Import `MeetingSchedulerModal`
 - [ ] Add state: `const [showMeetingSchedulerModal, setShowMeetingSchedulerModal] = useState(false)`
 - [ ] Pass handler to `AIFeaturesMenu`: `onOpenMeetingScheduler={() => setShowMeetingSchedulerModal(true)}`
 - [ ] Add `<MeetingSchedulerModal>` component with state
 
 **Acceptance:**
+
 - Button appears in AI menu
 - Opens modal correctly
 - Modal closes properly
@@ -118,6 +132,7 @@
 ---
 
 ### Task 1.5: Deploy and Test Meeting Scheduler
+
 **Time:** 30 minutes
 
 - [ ] Deploy Cloud Functions: `cd functions && npm run build && firebase deploy --only functions`
@@ -134,6 +149,7 @@
 - [ ] Take screenshots for documentation
 
 **Acceptance:**
+
 - All test scenarios pass
 - Response time meets target
 - Error handling works
@@ -142,9 +158,11 @@
 ---
 
 ## Phase 2: Core Messaging Polish
+
 **Time:** 1.5 hours
 
 ### Task 2.1: Fix Typing Indicator Persistence (UX Polish)
+
 **Files:** `app/chat/[id].tsx`  
 **Time:** 30 minutes
 
@@ -159,6 +177,7 @@
 - [ ] Test: User types → stops → indicator persists for ~3 seconds → disappears
 
 **Acceptance:**
+
 - Typing indicator shows while actively typing
 - Persists for 3 seconds after user stops typing
 - Gracefully handles multiple users typing
@@ -167,17 +186,21 @@
 ---
 
 ### Task 2.3: Fix AI Feature UI Issues (Polish)
+
 **Files:** `components/SearchModal.tsx`, `components/ActionItemsModal.tsx`  
 **Time:** 30 minutes
 
 **Issue 1: Search results show "Invalid Date"**
+
 - [x] Fix `SearchModal.tsx` line 167: `createdAt` is Timestamp object, not Date
 - [x] Solution: Convert Firestore Timestamp properly before passing to `formatDate()`
 
 **Issue 2: Action items not sorted by priority**
+
 - [x] Sort action items before rendering: high → medium → low
 
 **Issue 3: Allow manual assignment of unassigned action items**
+
 - [ ] Add "Assign" button for items without `assigneeDisplayName`
 - [ ] Show modal/picker with conversation participants
 - [ ] Update Firestore: `conversations/{id}/actionItems/{itemId}` with `assigneeUid` and `assigneeDisplayName`
@@ -185,12 +208,14 @@
 - [ ] Display assigned user immediately
 
 **Implementation:**
+
 - [ ] Fetch conversation participants from `conversation.participants` map
 - [ ] Create simple modal with list of participants
 - [ ] On select: call new function `assignActionItem(conversationId, itemId, uid, displayName)`
 - [ ] Update UI to show assignee after assignment
 
 **Acceptance:**
+
 - Search results show proper dates (not "Invalid Date")
 - Action items sorted by priority (high at top)
 - Unassigned items show "Assign" button
@@ -199,7 +224,69 @@
 
 ---
 
-### Task 2.4: Add Group Chat Read Receipt Details
+### Task 2.4: My Tasks View (Cross-Conversation Task Management)
+**Files:** `app/my-tasks.tsx`, `services/taskService.ts`, `components/TaskListItem.tsx`  
+**Time:** 2 hours
+
+**Feature:** Dedicated screen showing all action items assigned to current user across all conversations.
+
+**Implementation:**
+
+**Step 1: Create Task Service (30 minutes)**
+- [ ] Create `services/taskService.ts`
+- [ ] Add function `getMyTasks(userId: string)` to query all action items where `assigneeUid === userId`
+- [ ] Query across all conversations using collection group query
+- [ ] Return sorted by priority, then due date
+- [ ] Include conversation name/ID for context
+
+**Step 2: Create My Tasks Screen (1 hour)**
+- [ ] Create `app/my-tasks.tsx` (new Expo Router screen)
+- [ ] Add navigation link from home screen or tab bar
+- [ ] Use FlatList to display tasks
+- [ ] Each task shows:
+  - Task text
+  - Priority badge (colored)
+  - Due date (if set)
+  - Conversation name (small text)
+  - Checkbox to mark complete
+- [ ] Group by status: Pending (top), Completed (bottom)
+- [ ] Add filter buttons: All, Pending, Completed
+- [ ] Add sort options: Priority, Due Date, Conversation
+
+**Step 3: Task List Item Component (30 minutes)**
+- [ ] Create `components/TaskListItem.tsx` (reusable)
+- [ ] Similar to action item card in modal
+- [ ] Add tap gesture to navigate to conversation
+- [ ] Optimistic updates when marking complete
+- [ ] Show conversation name with icon
+
+**Navigation Integration:**
+- [ ] Add "My Tasks" to home screen or main menu
+- [ ] Consider badge showing pending task count
+
+**Firestore Query:**
+```typescript
+// Collection group query to get all tasks for user across conversations
+const tasksQuery = query(
+  collectionGroup(db, 'ai_action_items'),
+  where('assigneeUid', '==', userId),
+  orderBy('priority'),
+  orderBy('dueDate')
+);
+```
+
+**Acceptance:**
+- Shows all tasks assigned to current user from all conversations
+- Can mark tasks complete from this view
+- Tapping task navigates to source conversation
+- Filters and sorting work correctly
+- Real-time updates when tasks change
+- Empty state shows helpful message
+
+---
+
+### Task 2.5: Add Group Chat Read Receipt Details
+
 **Files:** `app/chat/[id].tsx`, `components/MessageList.tsx`, `components/MessageBubble.tsx`  
 **Time:** 1 hour
 **File:** `types/index.ts`  
@@ -211,10 +298,12 @@
 ---
 
 ### Task 2.2: Create Read Details Display Logic
+
 **File:** `app/chat/[id].tsx`  
 **Time:** 30 minutes
 
 - [ ] Add new function `getReadDetails` (similar to existing `getReadStatus`):
+
   ```typescript
   const getReadDetails = (message: Message): {
     readBy: Array<{ uid: string; displayName: string }>;
@@ -224,6 +313,7 @@
     // Return list of who read and who didn't
   }
   ```
+
 - [ ] Logic:
   - Return `null` if not group chat or not own message
   - Check each participant's `lastRead` timestamp
@@ -231,6 +321,7 @@
   - Return arrays of read/unread participants
 
 **Acceptance:**
+
 - Function returns correct read status
 - Handles all edge cases
 - Performance is good (no unnecessary calculations)
@@ -238,6 +329,7 @@
 ---
 
 ### Task 2.3: Update MessageBubble Component
+
 **File:** `components/MessageBubble.tsx`  
 **Time:** 25 minutes
 
@@ -252,6 +344,7 @@
 - [ ] Only render if `readDetails` is not null (i.e., group chat + own message)
 
 **Acceptance:**
+
 - Read details display correctly
 - Only shows for appropriate messages
 - Updates in real-time
@@ -260,6 +353,7 @@
 ---
 
 ### Task 2.4: Connect Read Details to Chat Screen
+
 **File:** `app/chat/[id].tsx`  
 **Time:** 10 minutes
 
@@ -268,6 +362,7 @@
 - [ ] Test with existing group chat conversations
 
 **Acceptance:**
+
 - Read details appear in group chats
 - Real-time updates work
 - Performance is unaffected
@@ -275,9 +370,11 @@
 ---
 
 ## Phase 3: Performance Test Data & Benchmarking
+
 **Time:** 1.5 hours
 
 ### Task 3.1: Create Large Conversation Script
+
 **File:** `scripts/populateLargeConversation.js`  
 **Time:** 30 minutes
 
@@ -296,12 +393,14 @@
   - Mark some as priority
 - [ ] Add cleanup function to delete test conversation
 - [ ] Add to `package.json` scripts:
+
   ```json
   "populate:large": "node scripts/populateLargeConversation.js",
   "cleanup:large": "node scripts/populateLargeConversation.js --cleanup"
   ```
 
 **Acceptance:**
+
 - Script creates 1500 messages successfully
 - Messages have realistic content and timestamps
 - Conversation appears in app
@@ -310,10 +409,13 @@
 ---
 
 ### Task 3.2: Add Performance Timing Logs
+
 **Time:** 30 minutes
 
 **File:** `app/chat/[id].tsx`
+
 - [ ] Add timing for message delivery:
+
   ```typescript
   // In sendMessage, before addDoc:
   const sendStartTime = Date.now();
@@ -324,7 +426,9 @@
   ```
 
 **File:** `app/_layout.tsx`
+
 - [ ] Add timing for app launch:
+
   ```typescript
   // At top of file:
   const appStartTime = Date.now();
@@ -335,7 +439,9 @@
   ```
 
 **File:** `components/MessageList.tsx`
+
 - [ ] Add timing for message list render:
+
   ```typescript
   const renderStartTime = useRef(Date.now());
   
@@ -348,7 +454,9 @@
   ```
 
 **File:** `services/aiService.ts`
+
 - [ ] Add timing for each AI feature:
+
   ```typescript
   // In callAIFeatureWithTimeout:
   const startTime = Date.now();
@@ -358,6 +466,7 @@
   ```
 
 **Acceptance:**
+
 - All timing logs added
 - Logs are clear and informative
 - No performance impact from logging
@@ -365,6 +474,7 @@
 ---
 
 ### Task 3.3: Run Performance Tests and Document
+
 **File:** `docs/PERFORMANCE_TEST_RESULTS.md`  
 **Time:** 30 minutes
 
@@ -384,6 +494,7 @@
   - Optimize read status calculations
 
 **Test Results Template:**
+
 ```markdown
 # Performance Test Results
 
@@ -411,6 +522,7 @@
 ```
 
 **Acceptance:**
+
 - All tests completed
 - Results documented
 - Performance meets targets or issues are documented
@@ -418,12 +530,14 @@
 ---
 
 ## Phase 4: Documentation Updates
+
 **Time:** 2 hours
 
 ### Task 4.1: Create Architecture Diagram
+
 **Time:** 30 minutes
 
-- [ ] Go to https://excalidraw.com/
+- [ ] Go to <https://excalidraw.com/>
 - [ ] Create diagram showing:
   - React Native App layer (screens, components, services)
   - Firebase Backend (Auth, Firestore, Cloud Functions)
@@ -435,6 +549,7 @@
 - [ ] Add diagram to ARCHITECTURE.md
 
 **Acceptance:**
+
 - Diagram is clear and professional
 - All major components shown
 - Data flows are labeled
@@ -443,6 +558,7 @@
 ---
 
 ### Task 4.2: Update Main README
+
 **File:** `README.md`  
 **Time:** 1 hour
 
@@ -464,6 +580,7 @@
 - [ ] Proofread for clarity and accuracy
 
 **Acceptance:**
+
 - README is comprehensive and professional
 - All sections complete
 - No broken links
@@ -472,10 +589,13 @@
 ---
 
 ### Task 4.3: Update Supporting Documentation
+
 **Time:** 30 minutes
 
 **docs/memory.md:**
+
 - [ ] Add October 26 completion entry:
+
   ```markdown
   ### Saturday 10/26
   
@@ -488,15 +608,18 @@
   ```
 
 **docs/ARCHITECTURE.md:**
+
 - [ ] Add section for Proactive Meeting Scheduler
 - [ ] Update data flow to include new Cloud Function
 - [ ] Add to AI Features Summary
 
 **docs/phase3-full-implementation/POST_MVP.md:**
+
 - [ ] Mark completed items with ✅
 - [ ] Update any relevant notes
 
 **.env.example:**
+
 - [ ] Ensure all required environment variables are listed:
   - Firebase config (API key, project ID, etc.)
   - Anthropic API key
@@ -506,6 +629,7 @@
 - [ ] Ensure it's in root directory
 
 **Acceptance:**
+
 - All docs updated and accurate
 - No outdated information
 - .env.example is complete
@@ -513,11 +637,13 @@
 ---
 
 ## Phase 5: Final Testing & Validation
+
 **Time:** 30 minutes
 
 ### Task 5.1: End-to-End Testing Checklist
 
 **Advanced AI Feature:**
+
 - [ ] Open group conversation
 - [ ] Click AI menu (✨) → "Suggest Meeting Times"
 - [ ] Wait for response (<5 seconds)
@@ -526,6 +652,7 @@
 - [ ] Test error cases (rate limit, timeout)
 
 **Group Chat Read Receipts:**
+
 - [ ] Open group conversation with multiple devices
 - [ ] Send message from device 1
 - [ ] Check device 1 shows "Delivered" initially
@@ -535,6 +662,7 @@
 - [ ] Verify device 1 updates to "Read by [Name1], [Name2]"
 
 **Performance:**
+
 - [ ] Open 1500-message conversation
 - [ ] Scroll through messages smoothly
 - [ ] Verify 60 FPS (no lag)
@@ -544,6 +672,7 @@
 - [ ] Verify response times meet targets
 
 **Documentation:**
+
 - [ ] Open README.md
 - [ ] Follow setup instructions from scratch
 - [ ] Verify all links work
@@ -551,6 +680,7 @@
 - [ ] Verify all commands work
 
 **Acceptance:**
+
 - All tests pass
 - No critical bugs
 - Performance meets targets
@@ -559,6 +689,7 @@
 ---
 
 ## Phase 6: Pre-Submission Checklist
+
 **Time:** 15 minutes
 
 ### Task 6.1: Code Quality Check
@@ -573,6 +704,7 @@
 - [ ] Remove commented-out code
 
 **Acceptance:**
+
 - No linter errors
 - No type errors
 - All tests pass
@@ -585,6 +717,7 @@
 - [ ] Review all changes: `git status`
 - [ ] Stage files: `git add .`
 - [ ] Commit with clear message:
+
   ```
   feat: Advanced AI capability and final polish
   
@@ -596,9 +729,11 @@
   
   All features tested and ready for submission.
   ```
+
 - [ ] Push to GitHub: `git push origin main`
 
 **Acceptance:**
+
 - All changes committed
 - Commit message is clear
 - GitHub repo is up to date
@@ -615,6 +750,7 @@
 - [ ] Ensure app runs correctly from fresh clone
 
 **Acceptance:**
+
 - GitHub repo is complete and professional
 - Fresh setup works perfectly
 - Ready for submission
@@ -661,6 +797,7 @@
 ## Notes & Decisions
 
 **Decision Log:**
+
 - [ ] Meeting Scheduler: Manual trigger (button) vs Proactive (automatic)
   - **Decision:** Start with manual, add proactive if time permits
 - [ ] Read receipts: Always visible vs Expandable on tap
@@ -694,4 +831,3 @@
 ---
 
 **Let's execute! 🚀**
-

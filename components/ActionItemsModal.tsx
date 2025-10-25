@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
 import {
+    Alert,
     FlatList,
     Modal,
     StyleSheet,
@@ -7,8 +9,9 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { db } from '../firebase.config';
 import { useAIFeature } from '../hooks/useAIFeature';
-import { extractActionItems, toggleActionItemStatus } from '../services/aiService';
+import { assignActionItem, extractActionItems, toggleActionItemStatus } from '../services/aiService';
 import { commonModalStyles } from '../styles/commonModalStyles';
 import type { ActionItem } from '../types';
 import { getPriorityColor } from '../utils/colorHelpers';
@@ -25,12 +28,20 @@ interface ActionItemsModalProps {
   onClose: () => void;
 }
 
+interface Participant {
+  uid: string;
+  displayName: string;
+}
+
 export function ActionItemsModal({
   visible,
   conversationId,
   onClose,
 }: ActionItemsModalProps) {
   const [items, setItems] = useState<ActionItem[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [showAssignPicker, setShowAssignPicker] = useState(false);
+  const [itemToAssign, setItemToAssign] = useState<string | null>(null);
   
   const { data, loading, loadingSlowly, error, reload } = useAIFeature({
     visible,
@@ -42,12 +53,40 @@ export function ActionItemsModal({
   if (data && items !== (data as any).items) {
     const fetchedItems = (data as any).items || [];
     // Sort by priority: high → medium → low
-    const priorityOrder = { high: 0, medium: 1, low: 2 };
-    const sortedItems = [...fetchedItems].sort((a, b) => {
+    const priorityOrder: { [key: string]: number } = { high: 0, medium: 1, low: 2 };
+    const sortedItems = [...fetchedItems].sort((a: ActionItem, b: ActionItem) => {
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
     setItems(sortedItems);
   }
+
+  // Fetch conversation participants
+  useEffect(() => {
+    if (!visible || !conversationId) return;
+
+    const fetchParticipants = async () => {
+      try {
+        const convRef = doc(db, 'conversations', conversationId);
+        const convSnap = await getDoc(convRef);
+        
+        if (convSnap.exists()) {
+          const convData = convSnap.data();
+          const participantsMap = convData.participants || {};
+          const participantsList: Participant[] = Object.entries(participantsMap).map(
+            ([uid, data]: [string, any]) => ({
+              uid,
+              displayName: data.displayName || 'Unknown',
+            })
+          );
+          setParticipants(participantsList);
+        }
+      } catch (error) {
+        console.error('Error fetching participants:', error);
+      }
+    };
+
+    fetchParticipants();
+  }, [visible, conversationId]);
 
   const handleToggleStatus = async (itemId: string, currentStatus: string) => {
     const newStatus: 'pending' | 'completed' = currentStatus === 'pending' ? 'completed' : 'pending';
@@ -73,8 +112,47 @@ export function ActionItemsModal({
     }
   };
 
+  const handleAssignPress = (itemId: string) => {
+    setItemToAssign(itemId);
+    setShowAssignPicker(true);
+  };
+
+  const handleAssignToParticipant = async (participant: Participant) => {
+    if (!itemToAssign) return;
+
+    // Optimistic update
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === itemToAssign
+          ? { ...item, assigneeUid: participant.uid, assigneeDisplayName: participant.displayName }
+          : item
+      )
+    );
+
+    setShowAssignPicker(false);
+    setItemToAssign(null);
+
+    try {
+      await assignActionItem(conversationId, itemToAssign, participant.uid, participant.displayName);
+    } catch (err: any) {
+      console.error('Assign error:', err);
+      Alert.alert('Error', 'Failed to assign task. Please try again.');
+      // Revert on error
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === itemToAssign
+            ? { ...item, assigneeUid: null, assigneeDisplayName: null }
+            : item
+        )
+      );
+    }
+  };
+
   const handleClose = () => {
     setItems([]);
+    setParticipants([]);
+    setShowAssignPicker(false);
+    setItemToAssign(null);
     onClose();
   };
 
@@ -133,13 +211,20 @@ export function ActionItemsModal({
                       {item.text}
                     </Text>
 
-                    {item.assigneeDisplayName && (
+                    {item.assigneeDisplayName ? (
                       <View style={styles.assigneeContainer}>
                         <Text style={styles.assigneeIcon}>👤</Text>
                         <Text style={styles.assigneeText}>
                           {item.assigneeDisplayName}
                         </Text>
                       </View>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => handleAssignPress(item.id)}
+                        style={styles.assignButton}
+                      >
+                        <Text style={styles.assignButtonText}>➕ Assign</Text>
+                      </TouchableOpacity>
                     )}
 
                     {item.dueDate && (
@@ -181,6 +266,41 @@ export function ActionItemsModal({
             ]}
           />
         )}
+
+        {/* Assignment Picker Modal */}
+        <Modal
+          visible={showAssignPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowAssignPicker(false)}
+        >
+          <TouchableOpacity
+            style={styles.pickerOverlay}
+            activeOpacity={1}
+            onPress={() => setShowAssignPicker(false)}
+          >
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerTitle}>Assign to:</Text>
+              {participants.map((participant) => (
+                <TouchableOpacity
+                  key={participant.uid}
+                  style={styles.pickerItem}
+                  onPress={() => handleAssignToParticipant(participant)}
+                >
+                  <Text style={styles.pickerItemText}>
+                    👤 {participant.displayName}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={styles.pickerCancelButton}
+                onPress={() => setShowAssignPicker(false)}
+              >
+                <Text style={styles.pickerCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </View>
     </Modal>
   );
@@ -272,6 +392,58 @@ const styles = StyleSheet.create({
   priorityText: {
     fontSize: 11,
     fontWeight: '600',
+    color: Colors.textLight,
+  },
+  assignButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: Colors.primary,
+    borderRadius: 6,
+    marginBottom: 4,
+    alignSelf: 'flex-start',
+  },
+  assignButtonText: {
+    fontSize: 13,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pickerContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '80%',
+    maxWidth: 400,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.textDark,
+    marginBottom: 16,
+  },
+  pickerItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.backgroundGray,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  pickerItemText: {
+    fontSize: 16,
+    color: Colors.textDark,
+  },
+  pickerCancelButton: {
+    marginTop: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  pickerCancelText: {
+    fontSize: 16,
     color: Colors.textLight,
   },
 });
