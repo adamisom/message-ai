@@ -111,6 +111,22 @@ Priority rules:
     console.error('📝 Got Claude response, length:', rawResponse.length);
     console.error('📝 Response starts with:', rawResponse.substring(0, 100));
 
+    // 🔍 DEBUG: Write raw response to Firestore for inspection
+    const debugLogRef = db.collection('debug_logs').doc();
+    await debugLogRef.set({
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      conversationId: data.conversationId,
+      userId: context.auth?.uid || 'unknown',
+      feature: 'extractActionItems',
+      rawResponseLength: rawResponse.length,
+      rawResponseFull: rawResponse,
+      rawResponsePreview: rawResponse.substring(0, 1000),
+      rawResponseEnd: rawResponse.substring(Math.max(0, rawResponse.length - 500)),
+      // Character codes of first 300 chars to detect hidden characters
+      firstCharsAsCodes: rawResponse.substring(0, 300).split('').map(c => c.charCodeAt(0)),
+    });
+    console.error('🔍 Debug log written to:', debugLogRef.id);
+
     // 9. Validate response (expecting array)
     let actionItemsArray;
     try {
@@ -126,6 +142,19 @@ Priority rules:
       console.error('❌ Response length:', rawResponse.length);
       console.error('❌ First 500 chars:', rawResponse.substring(0, 500));
       console.error('❌ Last 200 chars:', rawResponse.substring(rawResponse.length - 200));
+      
+      // 🔍 DEBUG: Write error details to Firestore
+      await db.collection('debug_logs').add({
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        conversationId: data.conversationId,
+        userId: context.auth?.uid || 'unknown',
+        feature: 'extractActionItems',
+        status: 'PARSING_ERROR',
+        errorMessage: (error as Error).message,
+        errorStack: (error as Error).stack,
+        rawResponseLength: rawResponse.length,
+      });
+      
       throw new functions.https.HttpsError(
         'internal',
         `Failed to parse action items: ${(error as Error).message}`

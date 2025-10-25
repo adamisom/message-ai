@@ -1,8 +1,51 @@
 # Action Items JSON Parsing Bug - Debugging Summary
 
 **Date:** October 25, 2025  
-**Status:** UNRESOLVED  
+**Status:** DEBUGGING IN PROGRESS - Firestore debugging implemented  
 **Error:** `Unexpected non-whitespace character after JSON at position X` (position varies: 173, 177, 187, etc.)
+
+---
+
+## Latest Update (October 25, 2025)
+
+### Implemented Firestore Debugging (Option 4)
+
+To work around unreliable console logging, we've implemented comprehensive Firestore debugging:
+
+**Changes Made:**
+
+1. **`functions/src/ai/actionItems.ts`** (lines 114-128):
+   - Added debug log write BEFORE parsing attempt
+   - Captures full raw response, character codes, and metadata
+   - Debug log ID written to console for easy retrieval
+
+2. **`functions/src/ai/actionItems.ts`** (lines 146-156):
+   - Added debug log write in error catch block
+   - Captures error message, stack trace, and response length
+
+3. **`functions/src/utils/conversationHelpers.ts`** (lines 57-70):
+   - Added hidden character detection in `extractJsonFromAIResponse`
+   - Scans first 500 chars for non-printable characters (code < 32)
+   - Logs warning if hidden characters found
+
+4. **Created helper scripts:**
+   - `scripts/viewDebugLogs.js` - View debug logs from Firestore
+   - `scripts/clearDebugLogs.js` - Clear debug logs collection
+
+**Deployment:**
+- Deleted old function: `firebase functions:delete extractActionItems --force`
+- Deployed fresh: `firebase deploy --only functions:extractActionItems`
+- Status: ✅ Successfully deployed
+
+### Next Steps
+
+1. **Trigger the function** by testing Action Items extraction in the app
+2. **View debug logs** using: `node scripts/viewDebugLogs.js`
+3. **Analyze the raw response** to identify the exact issue:
+   - Check for hidden characters (via character codes array)
+   - Verify JSON structure (first/last brace positions)
+   - Compare raw response with extracted JSON
+4. **Based on findings**, implement the appropriate fix from the alternatives list
 
 ---
 

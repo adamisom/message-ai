@@ -51,8 +51,25 @@ export function extractJsonFromAIResponse<T>(rawResponse: string): T {
 
   json = json.substring(firstBrace, lastBrace + 1);
 
+  // Trim whitespace and any trailing characters after extraction
+  json = json.trim();
+
   console.error('[extractJsonFromAIResponse] Final JSON length:', json.length);
   console.error('[extractJsonFromAIResponse] First 200 chars:', json.substring(0, 200));
+
+  // 🔍 DEBUG: Check for hidden characters in extracted JSON
+  let hiddenCharsFound = false;
+  for (let i = 0; i < Math.min(json.length, 500); i++) {
+    const code = json.charCodeAt(i);
+    // Allow printable chars, space, tab, newline, carriage return
+    if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
+      console.error(`[extractJsonFromAIResponse] ⚠️ Hidden char at position ${i}: code ${code}`);
+      hiddenCharsFound = true;
+    }
+  }
+  if (!hiddenCharsFound) {
+    console.error('[extractJsonFromAIResponse] No hidden characters detected in first 500 chars');
+  }
 
   return JSON.parse(json);
 }
@@ -88,7 +105,7 @@ export interface MessageQueryOptions {
 }
 
 export interface FormattedMessages {
-  messages: Array<{id: string; [key: string]: any}>;
+  messages: {id: string; [key: string]: any}[];
   formatted: string;
 }
 
