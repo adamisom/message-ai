@@ -164,7 +164,7 @@ export function SearchModal({
                 <View style={styles.resultHeader}>
                   <Text style={styles.senderName}>{item.senderName}</Text>
                   <Text style={styles.resultDate}>
-                    {formatDate(item.createdAt)}
+                    {item.createdAt?.toDate ? formatDate(item.createdAt.toDate()) : formatDate(item.createdAt)}
                   </Text>
                 </View>
                 <Text style={styles.messageText} numberOfLines={2}>

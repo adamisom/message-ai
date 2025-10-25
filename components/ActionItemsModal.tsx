@@ -40,7 +40,13 @@ export function ActionItemsModal({
 
   // Update local state when data changes
   if (data && items !== (data as any).items) {
-    setItems((data as any).items || []);
+    const fetchedItems = (data as any).items || [];
+    // Sort by priority: high → medium → low
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    const sortedItems = [...fetchedItems].sort((a, b) => {
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    });
+    setItems(sortedItems);
   }
 
   const handleToggleStatus = async (itemId: string, currentStatus: string) => {

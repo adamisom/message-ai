@@ -166,7 +166,40 @@
 
 ---
 
-### Task 2.2: Add Group Chat Read Receipt Details
+### Task 2.3: Fix AI Feature UI Issues (Polish)
+**Files:** `components/SearchModal.tsx`, `components/ActionItemsModal.tsx`  
+**Time:** 30 minutes
+
+**Issue 1: Search results show "Invalid Date"**
+- [x] Fix `SearchModal.tsx` line 167: `createdAt` is Timestamp object, not Date
+- [x] Solution: Convert Firestore Timestamp properly before passing to `formatDate()`
+
+**Issue 2: Action items not sorted by priority**
+- [x] Sort action items before rendering: high → medium → low
+
+**Issue 3: Allow manual assignment of unassigned action items**
+- [ ] Add "Assign" button for items without `assigneeDisplayName`
+- [ ] Show modal/picker with conversation participants
+- [ ] Update Firestore: `conversations/{id}/actionItems/{itemId}` with `assigneeUid` and `assigneeDisplayName`
+- [ ] Update local state optimistically
+- [ ] Display assigned user immediately
+
+**Implementation:**
+- [ ] Fetch conversation participants from `conversation.participants` map
+- [ ] Create simple modal with list of participants
+- [ ] On select: call new function `assignActionItem(conversationId, itemId, uid, displayName)`
+- [ ] Update UI to show assignee after assignment
+
+**Acceptance:**
+- Search results show proper dates (not "Invalid Date")
+- Action items sorted by priority (high at top)
+- Unassigned items show "Assign" button
+- Can assign to any conversation participant
+- Assignment persists and syncs across devices
+
+---
+
+### Task 2.4: Add Group Chat Read Receipt Details
 **Files:** `app/chat/[id].tsx`, `components/MessageList.tsx`, `components/MessageBubble.tsx`  
 **Time:** 1 hour
 **File:** `types/index.ts`  
