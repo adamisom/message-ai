@@ -10,7 +10,7 @@ interface UseAIFeatureOptions<T> {
 interface UseAIFeatureResult<T> {
   data: T | null;
   loading: boolean;
-  loadingSlowly: boolean; // True after 3 seconds of loading
+  loadingSlowly: boolean; // True after 5 seconds of loading
   error: string;
   reload: () => Promise<void>;
 }
@@ -36,10 +36,10 @@ export function useAIFeature<T>({
     setLoadingSlowly(false);
     setError('');
 
-    // Set "loading slowly" state after 3 seconds
+    // Set "loading slowly" state after 5 seconds
     slowLoadingTimerRef.current = setTimeout(() => {
       setLoadingSlowly(true);
-    }, 3000);
+    }, 5000);
 
     try {
       const result = await fetchFunction(conversationId, ...dependencies);
