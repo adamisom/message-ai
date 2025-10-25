@@ -1,18 +1,18 @@
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    FlatList,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { db } from '../firebase.config';
 import { useAIFeature } from '../hooks/useAIFeature';
-import { assignActionItem, extractActionItems, toggleActionItemStatus } from '../services/aiService';
 import { invalidateActionItemsCache } from '../services/aiCacheService';
+import { assignActionItem, extractActionItems, toggleActionItemStatus } from '../services/aiService';
 import { commonModalStyles } from '../styles/commonModalStyles';
 import type { ActionItem } from '../types';
 import { getPriorityColor } from '../utils/colorHelpers';
@@ -159,12 +159,10 @@ export function ActionItemsModal({
       console.log('[ActionItemsModal] Assignment successful');
       
       // 2. Invalidate cache so next open fetches fresh data
+      // Note: Don't reload here - optimistic update already shows the change
+      // Reloading would trigger "Scanning for action items..." which is bad UX
       await invalidateActionItemsCache(conversationId);
-      console.log('[ActionItemsModal] Cache invalidated');
-      
-      // 3. Reload from Firestore (rebuilds cache)
-      await reload();
-      console.log('[ActionItemsModal] Data reloaded with fresh cache');
+      console.log('[ActionItemsModal] Cache invalidated - fresh data on next open');
     } catch (err: any) {
       console.error('[ActionItemsModal] Assign error:', err);
       Alert.alert('Error', 'Failed to assign task. Please try again.');
