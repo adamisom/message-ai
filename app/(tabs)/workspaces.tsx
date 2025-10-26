@@ -242,9 +242,21 @@ export default function WorkspacesScreen() {
       <TrialWorkspaceModal
         visible={showTrialModal}
         onClose={() => setShowTrialModal(false)}
-        onUpgrade={async () => {
+        onUpgradeSuccess={async () => {
           setShowTrialModal(false);
-          setShowUpgradeModal(true);
+          // Refresh user data from Firestore to get new Pro status
+          if (user?.uid) {
+            try {
+              const updatedUser = await getUserProfile(user.uid);
+              if (updatedUser) {
+                await setUser(updatedUser);
+                // Reload workspaces to reflect new Pro status
+                await loadWorkspaces(user.uid);
+              }
+            } catch (error) {
+              console.error('Failed to refresh user data after upgrade:', error);
+            }
+          }
         }}
       />
     </ScrollView>

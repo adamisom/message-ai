@@ -4,28 +4,74 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import { httpsCallable } from 'firebase/functions';
+import React, { useState } from 'react';
 import {
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { functions } from '../firebase.config';
 import { Colors } from '../utils/colors';
 
 interface TrialWorkspaceModalProps {
   visible: boolean;
   onClose: () => void;
-  onUpgrade: () => void;
+  onUpgradeSuccess: () => void;
 }
 
 export function TrialWorkspaceModal({
   visible,
   onClose,
-  onUpgrade,
+  onUpgradeSuccess,
 }: TrialWorkspaceModalProps) {
+  const [isUpgrading, setIsUpgrading] = useState(false);
+
+  const handleUpgrade = async () => {
+    // MVP: Dummy payment - instant upgrade via Cloud Function
+    Alert.alert(
+      'Upgrade to Pro',
+      'MVP Mode: Instant upgrade (no real payment)\n\nIn production, this would open Stripe payment flow.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Upgrade Now',
+          onPress: async () => {
+            setIsUpgrading(true);
+            try {
+              const upgradeToPro = httpsCallable(functions, 'upgradeToPro');
+              const result = await upgradeToPro({});
+              
+              Alert.alert(
+                'Success!',
+                'You\'ve been upgraded to Pro! 🎉',
+                [{ 
+                  text: 'OK', 
+                  onPress: () => {
+                    onClose();
+                    onUpgradeSuccess();
+                  }
+                }]
+              );
+            } catch (error: any) {
+              Alert.alert(
+                'Error',
+                `Failed to upgrade: ${error.message}`,
+                [{ text: 'OK' }]
+              );
+            } finally {
+              setIsUpgrading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
   return (
     <Modal
       visible={visible}
@@ -81,12 +127,19 @@ export function TrialWorkspaceModal({
 
             {/* CTA Button */}
             <TouchableOpacity
-              style={styles.upgradeButton}
-              onPress={onUpgrade}
+              style={[styles.upgradeButton, isUpgrading && styles.upgradeButtonDisabled]}
+              onPress={handleUpgrade}
               activeOpacity={0.8}
+              disabled={isUpgrading}
             >
-              <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
-              <Ionicons name="arrow-forward" size={20} color="#FFF" />
+              {isUpgrading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <>
+                  <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#FFF" />
+                </>
+              )}
             </TouchableOpacity>
 
             {/* Maybe Later */}
@@ -209,6 +262,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+  },
+  upgradeButtonDisabled: {
+    opacity: 0.6,
   },
   upgradeButtonText: {
     fontSize: 16,
