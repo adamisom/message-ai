@@ -84,9 +84,8 @@ export default function ProfileScreen() {
       : '';
     showManageButton = true;
   } else if (user.trialEndsAt) {
-    const trialEndsAt = typeof user.trialEndsAt === 'number'
-      ? user.trialEndsAt
-      : user.trialEndsAt.toMillis?.() || 0;
+    // User has trial data - check if active
+    const trialEndsAt = user.trialEndsAt.toMillis ? user.trialEndsAt.toMillis() : user.trialEndsAt;
     
     if (now < trialEndsAt) {
       // Active Trial User - no buttons
@@ -94,6 +93,7 @@ export default function ProfileScreen() {
       statusBadge = '🎉 Trial User';
       statusColor = '#FFD700'; // Gold
       statusDetail = `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`;
+      // No buttons during active trial
     } else {
       // Free User (trial expired) - show upgrade only
       statusBadge = '🔓 Free User';
@@ -181,7 +181,7 @@ export default function ProfileScreen() {
       
       {/* Features Section */}
       <View style={styles.featuresSection}>
-        <Text style={styles.sectionTitle}>Your Pro Features</Text>
+        <Text style={styles.sectionTitle}>Pro Features</Text>
         
         {/* AI Features */}
         <Text style={styles.subheader}>AI Features:</Text>
@@ -208,12 +208,8 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.featureItem}>
           <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-          <Text style={styles.featureText}>Invite up to 25 members per workspace</Text>
-        </View>
-        <View style={styles.featureItem}>
-          <Ionicons name="checkmark-circle" size={20} color="#34C759" />
           <Text style={styles.featureText}>
-            Assign action items to your team within chats
+            Assign action items to your team
           </Text>
         </View>
         <View style={styles.featureItem}>
