@@ -204,7 +204,17 @@ export const getUserProfile = async (
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      return docSnap.data() as UserProfile;
+      const data = docSnap.data();
+      console.log('[getUserProfile] Raw data keys:', Object.keys(data).sort());
+      console.log('[getUserProfile] Critical fields:', {
+        isPaidUser: data.isPaidUser,
+        subscriptionTier: data.subscriptionTier,
+        trialUsed: data.trialUsed,
+        hasTrialEndsAt: !!data.trialEndsAt,
+      });
+      console.log('[getUserProfile] Has isPaidUser field?', 'isPaidUser' in data);
+      console.log('[getUserProfile] Has subscriptionTier field?', 'subscriptionTier' in data);
+      return data as UserProfile;
     }
 
     return null;

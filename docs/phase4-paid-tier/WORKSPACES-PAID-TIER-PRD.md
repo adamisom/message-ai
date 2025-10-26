@@ -1,10 +1,86 @@
 # MessageAI - Workspaces & Paid Tier PRD
 
-**Status:** Planning Phase  
+**Status:** 🚧 In Progress - Partial Implementation  
 **Target:** Post-MVP Enhancement (Phase 4 - BONUS WORK)  
 **Est. Implementation:** 3-4 weeks
 
 > ⚠️ **IMPORTANT:** This phase will ONLY be implemented AFTER the currently-planned "final" phase (Phase 3) is complete and polished, including the brain lift and demo video. This is bonus work to be done after Phase 3.
+
+---
+
+## 🎯 Implementation Progress
+
+### ✅ Completed (Sub-Phases 1-3)
+
+**Phase 1: Free Trial & Billing Foundation**
+- ✅ 5-day free trial for new users
+- ✅ Trial initialization Cloud Function (`startFreeTrial`)
+- ✅ Upgrade to Pro Cloud Function (`upgradeToPro`) - MVP mode (no real payments)
+- ✅ Trial management script (`manageTrial.js`) for testing
+- ✅ User profile screen with trial/subscription status display
+- ✅ `UpgradeToProModal` with trial and upgrade options
+- ✅ Profile button component in tab navigation
+
+**Phase 2: Workspaces Core**
+- ✅ Workspace creation/deletion
+- ✅ Workspace listing screen
+- ✅ Firestore schema for workspaces
+- ✅ Trial users blocked from creating workspaces (`TrialWorkspaceModal`)
+- ✅ Workspace info bar (clickable, conditional for free users)
+- ✅ Security rules for workspaces
+
+**Phase 3: Admin Features**
+- ✅ Action item assignment Cloud Function (`assignActionItem`)
+- ✅ Admin-only action item assignment in `ActionItemsModal`
+- ✅ Workspace admin validation
+
+**UI/UX Improvements**
+- ✅ Logout button moved to profile screen
+- ✅ Tab title styling improvements (20px, bold)
+- ✅ Workspace create button centered and enlarged
+- ✅ Improved spacing on Chats and Workspaces screens
+
+### 🚧 Known Issues
+
+**Critical: Firestore SDK Field Read Bug**
+- Symptom: `getUserProfile()` only returns 2 fields (`isOnline`, `lastSeenAt`) despite all fields existing in Firestore
+- Impact: Trial/subscription status doesn't update on app reload
+- Workaround: App uses cached AsyncStorage data; doesn't crash
+- Status: Documented in stash (see `RELOAD-CRASH-DEBUG.md` in stash for investigation details)
+
+### ❌ Not Yet Implemented (Sub-Phases 4+)
+
+**Phase 4: Workspace Members & Invitations**
+- ❌ Invite system (send/accept/decline invitations)
+- ❌ Member management (view members, remove members)
+- ❌ Invitation notifications
+
+**Phase 5: Workspace Chats**
+- ❌ Create chats within workspaces
+- ❌ Workspace chat list view
+- ❌ Workspace-scoped conversations
+
+**Phase 6: AI Feature Gating**
+- ❌ Lock AI features for free users in non-workspace chats
+- ❌ Sparkle menu upgrade prompts for free users
+- ❌ Workspace chat AI access for free members
+
+**Phase 7: Paid User Capabilities**
+- ❌ Edit/save AI-generated content
+- ❌ High-priority message markers
+- ❌ Capacity expansion flow for workspaces
+
+**Phase 8: Spam Prevention**
+- ❌ Spam reporting system
+- ❌ Strike tracking (with 1-month decay)
+- ❌ Automatic ban on 5 strikes
+- ❌ Spam appeal Cloud Function (Enterprise tier)
+
+**Phase 9: Billing & Admin**
+- ❌ Real Stripe integration (currently MVP mode)
+- ❌ Capacity upgrade/downgrade flows
+- ❌ Payment failure handling
+- ❌ Subscription management screen (placeholder exists)
 
 ---
 

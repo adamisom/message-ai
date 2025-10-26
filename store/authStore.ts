@@ -21,7 +21,7 @@ const STORAGE_KEY = '@messageai:user';
  * Auth Store
  * Manages user authentication state with AsyncStorage persistence
  */
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   loading: true, // Start as true to check for existing session
 
@@ -72,7 +72,10 @@ export const useAuthStore = create<AuthState>((set) => ({
           uid: cachedUser?.uid,
           email: cachedUser?.email,
           displayName: cachedUser?.displayName,
+          isPaidUser: cachedUser?.isPaidUser,
+          hasTrialEndsAt: !!cachedUser?.trialEndsAt,
         });
+        console.log('[authStore] Raw user JSON (first 200 chars):', userJson.substring(0, 200));
         
         // Validate that the user object has required fields
         if (cachedUser && cachedUser.uid && cachedUser.email) {
@@ -85,11 +88,48 @@ export const useAuthStore = create<AuthState>((set) => ({
           try {
             const freshUser = await getUserProfile(cachedUser.uid);
             if (freshUser) {
-              console.log('[authStore] ✅ Got fresh user data, updating cache and state');
-              // Update AsyncStorage with fresh data
+              console.log('[authStore] ✅ Got fresh user data from Firestore');
+              console.log('[authStore] Fresh user fields:', {
+                isPaidUser: freshUser.isPaidUser,
+                subscriptionTier: freshUser.subscriptionTier,
+                trialUsed: freshUser.trialUsed,
+                hasTrialEndsAt: !!freshUser.trialEndsAt,
+              });
+              
+              // Validate fresh user has required fields
+              if (!freshUser.uid || !freshUser.email) {
+                console.error('[authStore] ❌ Fresh user data is invalid, keeping cached user');
+                return; // Keep cached user, don't update
+              }
+              
+              // Always update AsyncStorage with fresh data for next session
               await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
-              // Update state (loading already false)
-              set({ user: freshUser });
+              
+              // Only update state if subscription/trial status changed
+              // This prevents unnecessary re-renders and component unmounting
+              const statusChanged = 
+                freshUser.isPaidUser !== cachedUser.isPaidUser ||
+                freshUser.subscriptionTier !== cachedUser.subscriptionTier ||
+                JSON.stringify(freshUser.trialEndsAt) !== JSON.stringify(cachedUser.trialEndsAt) ||
+                freshUser.trialUsed !== cachedUser.trialUsed;
+              
+              if (statusChanged) {
+                console.log('[authStore] 🔄 Subscription/trial status changed:');
+                console.log('  isPaidUser:', cachedUser.isPaidUser, '→', freshUser.isPaidUser);
+                console.log('  subscriptionTier:', cachedUser.subscriptionTier, '→', freshUser.subscriptionTier);
+                console.log('  trialUsed:', cachedUser.trialUsed, '→', freshUser.trialUsed);
+                console.log('  trialEndsAt changed:', JSON.stringify(cachedUser.trialEndsAt) !== JSON.stringify(freshUser.trialEndsAt));
+                
+                // Use get() to ensure we're not accidentally nullifying state during update
+                const currentState = get();
+                if (currentState.user) {
+                  set({ user: freshUser });
+                } else {
+                  console.warn('[authStore] ⚠️ Current user is null during update, skipping');
+                }
+              } else{
+                console.log('[authStore] ✅ Status unchanged, AsyncStorage updated (state unchanged)');
+              }
             } else {
               // User no longer exists in Firestore, clear session
               console.warn('[authStore] ⚠️ User not found in Firestore, clearing session');

@@ -106,12 +106,16 @@ async function manageTrial() {
       await db.collection('users').doc(userId).update({
         trialEndsAt: admin.firestore.Timestamp.fromDate(oneHourAgo),
         trialUsed: true,
+        isPaidUser: false,
+        subscriptionTier: 'free',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
       console.log('✅ Trial expired successfully!');
       console.log('   - trialEndsAt: 1 hour ago');
       console.log('   - trialUsed: true');
+      console.log('   - isPaidUser: false');
+      console.log('   - subscriptionTier: free');
       console.log('');
       console.log('🧪 Test behavior:');
       console.log('   - AI features should be blocked in personal chats');
@@ -128,6 +132,8 @@ async function manageTrial() {
         trialStartedAt: admin.firestore.Timestamp.fromDate(now),
         trialEndsAt: admin.firestore.Timestamp.fromDate(trialEndsAt),
         trialUsed: true,
+        isPaidUser: false,
+        subscriptionTier: 'free',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -135,6 +141,8 @@ async function manageTrial() {
       console.log(`   - Trial starts: ${now.toISOString()}`);
       console.log(`   - Trial ends: ${trialEndsAt.toISOString()}`);
       console.log(`   - Days: ${customDays}`);
+      console.log(`   - isPaidUser: false`);
+      console.log(`   - subscriptionTier: free`);
       console.log('');
       console.log('🧪 Test behavior:');
       console.log('   - AI features should work everywhere');
