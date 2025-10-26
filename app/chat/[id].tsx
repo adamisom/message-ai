@@ -2,19 +2,20 @@ import { Ionicons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    endBefore,
-    getDocs,
-    limit,
-    onSnapshot,
-    orderBy,
-    query,
-    serverTimestamp,
-    setDoc,
-    updateDoc
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  startAfter,
+  updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -226,6 +227,12 @@ export default function ChatScreen() {
   // Listen to messages (with pagination support)
   useEffect(() => {
     if (!conversationId || typeof conversationId !== 'string' || !user) return;
+    
+    // Skip if we're in pagination mode (listener already stopped)
+    if (isPaginationMode) {
+      console.log('⏭️ [ChatScreen] In pagination mode, skipping listener setup');
+      return;
+    }
 
     console.log('👂 [ChatScreen] Setting up messages listener (last 100 messages)');
 
@@ -237,6 +244,12 @@ export default function ChatScreen() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      // CRITICAL: If pagination mode was enabled while this callback was pending, ignore it
+      if (isPaginationMode) {
+        console.log('⚠️ [ChatScreen] Pagination mode active, ignoring listener update');
+        return;
+      }
+      
       console.log('📬 [ChatScreen] Received', snapshot.docs.length, 'messages from Firestore');
       
       const msgs = snapshot.docs.map(doc => ({
@@ -244,11 +257,11 @@ export default function ChatScreen() {
         ...doc.data(),
       })) as Message[];
 
-      // Reverse to show oldest-to-newest in the UI
-      const sortedMsgs = msgs.reverse();
+      // For inverted FlatList: keep DESC order (newest first)
+      // FlatList will render them inverted so newest appears at bottom of screen
 
       // Deduplicate messages (safety net for race conditions)
-      const uniqueMsgs = deduplicateMessages(sortedMsgs);
+      const uniqueMsgs = deduplicateMessages(msgs);
 
       // Track the oldest message for pagination
       if (snapshot.docs.length > 0) {
@@ -257,16 +270,6 @@ export default function ChatScreen() {
 
       // If we got fewer messages than the limit, there are no more older messages
       setHasMoreMessages(snapshot.docs.length === MESSAGE_LIMIT);
-
-      // DEBUG: Log all message IDs to see if we have temp messages
-      console.log('🔍 [ChatScreen] Message IDs:', uniqueMsgs.map(m => `${m.id.substring(0, 20)}... (${m.text?.substring(0, 10)}...)`));
-      
-      // Check for temp messages that should have been removed
-      const tempMessages = uniqueMsgs.filter(m => m.id.startsWith('temp_'));
-      if (tempMessages.length > 0) {
-        console.warn('⚠️ [ChatScreen] Found', tempMessages.length, 'temp messages still in state!');
-        tempMessages.forEach(tm => console.warn('  - Temp:', tm.id, 'text:', tm.text));
-      }
 
       setMessages(uniqueMsgs);
       setLoading(false);
@@ -285,7 +288,7 @@ export default function ChatScreen() {
       console.log('🔌 [ChatScreen] Cleaning up messages listener');
       unsubscribe();
     };
-  }, [conversationId, user]);
+  }, [conversationId, user, isPaginationMode]);
 
   // Phase 5: Listen to typing indicators
   useEffect(() => {
@@ -383,46 +386,110 @@ export default function ChatScreen() {
     }
   }, [messages, user, conversationId]);
 
+  // Scroll away from bottom handler - show button
+  const handleScrollAwayFromBottom = () => {
+    console.log('⬆️ [handleScrollAwayFromBottom] User scrolled away, showing button');
+    setShowScrollToBottom(true);
+  };
+
   // Scroll to bottom and re-enable real-time listener
-  const handleScrollToBottom = () => {
+  const handleScrollToBottom = async () => {
+    console.log('⬇️ [handleScrollToBottom] User at bottom');
+    
+    // Hide the scroll-to-bottom button
+    setShowScrollToBottom(false);
+    
     // Only re-enable listener if we're in pagination mode
     if (!isPaginationMode) return;
     
-    console.log('⬇️ [handleScrollToBottom] User at bottom, re-enabling real-time listener');
+    console.log('   Fetching latest messages and switching to append-only mode');
     
-    // Re-enable real-time listener
-    if (conversationId && user) {
-      console.log('🔊 [handleScrollToBottom] Re-subscribing to real-time listener');
-      
-      const q = query(
+    if (!conversationId || !user) return;
+    
+    try {
+      // Step 1: Fetch the current latest 100 messages to catch up
+      console.log('📥 [handleScrollToBottom] Fetching latest 100 messages to catch up...');
+      const latestQuery = query(
         collection(db, 'conversations', conversationId as string, 'messages'),
         orderBy('createdAt', 'desc'),
         limit(MESSAGE_LIMIT)
       );
       
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        console.log('📬 [ChatScreen] Real-time listener re-enabled, received', snapshot.docs.length, 'messages');
+      const latestSnapshot = await getDocs(latestQuery);
+      const latestMessages = latestSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Message[];
+      
+      // For inverted list: keep DESC order (NO reverse)
+      console.log(`📬 [handleScrollToBottom] Fetched ${latestMessages.length} latest messages (DESC order)`);
+      
+      // Step 2: Merge with existing paginated messages (prepend newer to inverted list)
+      const existingIds = new Set(messages.map(m => m.id));
+      const newMessages = latestMessages.filter(msg => !existingIds.has(msg.id));
+      
+      if (newMessages.length > 0) {
+        console.log(`➕ [handleScrollToBottom] Prepending ${newMessages.length} new messages to existing ${messages.length}`);
+        // PREPEND for inverted list (newer messages go at beginning of array)
+        setMessages(prev => [...newMessages, ...prev]);
+      } else {
+        console.log('✅ [handleScrollToBottom] No new messages, already caught up');
+      }
+      
+      // Step 3: Set up append-only listener for future messages
+      console.log('🔊 [handleScrollToBottom] Setting up append-only listener for new messages');
+      
+      // Get the most recent message after merge (first element in inverted list)
+      const currentMessages = newMessages.length > 0 
+        ? [...newMessages, ...messages]
+        : messages;
+      
+      if (currentMessages.length === 0) {
+        console.warn('⚠️ [handleScrollToBottom] No messages to set up listener');
+        return;
+      }
+      
+      // Most recent message is at index 0 in inverted list
+      const mostRecentMsg = currentMessages[0];
+      
+      // Fetch the document to use as cursor
+      const mostRecentDocRef = doc(db, 'conversations', conversationId as string, 'messages', mostRecentMsg.id);
+      const mostRecentDocSnap = await getDoc(mostRecentDocRef);
+      
+      if (!mostRecentDocSnap.exists()) {
+        console.error('❌ [handleScrollToBottom] Could not fetch most recent message document');
+        return;
+      }
+      
+      // Query for messages AFTER the most recent one
+      const appendOnlyQuery = query(
+        collection(db, 'conversations', conversationId as string, 'messages'),
+        orderBy('createdAt', 'asc'),
+        startAfter(mostRecentDocSnap)
+      );
+      
+      const unsubscribe = onSnapshot(appendOnlyQuery, (snapshot) => {
+        if (snapshot.docs.length === 0) return;
         
-        const msgs = snapshot.docs.map(doc => ({
+        console.log('📬 [handleScrollToBottom] Append-only listener received', snapshot.docs.length, 'new messages');
+        
+        const newMsgs = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
         })) as Message[];
         
-        const sortedMsgs = msgs.reverse();
-        const uniqueMsgs = deduplicateMessages(sortedMsgs);
-        
-        // Update oldest message ref
-        if (snapshot.docs.length > 0) {
-          oldestMessageRef.current = snapshot.docs[snapshot.docs.length - 1];
-        }
-        
-        setMessages(uniqueMsgs);
-        setHasMoreMessages(snapshot.docs.length === MESSAGE_LIMIT);
+        // PREPEND to inverted list (new messages go at beginning)
+        setMessages(prev => [...newMsgs, ...prev]);
       });
       
       unsubscribeRef.current = unsubscribe;
       setIsPaginationMode(false);
       setShowScrollToBottom(false);
+      
+      console.log('✅ [handleScrollToBottom] Successfully switched to append-only mode');
+      
+    } catch (error) {
+      console.error('❌ [handleScrollToBottom] Error:', error);
     }
   };
 
@@ -430,14 +497,13 @@ export default function ChatScreen() {
   const scrollToBottom = () => {
     console.log('🔘 [scrollToBottom] Button clicked, jumping to bottom');
     
-    // Scroll to bottom
-    messageListRef.current?.scrollToIndex({
-      index: messages.length - 1,
-      animated: true,
-      viewPosition: 1,
-    });
+    // First, scroll the list to bottom
+    messageListRef.current?.scrollToEnd({ animated: true });
     
-    // Re-enable listener happens automatically via handleScrollToBottom when scroll completes
+    // Then trigger the listener re-enable after a short delay
+    setTimeout(() => {
+      handleScrollToBottom();
+    }, 500); // Give scroll animation time to complete
   };
 
   // Load more messages (pagination)
@@ -466,10 +532,12 @@ export default function ChatScreen() {
 
     try {
       // Query for messages BEFORE the oldest message we have
+      // CRITICAL: With DESC order, use startAfter() not endBefore()
+      // DESC order means newest-first, so startAfter() goes to older messages
       const q = query(
         collection(db, 'conversations', conversationId, 'messages'),
         orderBy('createdAt', 'desc'),
-        endBefore(oldestMessageRef.current),
+        startAfter(oldestMessageRef.current), // <-- FIXED: was endBefore, should be startAfter for DESC
         limit(MESSAGE_LIMIT)
       );
 
@@ -488,27 +556,19 @@ export default function ChatScreen() {
         ...doc.data(),
       })) as Message[];
 
-      // Reverse to show oldest-to-newest
-      const sortedOlderMsgs = olderMsgs.reverse();
-
-      // DEBUG: Check for duplicates between old and new messages
-      const existingIds = new Set(messages.map(m => m.id));
-      const newIds = sortedOlderMsgs.map(m => m.id);
-      const duplicatesWithExisting = newIds.filter(id => existingIds.has(id));
-      
-      if (duplicatesWithExisting.length > 0) {
-        console.error('❌ [loadMoreMessages] DUPLICATE IDs between existing and new messages!');
-        console.error('   Duplicates:', duplicatesWithExisting);
-      }
-
+      // For inverted FlatList: keep DESC order (NO reverse)
       // Update oldest message ref
       oldestMessageRef.current = snapshot.docs[snapshot.docs.length - 1];
 
-      // Prepend older messages to existing messages, then deduplicate
-      console.log('   Prepending', sortedOlderMsgs.length, 'messages to', messages.length, 'existing');
+      // APPEND older messages to existing messages for inverted list
+      // Current array: [newest...oldest]
+      // Paginated array: [slightlyOlder...evenOlder]
+      // Result: [newest...oldest, slightlyOlder...evenOlder]
       setMessages(prev => {
-        const combined = [...sortedOlderMsgs, ...prev];
-        return deduplicateMessages(combined);
+        const combined = [...prev, ...olderMsgs];
+        const deduped = deduplicateMessages(combined);
+        console.log('   After combining: total', deduped.length, 'messages');
+        return deduped;
       });
 
       // Check if there are more messages to load
@@ -544,7 +604,8 @@ export default function ChatScreen() {
     };
 
     // Optimistic update: Add temp message immediately
-    setMessages(prev => [...prev, tempMessage]);
+    // PREPEND for inverted list (new messages at index 0)
+    setMessages(prev => [tempMessage, ...prev]);
 
     // Set timeout for failure detection (10 seconds)
     const timeout = setTimeout(() => {
@@ -816,6 +877,7 @@ export default function ChatScreen() {
         isLoadingMore={isLoadingMore}
         hasMoreMessages={hasMoreMessages}
         onScrollToBottom={handleScrollToBottom}
+        onScrollAwayFromBottom={handleScrollAwayFromBottom}
       />
       <TypingIndicator typingUsers={typingUsers} />
       <MessageInput
@@ -825,8 +887,8 @@ export default function ChatScreen() {
         disabled={false} // Can send even when offline (will queue)
       />
       
-      {/* Jump to Bottom Button (shows when in pagination mode) */}
-      {isPaginationMode && (
+      {/* Jump to Bottom Button (shows when user has scrolled away from bottom) */}
+      {showScrollToBottom && (
         <TouchableOpacity
           style={styles.scrollToBottomButton}
           onPress={scrollToBottom}

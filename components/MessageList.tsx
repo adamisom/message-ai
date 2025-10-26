@@ -17,10 +17,12 @@ interface MessageListProps {
   isLoadingMore?: boolean;
   hasMoreMessages?: boolean;
   onScrollToBottom?: () => void; // Callback when user scrolls to bottom
+  onScrollAwayFromBottom?: () => void; // Callback when user scrolls away from bottom
 }
 
 export interface MessageListRef {
   scrollToIndex: (params: { index: number; animated?: boolean; viewPosition?: number }) => void;
+  scrollToEnd: (params?: { animated?: boolean }) => void;
 }
 
 const MessageList = forwardRef<MessageListRef, MessageListProps>(({ 
@@ -34,26 +36,42 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
   isLoadingMore = false,
   hasMoreMessages = false,
   onScrollToBottom,
+  onScrollAwayFromBottom,
 }, ref) => {
   const flatListRef = useRef<FlatList>(null);
+  const isAtBottomRef = useRef(true); // Track if user is at bottom
 
-  // Expose scrollToIndex method to parent
+  // Expose scrollToIndex and scrollToEnd methods to parent
   useImperativeHandle(ref, () => ({
     scrollToIndex: (params) => {
       flatListRef.current?.scrollToIndex(params);
     },
+    scrollToEnd: (params) => {
+      flatListRef.current?.scrollToEnd(params);
+    },
   }));
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom ONLY on initial load
+  // NOTE: With inverted FlatList, we don't need auto-scroll!
+  // The list naturally starts at the "top" which shows newest messages at bottom of screen
+  const isInitialLoadRef = useRef(true);
+  const hasScrolledInitiallyRef = useRef(false);
+
+  // Remove all auto-scroll logic - inverted list handles this naturally
   useEffect(() => {
-    if (messages.length > 0) {
-      console.log('📜 [MessageList] Auto-scrolling to latest message');
-      // Small delay to ensure FlatList has rendered
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+    if (isInitialLoadRef.current && messages.length > 0) {
+      console.log('📜 [MessageList] Initial messages loaded (inverted list - no scroll needed)');
+      isInitialLoadRef.current = false;
     }
   }, [messages.length]);
+
+  // Keep content height tracking for debugging
+  const contentHeightRef = useRef(0);
+
+  // Handle content size change - just track height
+  const handleContentSizeChange = (contentWidth: number, contentHeight: number) => {
+    contentHeightRef.current = contentHeight;
+  };
 
   // Render loading indicator at the top when fetching older messages
   const renderListHeader = () => {
@@ -67,20 +85,35 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
   };
 
   // Handle scroll events to detect when user is near the top OR bottom
+  // NOTE: With inverted list, "top" and "bottom" are flipped!
+  // Scrolling "down" in inverted list = scrolling up in visual UI (toward older messages)
   const handleScroll = (event: any) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     
-    // Check if scrolled near top (within 100px) - trigger load more
-    if (contentOffset.y < 100 && hasMoreMessages && !isLoadingMore && onLoadMore) {
-      console.log('📜 [MessageList] Near top, loading more messages...');
+    // In inverted list: scrolling DOWN (larger contentOffset.y) = loading older messages
+    // Check if scrolled near BOTTOM of inverted list (which appears as top in UI)
+    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    
+    // Trigger pagination when near bottom of inverted list (= top of visual UI = older messages)
+    if (distanceFromBottom < 100 && hasMoreMessages && !isLoadingMore && onLoadMore) {
+      console.log('📜 [MessageList] Near top of UI (bottom of inverted list), loading more messages...');
       onLoadMore();
     }
     
-    // Check if scrolled to bottom (within 50px) - trigger onScrollToBottom callback
-    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-    if (distanceFromBottom < 50 && onScrollToBottom) {
-      console.log('⬇️ [MessageList] User scrolled to bottom, notifying parent');
-      onScrollToBottom();
+    // Check if at TOP of inverted list (= bottom of visual UI = newest messages)
+    const isAtTop = contentOffset.y < 100;
+    
+    // Detect state change
+    if (isAtTop !== isAtBottomRef.current) {
+      isAtBottomRef.current = isAtTop;
+      
+      if (isAtTop && onScrollToBottom) {
+        console.log('⬇️ [MessageList] User at bottom of UI (top of inverted list), notifying parent');
+        onScrollToBottom();
+      } else if (!isAtTop && onScrollAwayFromBottom) {
+        console.log('⬆️ [MessageList] User scrolled away from bottom, notifying parent');
+        onScrollAwayFromBottom();
+      }
     }
   };
 
@@ -88,6 +121,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
     <FlatList
       ref={flatListRef}
       data={messages}
+      inverted={true}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
         <MessageBubble
@@ -101,8 +135,14 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
       )}
       contentContainerStyle={styles.container}
       ListHeaderComponent={renderListHeader}
+      ListFooterComponent={() => <View style={{ height: 8 }} />}
       onScroll={handleScroll}
       scrollEventThrottle={400}
+      onContentSizeChange={handleContentSizeChange}
+      maintainVisibleContentPosition={{
+        minIndexForVisible: 0,
+        autoscrollToTopThreshold: 10,
+      }}
       onScrollToIndexFailed={(info) => {
         // Handle scroll failures gracefully
         console.warn('Scroll to index failed:', info);

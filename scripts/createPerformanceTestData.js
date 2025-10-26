@@ -217,7 +217,15 @@ async function createPerformanceTestData() {
         const messageRef = db.collection(`conversations/${TEST_CONVERSATION_ID}/messages`).doc();
         const sender = PARTICIPANTS[Math.floor(Math.random() * PARTICIPANTS.length)];
         const timestamp = new Date(startTime + ((existingCount + i) * timeIncrement));
-        const messageText = generateMessage();
+        
+        // Hard-code the VERY FIRST message for easy verification
+        let messageText;
+        if (existingCount + i === 0) {
+          messageText = "🎬 THIS IS THE VERY FIRST MESSAGE - If you see this, you've scrolled all the way back!";
+          console.log(`   🎬 Creating first message with special text for verification`);
+        } else {
+          messageText = generateMessage();
+        }
         
         batch.set(messageRef, {
           text: messageText,

@@ -11,6 +11,7 @@ describe('MessageList', () => {
       senderId: 'user1',
       senderName: 'Alice',
       createdAt: new Date('2025-01-01T10:00:00Z'),
+      participants: ['user1', 'user2'],
     },
     {
       id: '2',
@@ -18,6 +19,7 @@ describe('MessageList', () => {
       senderId: 'user2',
       senderName: 'Bob',
       createdAt: new Date('2025-01-01T10:01:00Z'),
+      participants: ['user1', 'user2'],
     },
   ];
 
