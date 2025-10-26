@@ -39,23 +39,29 @@
 
 **UI/UX Improvements**
 
-- ✅ Logout button moved to profile screen
+- ✅ Logout button moved to profile screen (with icon)
 - ✅ Tab title styling improvements (20px, bold)
 - ✅ Workspace create button centered and enlarged
 - ✅ Improved spacing on Chats and Workspaces screens
+- ✅ Bottom nav reordered: Chats | New Chat | Workspaces (Oct 26)
+- ✅ Help modal with refresh button and support info (Oct 26)
+- ✅ "Start Trial" button functionality (direct trial start, no modal) (Oct 26)
+- ✅ All screens use `refreshUserProfile()` for consistent refresh pattern (Oct 26)
 
 ### 🚧 Known Issues
 
-**~Critical: Firestore SDK Field Read Bug~ ✅ RESOLVED**
+**~Critical: Trial Status Not Updating on App Reload~ ✅ RESOLVED**
 
-- ~~Symptom: `getUserProfile()` only returns 2 fields (`isOnline`, `lastSeenAt`) despite all fields existing in Firestore~~
-- ~~Impact: Trial/subscription status doesn't update on app reload~~
-- ~~Workaround: App uses cached AsyncStorage data; doesn't crash~~
-- **Resolution (Oct 26):** Implemented hybrid client-side write workaround
-  - Modified `presenceService.ts` to re-write all subscription fields when setting user online
-  - Theory validated: SDK only returns fields written by same client
-  - Result: Trial/subscription status now updates correctly on reload
-  - See `RELOAD-CRASH-DEBUG.md` for full investigation and solution details
+- ~~Symptom: Trial/subscription status doesn't persist correctly after app reload~~
+- ~~Root cause: Presence tracking writes interfered with `getUserProfile()` fetch~~
+- **Resolution (Oct 26):** Fixed loading flag timing to prevent race condition
+  - Keep `loading: true` during profile fetch in `restoreSession()`
+  - Presence tracking useEffect now waits for `loading: false` before starting
+  - This prevents presence writes from interfering with the initial profile fetch
+  - Changed `getUserProfile()` to use `getDocFromServer()` instead of `getDoc()` to bypass stale cache
+  - Merge strategy combines cached data with fresh server data
+  - Result: Trial/subscription status now correctly updates on reload
+  - See commits `a6ab4c2`, `fb179ce`, `8cdf204` for implementation details
 
 ### ❌ Not Yet Implemented (Sub-Phases 4+)
 
