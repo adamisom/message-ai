@@ -12,6 +12,10 @@ export default function TabsLayout() {
         headerShown: true,
         tabBarActiveTintColor: '#007AFF',
         headerRight: () => <ProfileButton />,
+        headerTitleStyle: {
+          fontSize: 20,
+          fontWeight: '600',
+        },
       }}
     >
       <Tabs.Screen

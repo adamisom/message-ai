@@ -110,12 +110,11 @@ export default function WorkspacesScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Workspaces</Text>
         <TouchableOpacity
           style={styles.createButton}
           onPress={handleCreateWorkspace}
         >
-          <Ionicons name="add-circle" size={24} color={Colors.primary} />
+          <Ionicons name="add-circle" size={32} color={Colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -340,6 +339,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingTop: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -354,9 +354,9 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   headerTitle: {
     fontSize: 28,
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
     color: Colors.textDark,
   },
   createButton: {
-    padding: 8,
+    padding: 4,
   },
   currentWorkspaceBox: {
     flexDirection: 'row',
