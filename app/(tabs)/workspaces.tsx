@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { TrialWorkspaceModal } from '../../components/TrialWorkspaceModal';
 import { UpgradeToProModal } from '../../components/UpgradeToProModal';
+import { getUserWorkspaceInvitations } from '../../services/workspaceService';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { Workspace } from '../../types';
@@ -47,18 +48,31 @@ export default function WorkspacesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showTrialModal, setShowTrialModal] = useState(false);
+  const [invitationCount, setInvitationCount] = useState(0);
 
   useEffect(() => {
     if (user?.uid) {
       loadWorkspaces(user.uid);
+      loadInvitationCount();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
+
+  const loadInvitationCount = async () => {
+    if (!user?.uid) return;
+    try {
+      const invitations = await getUserWorkspaceInvitations(user.uid);
+      setInvitationCount(invitations.length);
+    } catch (error) {
+      console.error('Error loading invitation count:', error);
+    }
+  };
 
   const handleRefresh = async () => {
     if (!user?.uid) return;
     setRefreshing(true);
     await loadWorkspaces(user.uid);
+    await loadInvitationCount();
     setRefreshing(false);
   };
 
@@ -116,6 +130,26 @@ export default function WorkspacesScreen() {
           <Ionicons name="add-circle" size={32} color={Colors.primary} />
         </TouchableOpacity>
       </View>
+
+      {/* Invitations Banner */}
+      {invitationCount > 0 && (
+        <TouchableOpacity
+          style={styles.invitationsBanner}
+          onPress={() => router.push('/workspace/invitations' as any)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.invitationsBadge}>
+            <Text style={styles.invitationsBadgeText}>{invitationCount}</Text>
+          </View>
+          <View style={styles.invitationsContent}>
+            <Ionicons name="mail" size={20} color={Colors.primary} />
+            <Text style={styles.invitationsText}>
+              {invitationCount} pending invitation{invitationCount !== 1 ? 's' : ''}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
+        </TouchableOpacity>
+      )}
 
       {/* Current Workspace Indicator */}
       {currentWorkspace && workspaces.find((ws: Workspace) => ws.id === currentWorkspace?.id) && (
@@ -513,6 +547,41 @@ const styles = StyleSheet.create({
   },
   infoArrow: {
     marginLeft: 8,
+  },
+  invitationsBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+  },
+  invitationsBadge: {
+    backgroundColor: Colors.primary,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  invitationsBadgeText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  invitationsContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  invitationsText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 });
 

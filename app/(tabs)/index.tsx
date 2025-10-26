@@ -8,6 +8,7 @@ import { db } from '../../firebase.config';
 import { scheduleMessageNotification } from '../../services/notificationService';
 import { useAuthStore } from '../../store/authStore';
 import { useChatStore } from '../../store/chatStore';
+import { useWorkspaceStore } from '../../store/workspaceStore';
 import { UserStatusInfo } from '../../types';
 
 export default function ConversationsList() {

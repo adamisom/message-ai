@@ -21,6 +21,7 @@
 - ✅ User profile screen with trial/subscription status display
 - ✅ `UpgradeToProModal` with trial and upgrade options
 - ✅ Profile button component in tab navigation
+- ✅ 500 user MVP limit (enforced in `registerUser()`)
 
 **Phase 2: Workspaces Core**
 
@@ -63,40 +64,51 @@
   - Result: Trial/subscription status now correctly updates on reload
   - See commits `a6ab4c2`, `fb179ce`, `8cdf204` for implementation details
 
-### ❌ Not Yet Implemented (Sub-Phases 4+)
+### 🚧 Partially Implemented (Sub-Phases 4-6)
 
-**Phase 4: Workspace Members & Invitations**
+**Sub-Phase 4: Invitations System (Workspaces & Group Chats)**
 
-- ❌ Invite system (send/accept/decline invitations)
-- ❌ Member management (view members, remove members)
-- ❌ Invitation notifications
+- ✅ Workspace invitation Cloud Functions (`acceptWorkspaceInvitation`, `declineWorkspaceInvitation`, `reportWorkspaceInvitationSpam`)
+- ✅ Invitations management screen (`app/workspace/invitations.tsx`)
+- ✅ Member management UI (`app/workspace/[id]/members.tsx`, `app/workspace/[id]/settings.tsx`)
+- ✅ Spam strike tracking with 1-month decay
+- ✅ **Invitation badge on profile button** (upper left position with count)
+- ✅ **Notifications section on profile screen** (displays pending workspace invitations)
+- ❌ Group chat invitations (non-workspace chats only - workspace members can directly add)
 
-**Phase 5: Workspace Chats**
+**Note:** Invitations apply to:
+- Workspace membership (always requires invitation) ✅
+- Group chats outside workspaces (requires invitation) ❌
+- Group chats within workspaces: NO invitation needed (any member can add others directly) N/A
+
+**Sub-Phase 5: Workspace Chats**
 
 - ❌ Create chats within workspaces
 - ❌ Workspace chat list view
 - ❌ Workspace-scoped conversations
 
-**Phase 6: AI Feature Gating**
+**Sub-Phase 6: AI Feature Gating**
 
-- ❌ Lock AI features for free users in non-workspace chats
-- ❌ Sparkle menu upgrade prompts for free users
-- ❌ Workspace chat AI access for free members
+- ✅ Lock AI features for free users in non-workspace chats
+- ✅ Sparkle menu upgrade prompts for free users
+- ❌ Workspace chat AI access for free members (blocked by Sub-Phase 5)
 
-**Phase 7: Paid User Capabilities**
+### ❌ Not Yet Implemented (Sub-Phases 7+)
+
+**Sub-Phase 7: Paid User Capabilities**
 
 - ❌ Edit/save AI-generated content
 - ❌ High-priority message markers
 - ❌ Capacity expansion flow for workspaces
 
-**Phase 8: Spam Prevention**
+**Sub-Phase 8: Spam Prevention**
 
 - ❌ Spam reporting system
 - ❌ Strike tracking (with 1-month decay)
 - ❌ Automatic ban on 5 strikes
 - ❌ Spam appeal Cloud Function (Enterprise tier)
 
-**Phase 9: Billing & Admin**
+**Sub-Phase 9: Billing & Admin**
 
 - ❌ Real Stripe integration (currently MVP mode)
 - ❌ Capacity upgrade/downgrade flows

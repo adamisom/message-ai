@@ -23,6 +23,7 @@ export { analyzeMeetingScheduling } from './ai/proactiveMeeting';
 // Phase 4: Workspaces & Paid Tier
 export {
     acceptWorkspaceInvitation, createWorkspace,
+    declineWorkspaceInvitation,
     deleteWorkspace, reportWorkspaceInvitationSpam
 } from './workspaces';
 

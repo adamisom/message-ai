@@ -20,7 +20,9 @@ import {
 } from 'react-native';
 import { HelpModal, UpgradeToProModal } from '../../components';
 import { logoutUser } from '../../services/authService';
+import { getUserWorkspaceInvitations } from '../../services/workspaceService';
 import { useAuthStore } from '../../store/authStore';
+import type { WorkspaceInvitation } from '../../types';
 import { Colors } from '../../utils/colors';
 
 /**
@@ -59,6 +61,18 @@ export default function ProfileScreen() {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isStartingTrial, setIsStartingTrial] = useState(false);
+  const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
+  
+  // Load pending invitations
+  const loadInvitations = useCallback(async () => {
+    if (!user?.uid) return;
+    try {
+      const invites = await getUserWorkspaceInvitations(user.uid);
+      setInvitations(invites);
+    } catch (error) {
+      console.error('Failed to load invitations:', error);
+    }
+  }, [user?.uid]);
   
   // Refresh user data when screen is focused
   useFocusEffect(
@@ -68,6 +82,7 @@ export default function ProfileScreen() {
           setIsRefreshing(true);
           try {
             await refreshUserProfile();
+            await loadInvitations();
           } catch (error) {
             console.error('Failed to refresh user data:', error);
           } finally {
@@ -77,7 +92,7 @@ export default function ProfileScreen() {
       };
       
       refreshUser();
-    }, [user?.uid, refreshUserProfile])
+    }, [user?.uid, refreshUserProfile, loadInvitations])
   );
   
   // Manual refresh handler
@@ -266,6 +281,48 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Notifications Section - Only show if invitations exist */}
+      {invitations.length > 0 && (
+        <View style={styles.notificationsSection}>
+          <Text style={styles.notificationsSectionTitle}>Notifications</Text>
+          
+          {invitations.map((invitation) => (
+            <TouchableOpacity
+              key={invitation.id}
+              style={styles.notificationCard}
+              onPress={() => router.push('/workspace/invitations' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.notificationIcon}>
+                <Ionicons name="business" size={20} color={Colors.primary} />
+              </View>
+              
+              <View style={styles.notificationContent}>
+                <Text style={styles.notificationTitle}>
+                  Workspace Invitation
+                </Text>
+                <Text style={styles.notificationText}>
+                  {invitation.invitedByDisplayName} invited you to join{' '}
+                  <Text style={styles.notificationWorkspace}>{invitation.workspaceName}</Text>
+                </Text>
+              </View>
+              
+              <Ionicons name="chevron-forward" size={20} color={Colors.textMedium} />
+            </TouchableOpacity>
+          ))}
+          
+          <TouchableOpacity
+            style={styles.viewAllButton}
+            onPress={() => router.push('/workspace/invitations' as any)}
+          >
+            <Text style={styles.viewAllButtonText}>
+              View All Invitations ({invitations.length})
+            </Text>
+            <Ionicons name="arrow-forward" size={16} color={Colors.primary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Profile Header */}
       <View style={styles.headerSection}>
         {/* Large Avatar with Initials */}
@@ -432,6 +489,66 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#B91C1C',
+  },
+  notificationsSection: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  notificationsSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.textDark,
+    marginBottom: 12,
+  },
+  notificationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  notificationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  notificationContent: {
+    flex: 1,
+  },
+  notificationTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textDark,
+    marginBottom: 4,
+  },
+  notificationText: {
+    fontSize: 13,
+    color: Colors.textMedium,
+    lineHeight: 18,
+  },
+  notificationWorkspace: {
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 4,
+    gap: 6,
+  },
+  viewAllButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
   },
   loadingContainer: {
     flex: 1,

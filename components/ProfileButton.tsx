@@ -4,12 +4,13 @@
  * Circular button displaying user initials in the top-right corner of tab screens.
  * Navigates to the user profile screen when tapped.
  * Shows selected state when on profile screen.
+ * Shows notification badge (upper left) for pending invitations.
  */
 
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter, usePathname } from 'expo-router';
-import React from 'react';
+import { usePathname, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getUserWorkspaceInvitations } from '../services/workspaceService';
 import { useAuthStore } from '../store/authStore';
 import { Colors } from '../utils/colors';
 
@@ -37,31 +38,69 @@ export const ProfileButton: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
+  const [invitationCount, setInvitationCount] = useState(0);
   
   // Determine if we're on the profile screen
   const isOnProfileScreen = pathname === '/profile';
   
   const initials = getInitials(user?.displayName || '');
   
+  // Load invitation count
+  useEffect(() => {
+    loadInvitationCount();
+    
+    // Refresh count every 30 seconds while component is mounted
+    const interval = setInterval(loadInvitationCount, 30000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
+  
+  const loadInvitationCount = async () => {
+    if (!user?.uid) return;
+    try {
+      const invitations = await getUserWorkspaceInvitations(user.uid);
+      setInvitationCount(invitations.length);
+    } catch (error) {
+      console.error('[ProfileButton] Error loading invitation count:', error);
+    }
+  };
+  
   const handlePress = () => {
     router.push('/profile' as any);
   };
   
   return (
-    <TouchableOpacity
-      style={[
-        styles.button,
-        isOnProfileScreen && styles.buttonSelected
-      ]}
-      onPress={handlePress}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.initials}>{initials}</Text>
-    </TouchableOpacity>
+    <View style={styles.container}>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          isOnProfileScreen && styles.buttonSelected
+        ]}
+        onPress={handlePress}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.initials}>{initials}</Text>
+      </TouchableOpacity>
+      
+      {/* Notification Badge - Upper Left Position */}
+      {invitationCount > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>
+            {invitationCount > 9 ? '9+' : invitationCount}
+          </Text>
+        </View>
+      )}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    width: 44, // Extra space for badge
+    height: 36,
+    marginRight: 4,
+    position: 'relative',
+  },
   button: {
     width: 36,
     height: 36,
@@ -71,7 +110,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#FFF',
-    marginRight: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -85,6 +123,26 @@ const styles = StyleSheet.create({
   initials: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#FFF',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#DC2626', // Red notification badge
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#FFF',
+    zIndex: 10,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '700',
     color: '#FFF',
   },
 });
