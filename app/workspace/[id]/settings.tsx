@@ -33,6 +33,7 @@ export default function WorkspaceSettingsScreen() {
 
   useEffect(() => {
     loadWorkspace();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const loadWorkspace = async () => {
@@ -91,7 +92,7 @@ export default function WorkspaceSettingsScreen() {
   const handleLeaveWorkspace = () => {
     Alert.alert(
       'Leave Workspace?',
-      `Are you sure you want to leave "${workspace?.name}"?\n\nYou'll lose access to all workspace chats.`,
+      `Are you sure you want to leave "${workspace?.name}"?\n\nYou&apos;ll lose access to all workspace chats.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -152,7 +153,7 @@ export default function WorkspaceSettingsScreen() {
         <Text style={styles.workspaceName}>{workspace.name}</Text>
         {isAdmin && (
           <View style={styles.adminBadge}>
-            <Text style={styles.adminBadgeText}>You're the Admin</Text>
+            <Text style={styles.adminBadgeText}>You&apos;re the Admin</Text>
           </View>
         )}
       </View>

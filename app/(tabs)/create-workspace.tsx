@@ -8,24 +8,22 @@ import { useRouter } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+     ActivityIndicator,
+     Alert,
+     KeyboardAvoidingView,
+     Platform,
+     ScrollView,
+     StyleSheet,
+     Text,
+     TextInput,
+     TouchableOpacity,
+     View,
 } from 'react-native';
 import { functions } from '../../firebase.config';
-import { authStore } from '../../store/authStore';
 import { Colors } from '../../utils/colors';
 
 export default function CreateWorkspaceScreen() {
   const router = useRouter();
-  const user = authStore((state) => state.user);
 
   const [workspaceName, setWorkspaceName] = useState('');
   const [maxUsers, setMaxUsers] = useState('5');
@@ -57,7 +55,7 @@ export default function CreateWorkspaceScreen() {
 
     try {
       const createWorkspace = httpsCallable(functions, 'createWorkspace');
-      const result = await createWorkspace({
+      await createWorkspace({
         name: workspaceName.trim(),
         maxUsers: parseInt(maxUsers),
         initialMemberEmails: [], // Could add email input later

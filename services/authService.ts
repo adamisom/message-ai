@@ -50,13 +50,13 @@ export interface UserProfile {
   // Phase 4: Spam prevention
   spamStrikes?: number;
   spamBanned?: boolean;
-  spamReportsReceived?: Array<{
+  spamReportsReceived?: {
     reportedBy: string;
     reason: 'workspace' | 'groupChat';
     timestamp: any;
     workspaceId?: string;
     conversationId?: string;
-  }>;
+  }[];
 }
 
 /**

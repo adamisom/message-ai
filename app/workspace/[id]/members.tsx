@@ -30,6 +30,7 @@ export default function WorkspaceMembersScreen() {
 
   useEffect(() => {
     loadWorkspace();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const loadWorkspace = async () => {

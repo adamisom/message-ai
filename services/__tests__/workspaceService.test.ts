@@ -3,7 +3,7 @@
  * High-value tests for workspace CRUD operations
  */
 
-import { describe, it, expect, jest } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 
 // These are integration-style tests that would work with real Firestore
 // For true unit tests, you'd mock Firestore entirely

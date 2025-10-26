@@ -38,6 +38,7 @@ export default function WorkspacesScreen() {
     if (user?.uid) {
       loadWorkspaces(user.uid);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
   const handleRefresh = async () => {
