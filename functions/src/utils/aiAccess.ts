@@ -4,6 +4,7 @@
  */
 
 import * as admin from 'firebase-admin';
+import { checkUserAIAccess, checkWorkspaceAIAccess } from './aiAccessHelpers';
 
 const db = admin.firestore();
 
@@ -28,23 +29,14 @@ export async function canAccessAIFeatures(
     
     const user = userDoc.data()!;
     
-    // Check 1: Is user a paid Pro subscriber?
-    if (user.isPaidUser === true) {
-      return { canAccess: true };
+    // Check 1 & 2: Pro user or active trial (use tested helper)
+    const userAccessResult = checkUserAIAccess(user as any);
+    
+    if (userAccessResult.canAccess) {
+      return userAccessResult;
     }
     
-    // Check 2: Is user in active trial?
-    if (user.trialEndsAt) {
-      const now = Date.now();
-      const trialEndsAt = user.trialEndsAt.toMillis();
-      
-      if (now < trialEndsAt) {
-        const daysRemaining = Math.ceil((trialEndsAt - now) / (1000 * 60 * 60 * 24));
-        return { canAccess: true, trialDaysRemaining: daysRemaining };
-      }
-    }
-    
-    // Check 3: Is this conversation in a workspace where user is a member?
+    // Check 3: Workspace membership (if conversationId provided)
     if (conversationId) {
       const conversationDoc = await db.collection('conversations').doc(conversationId).get();
       
@@ -57,20 +49,24 @@ export async function canAccessAIFeatures(
           if (workspaceDoc.exists) {
             const workspace = workspaceDoc.data()!;
             
-            // User must be a member and workspace must be active (payment not lapsed)
-            if (workspace.members.includes(userId) && workspace.isActive) {
-              return { canAccess: true };
+            // Use tested helper for workspace access check
+            const workspaceAccessResult = checkWorkspaceAIAccess(workspace as any, userId);
+            
+            if (workspaceAccessResult.canAccess) {
+              return workspaceAccessResult;
             }
             
-            if (!workspace.isActive) {
-              return { canAccess: false, reason: 'Workspace payment lapsed - read-only mode' };
-            }
+            // Return specific workspace error
+            return {
+              canAccess: false,
+              reason: workspaceAccessResult.reason,
+            };
           }
         }
       }
     }
     
-    // No access: trial expired and not Pro
+    // No access: not Pro, trial expired, and not in workspace
     return { 
       canAccess: false, 
       reason: 'Upgrade to Pro or join a workspace to access AI features' 
@@ -84,6 +80,7 @@ export async function canAccessAIFeatures(
 
 /**
  * Get trial status for a user
+ * (Kept for backward compatibility, but could also use helper directly)
  */
 export async function getTrialStatus(userId: string): Promise<{
   isInTrial: boolean;

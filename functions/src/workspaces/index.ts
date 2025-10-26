@@ -5,6 +5,8 @@
 
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import { validateWorkspaceCreation, calculateWorkspaceCharge } from '../utils/workspaceHelpers';
+import { calculateActiveStrikes, shouldSendBanNotification } from '../utils/spamHelpers';
 
 const db = admin.firestore();
 
@@ -20,16 +22,7 @@ export const createWorkspace = functions.https.onCall(async (data, context) => {
 
   const { name, maxUsers, initialMemberEmails } = data;
 
-  // 2. Validation
-  if (!name || typeof name !== 'string' || name.trim().length === 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'Workspace name is required');
-  }
-
-  if (!maxUsers || typeof maxUsers !== 'number' || maxUsers < 2 || maxUsers > 25) {
-    throw new functions.https.HttpsError('invalid-argument', 'maxUsers must be between 2 and 25');
-  }
-
-  // 3. Get user document
+  // 2. Get user document
   const userRef = db.collection('users').doc(context.auth.uid);
   const userDoc = await userRef.get();
   
@@ -39,48 +32,32 @@ export const createWorkspace = functions.https.onCall(async (data, context) => {
 
   const user = userDoc.data()!;
 
-  // 4. Check Pro subscription (trial users cannot create workspaces)
-  if (!user.isPaidUser) {
-    throw new functions.https.HttpsError(
-      'permission-denied',
-      'Pro subscription required to create workspaces'
-    );
-  }
-
-  // 5. Check spam ban
-  if (user.spamBanned) {
-    throw new functions.https.HttpsError(
-      'permission-denied',
-      'Account restricted from creating workspaces due to spam reports'
-    );
-  }
-
-  // 6. Check workspace limit (5 max)
-  const workspacesOwned = user.workspacesOwned || [];
-  if (workspacesOwned.length >= 5) {
-    throw new functions.https.HttpsError(
-      'resource-exhausted',
-      'Workspace limit reached (5 max)'
-    );
-  }
-
-  // 7. Check name uniqueness for this user
+  // 3. Get existing workspace names for uniqueness check
   const existingWorkspaces = await db.collection('workspaces')
     .where('adminUid', '==', context.auth.uid)
     .get();
   
-  const nameExists = existingWorkspaces.docs.some(
-    doc => doc.data().name.toLowerCase() === name.toLowerCase()
-  );
+  const existingNames = existingWorkspaces.docs.map(doc => doc.data().name);
 
-  if (nameExists) {
-    throw new functions.https.HttpsError(
-      'already-exists',
-      'You already have a workspace with that name'
-    );
+  // 4. Validate workspace creation (uses tested helper function)
+  const validation = validateWorkspaceCreation(user as any, name, maxUsers, existingNames);
+  
+  if (!validation.valid) {
+    // Map error codes to appropriate HttpsError codes
+    const errorCodeMap: Record<string, functions.https.FunctionsErrorCode> = {
+      'invalid-name': 'invalid-argument',
+      'invalid-capacity': 'invalid-argument',
+      'pro-required': 'permission-denied',
+      'spam-banned': 'permission-denied',
+      'limit-reached': 'resource-exhausted',
+      'duplicate-name': 'already-exists',
+    };
+    
+    const errorCode = errorCodeMap[validation.errorCode || 'invalid-argument'] || 'invalid-argument';
+    throw new functions.https.HttpsError(errorCode, validation.error!);
   }
 
-  // 8. Create workspace
+  // 5. Create workspace
   const workspaceRef = db.collection('workspaces').doc();
   const now = admin.firestore.FieldValue.serverTimestamp();
 
@@ -100,14 +77,14 @@ export const createWorkspace = functions.https.onCall(async (data, context) => {
     createdAt: now,
     maxUsersThisMonth: maxUsers,
     billingCycleStart: now,
-    currentMonthCharge: maxUsers * 0.5,
+    currentMonthCharge: calculateWorkspaceCharge(maxUsers), // Use tested helper
     isActive: true,
     groupChatCount: 0,
     directChatCount: 0,
     totalMessages: 0,
   };
 
-  // 9. Create workspace and update user in transaction
+  // 6. Create workspace and update user in transaction
   await db.runTransaction(async (transaction) => {
     transaction.set(workspaceRef, workspace);
     transaction.update(userRef, {
@@ -115,7 +92,7 @@ export const createWorkspace = functions.https.onCall(async (data, context) => {
     });
   });
 
-  // 10. Send invitations to initial members (if provided)
+  // 7. Send invitations to initial members (if provided)
   let invitationsSent = 0;
   if (initialMemberEmails && Array.isArray(initialMemberEmails)) {
     for (const email of initialMemberEmails.slice(0, maxUsers - 1)) {
@@ -386,36 +363,46 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
   const inviter = inviterDoc.data()!;
   const reporterUid = context.auth.uid; // Store for use in transaction
 
-  // 5. Add spam report and update strikes in transaction
+  // 5. Calculate spam strikes using tested helper
   await db.runTransaction(async (transaction) => {
     const now = admin.firestore.FieldValue.serverTimestamp();
 
-    // Add spam report
+    // Get spam reports and add new report
     const spamReportsReceived = inviter.spamReportsReceived || [];
-    const oneMonthAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-
-    // Filter out reports older than 1 month
-    const activeReports = spamReportsReceived.filter((report: any) => {
-      const reportTime = report.timestamp?.toMillis?.() || 0;
-      return reportTime > oneMonthAgo;
-    });
+    
+    // Convert Firestore timestamps to Date objects for helper function
+    const reportsForCalculation = spamReportsReceived.map((report: any) => ({
+      reportedBy: report.reportedBy,
+      timestamp: report.timestamp,
+      reason: report.reason,
+      workspaceId: report.workspaceId,
+    }));
 
     // Add new report
-    activeReports.push({
+    const newReport = {
       reportedBy: reporterUid,
       reason: 'workspace',
       timestamp: now,
       workspaceId: invitation.workspaceId,
+    };
+    reportsForCalculation.push(newReport);
+
+    // Calculate active strikes using tested helper (with 1-month decay)
+    const strikeResult = calculateActiveStrikes(reportsForCalculation);
+
+    // Filter to keep only active reports (helper already validated these)
+    const oneMonthAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    const activeReports = spamReportsReceived.filter((report: any) => {
+      const reportTime = report.timestamp?.toMillis?.() || 0;
+      return reportTime > oneMonthAgo;
     });
+    activeReports.push(newReport);
 
-    const activeStrikeCount = activeReports.length;
-    const isBanned = activeStrikeCount >= 5;
-
-    // Update inviter
+    // Update inviter with strike data
     transaction.update(inviterRef, {
       spamReportsReceived: activeReports,
-      spamStrikes: activeStrikeCount,
-      spamBanned: isBanned,
+      spamStrikes: strikeResult.activeStrikes,
+      spamBanned: strikeResult.isBanned,
     });
 
     // Mark invitation as spam
@@ -424,24 +411,24 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
       respondedAt: now,
     });
 
-    // Send notification to inviter
-    if (isBanned && !inviter.spamBanned) {
-      // Just got banned
+    // Send notifications based on strike result
+    if (shouldSendBanNotification(inviter.spamBanned || false, strikeResult)) {
+      // Just got banned - send ban notification
       transaction.set(inviterRef.collection('notifications').doc(), {
         type: 'spam',
         action: 'banned',
         message: '🚫 Your account is restricted from creating workspaces and group chats due to spam reports.',
-        strikes: activeStrikeCount,
+        strikes: strikeResult.activeStrikes,
         timestamp: now,
         read: false,
       });
-    } else if (activeStrikeCount === 3 || activeStrikeCount === 4) {
-      // Warning notification
+    } else if (strikeResult.shouldNotify && strikeResult.notificationType === 'warning') {
+      // 3rd or 4th strike - send warning
       transaction.set(inviterRef.collection('notifications').doc(), {
         type: 'spam',
         action: 'warning',
-        message: `⚠️ You have ${activeStrikeCount} spam reports. Be careful - 5 strikes will restrict workspace/group creation.`,
-        strikes: activeStrikeCount,
+        message: `⚠️ You have ${strikeResult.activeStrikes} spam reports. Be careful - 5 strikes will restrict workspace/group creation.`,
+        strikes: strikeResult.activeStrikes,
         timestamp: now,
         read: false,
       });

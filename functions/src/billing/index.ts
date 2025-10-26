@@ -13,6 +13,7 @@
 
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import { calculateSubscriptionEndDate } from '../utils/subscriptionHelpers';
 
 const db = admin.firestore();
 
@@ -52,14 +53,13 @@ export const upgradeToPro = functions.https.onCall(async (data, context) => {
     // In production: Stripe.customers.create(), Stripe.subscriptions.create()
     
     const now = admin.firestore.FieldValue.serverTimestamp();
-    const oneYearFromNow = new Date();
-    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+    const subscriptionEndsAt = calculateSubscriptionEndDate(); // Use tested helper
 
     await userRef.update({
       isPaidUser: true,
       subscriptionTier: 'pro',
       subscriptionStartedAt: now,
-      subscriptionEndsAt: admin.firestore.Timestamp.fromDate(oneYearFromNow),
+      subscriptionEndsAt: admin.firestore.Timestamp.fromDate(subscriptionEndsAt),
       // MVP: Dummy Stripe IDs
       stripeCustomerId: `cus_mvp_${userId.substring(0, 10)}`,
       stripeSubscriptionId: `sub_mvp_${Date.now()}`,
@@ -71,7 +71,7 @@ export const upgradeToPro = functions.https.onCall(async (data, context) => {
     return {
       success: true,
       message: 'Successfully upgraded to Pro!',
-      subscriptionEndsAt: oneYearFromNow.toISOString(),
+      subscriptionEndsAt: subscriptionEndsAt.toISOString(),
     };
 
   } catch (error: any) {
