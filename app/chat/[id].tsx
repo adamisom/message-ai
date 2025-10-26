@@ -49,6 +49,7 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [canAccessAI, setCanAccessAI] = useState(false); // AI access control
   
   // Pagination state
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -86,6 +87,46 @@ export default function ChatScreen() {
   const timeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   console.log('💬 [ChatScreen] Rendering, conversationId:', conversationId, 'messagesCount:', messages.length);
+
+  // Check AI access based on user subscription, trial, or workspace membership
+  useEffect(() => {
+    if (!user || !conversation) {
+      setCanAccessAI(false);
+      return;
+    }
+
+    const checkAIAccess = () => {
+      // Pro users always have access
+      if (user.isPaidUser === true) {
+        setCanAccessAI(true);
+        return;
+      }
+
+      // Check if user is in active trial
+      if (user.trialEndsAt) {
+        const now = Date.now();
+        const trialEndsAt = typeof user.trialEndsAt === 'number' 
+          ? user.trialEndsAt 
+          : user.trialEndsAt.toMillis?.() || 0;
+        
+        if (now < trialEndsAt) {
+          setCanAccessAI(true);
+          return;
+        }
+      }
+
+      // Free users (after trial) can only access AI in workspace chats
+      if (conversation.workspaceId) {
+        setCanAccessAI(true);
+        return;
+      }
+
+      // No access: not Pro, trial expired, and not in workspace
+      setCanAccessAI(false);
+    };
+
+    checkAIAccess();
+  }, [user, conversation]);
 
   // Helper: Deduplicate messages by ID (safety net for race conditions)
   const deduplicateMessages = (msgs: Message[]): Message[] => {
@@ -981,10 +1022,19 @@ export default function ChatScreen() {
         onOpenDecisions={() => setShowDecisionsModal(true)}
         onOpenMeetingScheduler={() => setShowMeetingSchedulerModal(true)}
         isGroupChat={conversation.type === 'group'}
-        canAccessAI={true}
+        canAccessAI={canAccessAI}
         onUpgradeRequired={() => {
-          // TODO: Phase 4 - setShowUpgradeModal(true)
-          Alert.alert('Upgrade Required', 'Upgrade to Pro to access AI features');
+          Alert.alert(
+            'Upgrade to Pro',
+            'Upgrade to Pro to unlock AI features in all your chats.\n\nFree users can still use AI features in workspace chats!',
+            [
+              { text: 'Maybe Later', style: 'cancel' },
+              { text: 'Upgrade to Pro', onPress: () => {
+                // TODO: Navigate to upgrade screen
+                Alert.alert('Coming Soon', 'Upgrade flow will be implemented here');
+              }}
+            ]
+          );
         }}
       />
 
