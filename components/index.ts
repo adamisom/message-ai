@@ -5,6 +5,10 @@ export { DecisionsModal } from './DecisionsModal';
 export { SearchModal } from './SearchModal';
 export { SummaryModal } from './SummaryModal';
 
+// Phase 4: Paid Tier Components
+export { TrialBanner } from './TrialBanner';
+export { UpgradeToProModal } from './UpgradeToProModal';
+
 // Core Components
 export { default as ConversationItem } from './ConversationItem';
 export { default as GroupParticipantsModal } from './GroupParticipantsModal';
