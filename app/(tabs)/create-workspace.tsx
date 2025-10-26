@@ -8,22 +8,26 @@ import { useRouter } from 'expo-router';
 import { httpsCallable } from 'firebase/functions';
 import React, { useState } from 'react';
 import {
-     ActivityIndicator,
-     Alert,
-     KeyboardAvoidingView,
-     Platform,
-     ScrollView,
-     StyleSheet,
-     Text,
-     TextInput,
-     TouchableOpacity,
-     View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { functions } from '../../firebase.config';
+import { useAuthStore } from '../../store/authStore';
+import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Colors } from '../../utils/colors';
 
 export default function CreateWorkspaceScreen() {
   const router = useRouter();
+  const user = useAuthStore((state: any) => state.user);
+  const { addWorkspace } = useWorkspaceStore();
 
   const [workspaceName, setWorkspaceName] = useState('');
   const [maxUsers, setMaxUsers] = useState('5');
@@ -55,11 +59,17 @@ export default function CreateWorkspaceScreen() {
 
     try {
       const createWorkspace = httpsCallable(functions, 'createWorkspace');
-      await createWorkspace({
+      const result = await createWorkspace({
         name: workspaceName.trim(),
         maxUsers: parseInt(maxUsers),
         initialMemberEmails: [], // Could add email input later
       });
+
+      // Add workspace to local store immediately
+      const workspaceData = (result.data as any).workspace;
+      if (workspaceData) {
+        addWorkspace(workspaceData);
+      }
 
       Alert.alert(
         'Success!',
@@ -67,7 +77,15 @@ export default function CreateWorkspaceScreen() {
         [
           {
             text: 'OK',
-            onPress: () => router.back(),
+            onPress: () => {
+              // Navigate to workspaces tab
+              router.replace('/workspaces' as any);
+              
+              // Reload workspaces list to ensure sync
+              if (user?.uid) {
+                useWorkspaceStore.getState().loadWorkspaces(user.uid);
+              }
+            },
           },
         ]
       );
