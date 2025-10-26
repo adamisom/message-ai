@@ -30,3 +30,6 @@ export {
 // Phase 4: Billing (MVP dummy payment)
 export { downgradeToFree, startFreeTrial, upgradeToPro } from './billing';
 
+// Sub-Phase 6.5: Group Chat Management
+export { addMemberToGroupChat } from './groupChats/addMemberToGroupChat';
+

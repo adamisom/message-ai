@@ -1010,7 +1010,18 @@ export default function ChatScreen() {
           email: details.email,
         }))}
         currentUserId={user?.uid || ''}
+        conversationId={conversationId as string}
+        conversationType={conversation.type}
+        isWorkspaceChat={!!conversation.workspaceId}
         onClose={() => setShowParticipantsModal(false)}
+        onMemberAdded={async () => {
+          // Refresh conversation to update participant list
+          const conversationRef = doc(db, 'conversations', conversationId as string);
+          const updatedConversation = await getDoc(conversationRef);
+          if (updatedConversation.exists()) {
+            setConversation(updatedConversation.data() as Conversation);
+          }
+        }}
       />
 
       {/* AI Features Menu */}
