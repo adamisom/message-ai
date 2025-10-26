@@ -3,25 +3,24 @@
  * Manage workspace: members, capacity, billing, delete
  */
 
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { httpsCallable } from 'firebase/functions';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../../firebase.config';
+import { getWorkspace } from '../../../services/workspaceService';
 import { authStore } from '../../../store/authStore';
-import { workspaceStore } from '../../../store/workspaceStore';
-import { getWorkspace, deleteWorkspace as deleteWorkspaceService } from '../../../services/workspaceService';
-import { Colors } from '../../../utils/colors';
 import type { Workspace } from '../../../types';
+import { Colors } from '../../../utils/colors';
 
 export default function WorkspaceSettingsScreen() {
   const router = useRouter();

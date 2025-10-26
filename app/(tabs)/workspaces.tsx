@@ -4,22 +4,22 @@
  * Workspace switcher and management hub
  */
 
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  RefreshControl,
-  ActivityIndicator,
+    ActivityIndicator,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { authStore } from '../../store/authStore';
 import { workspaceStore } from '../../store/workspaceStore';
-import { Colors } from '../../utils/colors';
 import type { Workspace } from '../../types';
+import { Colors } from '../../utils/colors';
 
 export default function WorkspacesScreen() {
   const router = useRouter();
