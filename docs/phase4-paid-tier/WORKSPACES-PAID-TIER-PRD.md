@@ -137,12 +137,12 @@
 - ❌ Automatic ban on 5 strikes (already implemented for invitation spam)
 - ❌ Spam appeal Cloud Function (Enterprise tier)
 
-**Sub-Phase 9: Billing & Admin**
+**Sub-Phase 9: Production Sign-In**
 
-- ❌ Real Stripe integration (currently MVP mode)
-- ❌ Capacity upgrade/downgrade flows
-- ❌ Payment failure handling
-- ❌ Subscription management screen (placeholder exists)
+- ❌ Phone number authentication
+- ❌ LinkedIn OAuth
+- ❌ Okta OAuth
+- ❌ Multi-auth support and account linking
 
 **Sub-Phase 10: Export Workspace**
 
@@ -160,12 +160,19 @@
 - ❌ E2E test suite
 - ❌ Improve 'New Chat' UX (auto-detect direct/group based on user count)
 
-**Sub-Phase 12: Production Sign-In**
+**Sub-Phase 12: Billing & Admin**
 
-- ❌ Phone number authentication
-- ❌ LinkedIn OAuth
-- ❌ Okta OAuth
-- ❌ Multi-auth support and account linking
+- ❌ Real Stripe integration (currently MVP mode)
+- ❌ Capacity upgrade/downgrade flows
+- ❌ Payment failure handling
+- ❌ Subscription management screen (placeholder exists)
+
+**Sub-Phase 13: App Stores**
+
+- ❌ iPhone App Store submission
+- ❌ Android Play Store submission
+- ❌ App store assets and screenshots
+- ❌ App store optimization (ASO)
 
 ---
 
@@ -1652,7 +1659,7 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 
 ## 12. Implementation Phases
 
-### Phase 1: Foundation (Week 1)
+### Sub-Phase 1: Foundation (Week 1)
 
 **Goal:** Set up data model, authentication, basic workspace CRUD
 
@@ -1677,7 +1684,7 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 - Invite members
 - Accept/decline invitations
 
-### Phase 2: AI Feature Gating (Week 1-2)
+### Sub-Phase 2: AI Feature Gating (Week 1-2)
 
 **Goal:** Implement paid tier checks for AI features
 
@@ -1696,7 +1703,7 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 - Verify Pro users can access AI everywhere
 - Verify workspace membership doesn't grant AI access to free users
 
-### Phase 3: Workspace Chat Organization (Week 2)
+### Sub-Phase 3: Workspace Chat Organization (Week 2)
 
 **Goal:** Implement workspace mode toggle, chat filtering
 
@@ -1715,7 +1722,7 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 - Verify member limits
 - Delete workspace (verify cascading delete)
 
-### Phase 4: User Profile & Status (Week 2)
+### Sub-Phase 4: User Profile & Status (Week 2)
 
 **Goal:** Create user profile screen with status display and feature overview
 
@@ -1895,7 +1902,7 @@ function getInitials(displayName: string): string {
 - Usage statistics (AI requests, workspace activity)
 - In-app notifications bell (replace or complement profile button)
 
-### Phase 5: Admin Features - Assignment (Week 2-3)
+### Sub-Phase 5: Admin Features - Assignment (Week 2-3)
 
 **Goal:** Enable action item assignment for admins
 
@@ -1914,7 +1921,7 @@ function getInitials(displayName: string): string {
 - Non-admin sees read-only items
 - Assignment persists across devices
 
-### Phase 6: Admin Features - Edit & Save (Week 3)
+### Sub-Phase 6: Admin Features - Edit & Save (Week 3)
 
 **Goal:** Enable editing AI content for admins
 
@@ -1934,7 +1941,7 @@ function getInitials(displayName: string): string {
 - Admin edits action items
 - Members see edited versions
 
-### Phase 7: Spam Prevention (Week 3)
+### Sub-Phase 7: Spam Prevention (Week 3)
 
 **Goal:** Implement strike system
 
@@ -1953,7 +1960,7 @@ function getInitials(displayName: string): string {
 - Test 5-strike ban
 - Verify banned user can't create workspaces/groups
 
-### Phase 8: Billing Logic (Week 4)
+### Sub-Phase 8: Billing Logic (Week 4)
 
 **Goal:** Implement max user tracking, billing calculations
 
@@ -1973,7 +1980,52 @@ function getInitials(displayName: string): string {
 - Verify 30-day deletion
 - Manual billing calculation test
 
-### Phase 9: Export Workspace (Week 4)
+### Sub-Phase 9: Production Sign-In (Week 5)
+
+**Goal:** Support enterprise-grade authentication options
+
+**Rationale:** Not all companies/teams have sophisticated identity providers like Okta. Supporting multiple auth methods ensures broader adoption.
+
+**Tasks:**
+
+1. **Phone Number Authentication:**
+   - Integrate Firebase Phone Auth
+   - SMS verification flow
+   - Link phone number to existing accounts
+   
+2. **OAuth Providers:**
+   - **LinkedIn OAuth:** For professional teams, easy onboarding
+   - **Okta OAuth:** For enterprise customers with existing SSO
+   
+3. **Multi-Auth Support:**
+   - Allow users to link multiple auth methods
+   - Primary email for workspace invitations
+   - Unified user profile across auth methods
+   
+4. **UI Updates:**
+   - Login screen with provider selection
+   - "Sign in with LinkedIn" button
+   - "Sign in with Okta" button
+   - "Sign in with Phone" option
+   - Email/password (existing)
+
+**Security Considerations:**
+
+- Account linking validation
+- Email verification for OAuth accounts
+- Prevent duplicate accounts
+- SSO session management
+
+**Testing:**
+
+- Test each auth provider independently
+- Test account linking flows
+- Test workspace invitations with different auth methods
+- Edge case: User signs up with email, later links LinkedIn
+
+---
+
+### Sub-Phase 10: Export Workspace (Week 4)
 
 **Goal:** Enable workspace admins to export all workspace data
 
@@ -2024,7 +2076,7 @@ function getInitials(displayName: string): string {
 
 ---
 
-### Phase 10: Polish & Testing (Week 4)
+### Sub-Phase 11: Polish & Testing (Week 4)
 
 **Goal:** UI polish, edge cases, E2E testing
 
@@ -2046,48 +2098,79 @@ function getInitials(displayName: string): string {
 
 ---
 
-### Phase 11: Production Sign-In (Week 5)
+### Sub-Phase 12: Billing & Admin (Week 5)
 
-**Goal:** Support enterprise-grade authentication options
-
-**Rationale:** Not all companies/teams have sophisticated identity providers like Okta. Supporting multiple auth methods ensures broader adoption.
+**Goal:** Implement real Stripe integration and billing flows
 
 **Tasks:**
 
-1. **Phone Number Authentication:**
-   - Integrate Firebase Phone Auth
-   - SMS verification flow
-   - Link phone number to existing accounts
-
-2. **OAuth Providers:**
-   - **LinkedIn OAuth:** For professional teams, easy onboarding
-   - **Okta OAuth:** For enterprise customers with existing SSO
-
-3. **Multi-Auth Support:**
-   - Allow users to link multiple auth methods
-   - Primary email for workspace invitations
-   - Unified user profile across auth methods
-
-4. **UI Updates:**
-   - Login screen with provider selection
-   - "Sign in with LinkedIn" button
-   - "Sign in with Okta" button
-   - "Sign in with Phone" option
-   - Email/password (existing)
-
-**Security Considerations:**
-
-- Account linking validation
-- Email verification for OAuth accounts
-- Prevent duplicate accounts
-- SSO session management
+1. Integrate Stripe SDK
+2. Create subscription management endpoints
+3. Implement payment failure handling
+4. Add capacity upgrade/downgrade flows
+5. Build subscription management screen
+6. Webhook handlers for Stripe events
+7. Pro-rated billing calculations
 
 **Testing:**
 
-- Test each auth provider independently
-- Test account linking flows
-- Test workspace invitations with different auth methods
-- Edge case: User signs up with email, later links LinkedIn
+- Add/remove members (verify max tracking)
+- Simulate payment lapse (read-only state)
+- Verify 30-day deletion
+- Manual billing calculation test
+
+---
+
+### Sub-Phase 13: App Stores (Week 6)
+
+**Goal:** Publish MessageAI to iPhone App Store and Android Play Store
+
+**Tasks:**
+
+1. **iPhone App Store:**
+   - Create App Store Connect account
+   - Prepare app metadata (description, keywords, screenshots)
+   - Generate app icons and promotional assets
+   - Configure app signing and provisioning profiles
+   - Submit for TestFlight beta testing
+   - Address App Review feedback
+   - Submit for production release
+   
+2. **Android Play Store:**
+   - Create Google Play Console account
+   - Prepare store listing (description, graphics, screenshots)
+   - Generate signed APK/AAB bundle
+   - Configure release tracks (internal → closed beta → production)
+   - Submit for review
+   - Address Play Store review feedback
+   - Production release
+
+3. **App Store Assets:**
+   - App icon (multiple sizes for both platforms)
+   - Screenshots (various device sizes)
+   - Promotional text and descriptions
+   - Privacy policy URL
+   - Support URL
+   - App preview videos (optional but recommended)
+
+4. **App Store Optimization (ASO):**
+   - Keyword research for both stores
+   - Compelling app title and subtitle
+   - Feature graphics
+   - Localization (if applicable)
+
+**Testing:**
+
+- TestFlight beta testing (iOS)
+- Internal testing track (Android)
+- Verify in-app purchases work on production stores
+- Test deep linking from store pages
+- Verify analytics tracking
+
+**Estimated Timeline:**
+
+- iOS: 1-2 weeks (including review time)
+- Android: 3-7 days (typically faster review)
 
 ---
 
