@@ -36,8 +36,15 @@ service cloud.firestore {
     
     // Workspaces collection - top-level
     match /workspaces/{workspaceId} {
-      // Members can read their workspace
-      allow read: if isWorkspaceMember(workspaceId);
+      // Get individual workspace: members can read
+      allow get: if isWorkspaceMember(workspaceId);
+      
+      // List workspaces: authenticated users can query (rules check each doc via 'list' below)
+      // Security is enforced per-document: user must be admin OR member
+      allow list: if isAuthenticated() && (
+        resource.data.adminUid == request.auth.uid ||
+        request.auth.uid in resource.data.members
+      );
       
       // Only Pro users can create workspaces (trial users cannot)
       allow create: if isPaidUser() && 
