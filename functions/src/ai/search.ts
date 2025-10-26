@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import {canAccessAIFeatures} from '../utils/aiAccess';
 import { generateEmbedding } from '../utils/openai';
 import { queryVectors } from '../utils/pinecone';
 import { checkAIRateLimit } from '../utils/rateLimit';
@@ -43,6 +44,15 @@ export const semanticSearch = functions
       throw new functions.https.HttpsError(
         'resource-exhausted',
         'Search usage limit exceeded'
+      );
+    }
+
+    // 2.5. Phase 4: Check AI feature access
+    const aiAccess = await canAccessAIFeatures(context.auth.uid, data.conversationId);
+    if (!aiAccess.canAccess) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        aiAccess.reason || 'AI features require Pro subscription or active trial'
       );
     }
 

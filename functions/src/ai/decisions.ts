@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import {canAccessAIFeatures} from '../utils/aiAccess';
 import {callClaudeWithTool} from '../utils/anthropic';
 import {trackDecisionsTool} from '../utils/aiTools';
 import {getCachedResult} from '../utils/caching';
@@ -26,6 +27,15 @@ export const trackDecisions = functions
     }
 
     await verifyConversationAccess(context.auth.uid, data.conversationId);
+
+    // Phase 4: Check AI feature access
+    const aiAccess = await canAccessAIFeatures(context.auth.uid, data.conversationId);
+    if (!aiAccess.canAccess) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        aiAccess.reason || 'AI features require Pro subscription or active trial'
+      );
+    }
 
     const allowed = await checkAIRateLimit(context.auth.uid, 'decision');
     if (!allowed) {
