@@ -11,6 +11,7 @@ export {
 
 // Phase 1: AI Features
 export { extractActionItems } from './ai/actionItems';
+export { assignActionItem } from './ai/assignActionItem';
 export { trackDecisions } from './ai/decisions';
 export { batchAnalyzePriority, quickPriorityCheckTrigger } from './ai/priority';
 export { semanticSearch } from './ai/search';

@@ -7,8 +7,8 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -54,8 +54,32 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, setUser } = useAuthStore();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
-  if (!user) {
+  // Refresh user data when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const refreshUser = async () => {
+        if (user?.uid) {
+          setIsRefreshing(true);
+          try {
+            const freshUser = await getUserProfile(user.uid);
+            if (freshUser) {
+              await setUser(freshUser);
+            }
+          } catch (error) {
+            console.error('Failed to refresh user data:', error);
+          } finally {
+            setIsRefreshing(false);
+          }
+        }
+      };
+      
+      refreshUser();
+    }, [user?.uid, setUser])
+  );
+  
+  if (!user || isRefreshing) {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.loadingText}>Loading profile...</Text>
@@ -88,17 +112,22 @@ export default function ProfileScreen() {
     const trialEndsAt = user.trialEndsAt.toMillis ? user.trialEndsAt.toMillis() : user.trialEndsAt;
     
     if (now < trialEndsAt) {
-      // Active Trial User - no buttons
+      // Active Trial User - show upgrade button
       const daysRemaining = Math.ceil((trialEndsAt - now) / (1000 * 60 * 60 * 24));
       statusBadge = '🎉 Trial User';
       statusColor = '#FFD700'; // Gold
       statusDetail = `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`;
-      // No buttons during active trial
+      showUpgradeButton = true;
     } else {
-      // Free User (trial expired) - show upgrade only
+      // Free User (trial expired)
       statusBadge = '🔓 Free User';
       statusColor = '#8E8E93';
-      statusDetail = '';
+      statusDetail = 'Trial ended';
+      
+      // Check if they're eligible for trial again (test script scenario)
+      if (!user.trialUsed) {
+        showTrialButton = true;
+      }
       showUpgradeButton = true;
     }
   } else {
@@ -241,7 +270,7 @@ export default function ProfileScreen() {
             onPress={() => setShowUpgradeModal(true)}
             activeOpacity={0.7}
           >
-            <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
+            <Text style={styles.upgradeButtonText}>Upgrade to Pro Now</Text>
             <Ionicons name="arrow-forward" size={20} color="#FFF" />
           </TouchableOpacity>
         )}

@@ -207,6 +207,7 @@ export async function toggleActionItemStatus(
 
 /**
  * Assign Action Item - Manually assign an action item to a participant
+ * Phase 4: Admin Features - Calls Cloud Function with admin validation
  * @param conversationId - Conversation containing the action item
  * @param itemId - Action item ID
  * @param assigneeUid - UID of the user to assign
@@ -218,23 +219,21 @@ export async function assignActionItem(
   itemId: string,
   assigneeUid: string,
   assigneeDisplayName: string
-) {
+): Promise<void> {
   try {
-    const {doc, updateDoc, serverTimestamp} = await import('firebase/firestore');
-    const {db} = await import('../firebase.config');
-
-    const itemRef = doc(
-      db,
-      `conversations/${conversationId}/ai_action_items/${itemId}`
+    await callAIFeatureWithTimeout(
+      'assignActionItem',
+      {
+        conversationId,
+        itemId,
+        assigneeUid,
+        assigneeDisplayName,
+      },
+      30000 // 30 second timeout
     );
-    await updateDoc(itemRef, {
-      assigneeUid,
-      assigneeDisplayName,
-      updatedAt: serverTimestamp(),
-    });
   } catch (error: any) {
     console.error('[aiService] assignActionItem error:', error);
-    throw new Error(error.message || 'Failed to assign action item');
+    throw new Error(getErrorMessage(error));
   }
 }
 

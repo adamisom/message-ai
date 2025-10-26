@@ -16,6 +16,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { TrialWorkspaceModal } from '../../components/TrialWorkspaceModal';
 import { UpgradeToProModal } from '../../components/UpgradeToProModal';
 import { getUserProfile } from '../../services/authService';
 import { useAuthStore } from '../../store/authStore';
@@ -46,6 +47,7 @@ export default function WorkspacesScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showTrialModal, setShowTrialModal] = useState(false);
 
   useEffect(() => {
     if (user?.uid) {
@@ -68,14 +70,22 @@ export default function WorkspacesScreen() {
   };
 
   const handleCreateWorkspace = () => {
-    // Check if user is Pro or in trial
-    if (!user?.isPaidUser && !isInTrial(user)) {
-      // Show upgrade modal
-      setShowUpgradeModal(true);
+    // Check if user is Pro
+    if (user?.isPaidUser) {
+      // Pro user - allow workspace creation
+      router.push('/create-workspace' as any);
       return;
     }
 
-    router.push('/create-workspace' as any);
+    // Check if user is in trial
+    if (isInTrial(user)) {
+      // Trial user - show restriction modal
+      setShowTrialModal(true);
+      return;
+    }
+
+    // Free user - show upgrade modal
+    setShowUpgradeModal(true);
   };
 
   const ownedWorkspaces = workspaces.filter((ws: Workspace) => ws.adminUid === user?.uid);
@@ -225,6 +235,16 @@ export default function WorkspacesScreen() {
               console.error('Failed to refresh user data after trial start:', error);
             }
           }
+        }}
+      />
+
+      {/* Trial Workspace Restriction Modal */}
+      <TrialWorkspaceModal
+        visible={showTrialModal}
+        onClose={() => setShowTrialModal(false)}
+        onUpgrade={async () => {
+          setShowTrialModal(false);
+          setShowUpgradeModal(true);
         }}
       />
     </ScrollView>

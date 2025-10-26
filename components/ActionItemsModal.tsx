@@ -1,6 +1,7 @@
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import {
+    Alert,
     FlatList,
     Modal,
     StyleSheet,
@@ -10,15 +11,15 @@ import {
 } from 'react-native';
 import { db } from '../firebase.config';
 import { useAIFeature } from '../hooks/useAIFeature';
-import { extractActionItems } from '../services/aiService';
-// PHASE 4: Uncomment these imports when implementing assignment
-// import { invalidateActionItemsCache } from '../services/aiCacheService';
-// import { assignActionItem, toggleActionItemStatus } from '../services/aiService';
+import { invalidateActionItemsCache } from '../services/aiCacheService';
+import { assignActionItem, extractActionItems } from '../services/aiService';
+import { useAuthStore } from '../store/authStore';
 import { commonModalStyles } from '../styles/commonModalStyles';
 import type { ActionItem } from '../types';
 import { getPriorityColor } from '../utils/colorHelpers';
 import { Colors } from '../utils/colors';
 import { formatDateString } from '../utils/dateFormat';
+import { isWorkspaceAdmin } from '../utils/workspacePermissions';
 import { EmptyState } from './modals/EmptyState';
 import { ErrorState } from './modals/ErrorState';
 import { LoadingState } from './modals/LoadingState';
@@ -40,11 +41,14 @@ export function ActionItemsModal({
   conversationId,
   onClose,
 }: ActionItemsModalProps) {
+  const user = useAuthStore((state) => state.user);
   const [items, setItems] = useState<ActionItem[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [itemToAssign, setItemToAssign] = useState<string | null>(null);
   const itemToAssignRef = useRef<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
   
   const { data, loading, loadingSlowly, error, reload } = useAIFeature<any>({
     visible,
@@ -76,6 +80,19 @@ export function ActionItemsModal({
         
         if (convSnap.exists()) {
           const convData = convSnap.data();
+          
+          // Get workspace ID
+          const wsId = convData.workspaceId;
+          setWorkspaceId(wsId);
+          
+          // Check if user is admin
+          if (user?.uid && wsId) {
+            const adminStatus = await isWorkspaceAdmin(user.uid, wsId);
+            setIsAdmin(adminStatus);
+          } else {
+            setIsAdmin(false);
+          }
+          
           const participantDetails = convData.participantDetails || {};
           const participantsList: Participant[] = Object.entries(participantDetails).map(
             ([uid, data]: [string, any]) => ({
@@ -91,7 +108,7 @@ export function ActionItemsModal({
     };
 
     fetchParticipants();
-  }, [visible, conversationId]);
+  }, [visible, conversationId, user?.uid]);
 
   // PHASE 4: Uncomment toggle status when implementing workspaces
   // (Status toggling also creates persistent state that needs proper management)
@@ -123,73 +140,63 @@ export function ActionItemsModal({
   //   }
   // };
 
-  // ======================================================================
-  // PHASE 4 (Workspaces & Paid Tier): Action Item Assignment
-  // ======================================================================
-  // Assignment functionality is commented out in Phase 3 because:
-  // - Creates persistent state that needs proper management
-  // - Requires admin permissions (workspace admins only)
-  // - Should be implemented alongside paid tier and workspace features
-  // 
-  // Uncomment this code when implementing Phase 4.
-  // ======================================================================
+  // PHASE 4: Action Item Assignment (now enabled for workspace admins)
+  const handleAssignPress = (itemId: string) => {
+    console.log('[ActionItemsModal] handleAssignPress called with:', itemId);
+    setItemToAssign(itemId);
+    itemToAssignRef.current = itemId;
+    setShowAssignPicker(true);
+  };
 
-  // const handleAssignPress = (itemId: string) => {
-  //   console.log('[ActionItemsModal] handleAssignPress called with:', itemId);
-  //   setItemToAssign(itemId);
-  //   itemToAssignRef.current = itemId;
-  //   setShowAssignPicker(true);
-  // };
+  const handleAssignToParticipant = async (participant: Participant, itemId: string) => {
+    console.log('[ActionItemsModal] handleAssignToParticipant called:', participant.displayName, 'itemId:', itemId);
+    
+    if (!itemId) {
+      console.warn('[ActionItemsModal] No itemId provided');
+      return;
+    }
 
-  // const handleAssignToParticipant = async (participant: Participant, itemId: string) => {
-  //   console.log('[ActionItemsModal] handleAssignToParticipant called:', participant.displayName, 'itemId:', itemId);
-  //   
-  //   if (!itemId) {
-  //     console.warn('[ActionItemsModal] No itemId provided');
-  //     return;
-  //   }
+    console.log('[ActionItemsModal] Starting optimistic update');
 
-  //   console.log('[ActionItemsModal] Starting optimistic update');
+    // Optimistic update
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? { ...item, assigneeUid: participant.uid, assigneeDisplayName: participant.displayName }
+          : item
+      )
+    );
 
-  //   // Optimistic update
-  //   setItems((prev) =>
-  //     prev.map((item) =>
-  //       item.id === itemId
-  //         ? { ...item, assigneeUid: participant.uid, assigneeDisplayName: participant.displayName }
-  //         : item
-  //     )
-  //   );
+    // Close the picker and clear the ref AFTER optimistic update
+    setShowAssignPicker(false);
+    setItemToAssign(null);
+    itemToAssignRef.current = null;
 
-  //   // Close the picker and clear the ref AFTER optimistic update
-  //   setShowAssignPicker(false);
-  //   setItemToAssign(null);
-  //   itemToAssignRef.current = null;
+    console.log('[ActionItemsModal] Calling assignActionItem API');
 
-  //   console.log('[ActionItemsModal] Calling assignActionItem API');
-
-  //   try {
-  //     // 1. Update Firestore document
-  //     await assignActionItem(conversationId, itemId, participant.uid, participant.displayName);
-  //     console.log('[ActionItemsModal] Assignment successful');
-  //     
-  //     // 2. Invalidate cache so next open fetches fresh data
-  //     // Note: Don't reload here - optimistic update already shows the change
-  //     // Reloading would trigger "Scanning for action items..." which is bad UX
-  //     await invalidateActionItemsCache(conversationId);
-  //     console.log('[ActionItemsModal] Cache invalidated - fresh data on next open');
-  //   } catch (err: any) {
-  //     console.error('[ActionItemsModal] Assign error:', err);
-  //     Alert.alert('Error', 'Failed to assign task. Please try again.');
-  //     // Revert on error
-  //     setItems((prev) =>
-  //       prev.map((item) =>
-  //         item.id === itemId
-  //           ? { ...item, assigneeUid: null, assigneeDisplayName: null }
-  //           : item
-  //       )
-  //     );
-  //   }
-  // };
+    try {
+      // 1. Update Firestore document via Cloud Function
+      await assignActionItem(conversationId, itemId, participant.uid, participant.displayName);
+      console.log('[ActionItemsModal] Assignment successful');
+      
+      // 2. Invalidate cache so next open fetches fresh data
+      // Note: Don't reload here - optimistic update already shows the change
+      // Reloading would trigger "Scanning for action items..." which is bad UX
+      await invalidateActionItemsCache(conversationId);
+      console.log('[ActionItemsModal] Cache invalidated - fresh data on next open');
+    } catch (err: any) {
+      console.error('[ActionItemsModal] Assign error:', err);
+      Alert.alert('Error', err.message || 'Failed to assign task. Please try again.');
+      // Revert on error
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === itemId
+            ? { ...item, assigneeUid: null, assigneeDisplayName: null }
+            : item
+        )
+      );
+    }
+  };
 
   const handleClose = () => {
     setItems([]);
@@ -197,6 +204,8 @@ export function ActionItemsModal({
     setShowAssignPicker(false);
     setItemToAssign(null);
     itemToAssignRef.current = null;
+    setIsAdmin(false);
+    setWorkspaceId(undefined);
     onClose();
   };
 
@@ -264,16 +273,6 @@ export function ActionItemsModal({
                       {item.text}
                     </Text>
 
-                    {item.assigneeDisplayName && (
-                      <View style={styles.assigneeContainer}>
-                        <Text style={styles.assigneeIcon}>👤</Text>
-                        <Text style={styles.assigneeText}>
-                          {item.assigneeDisplayName}
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* PHASE 4: Uncomment assign button when implementing workspaces
                     {item.assigneeDisplayName ? (
                       <View style={styles.assigneeContainer}>
                         <Text style={styles.assigneeIcon}>👤</Text>
@@ -281,15 +280,14 @@ export function ActionItemsModal({
                           {item.assigneeDisplayName}
                         </Text>
                       </View>
-                    ) : (
+                    ) : isAdmin && workspaceId ? (
                       <TouchableOpacity
                         onPress={() => handleAssignPress(item.id)}
                         style={styles.assignButton}
                       >
                         <Text style={styles.assignButtonText}>➕ Assign</Text>
                       </TouchableOpacity>
-                    )}
-                    */}
+                    ) : null}
 
                     {item.dueDate && (
                       <View style={styles.dueDateContainer}>
@@ -331,7 +329,7 @@ export function ActionItemsModal({
           />
         )}
 
-        {/* PHASE 4: Uncomment assignment picker modal when implementing workspaces
+        {/* Assignment Picker Modal */}
         <Modal
           visible={showAssignPicker}
           transparent
@@ -390,7 +388,6 @@ export function ActionItemsModal({
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
-        */}
       </View>
     </Modal>
   );

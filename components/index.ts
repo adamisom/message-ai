@@ -8,6 +8,7 @@ export { SummaryModal } from './SummaryModal';
 // Phase 4: Paid Tier Components
 export { ProfileButton } from './ProfileButton';
 export { TrialBanner } from './TrialBanner';
+export { TrialWorkspaceModal } from './TrialWorkspaceModal';
 export { UpgradeToProModal } from './UpgradeToProModal';
 
 // Core Components
