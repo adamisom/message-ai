@@ -12,7 +12,7 @@
 
 **Last Updated:** October 26, 2025  
 **Current Branch:** `PaidTier`  
-**Overall Status:** Sub-Phases 1-6 Complete ✅ | Sub-Phases 7+ Pending ❌
+**Overall Status:** Sub-Phases 1-6 Complete ✅ | Sub-Phase 6.5 In Planning 📋 | Sub-Phases 7+ Pending ❌
 
 ### ✅ Completed (Sub-Phases 1-6)
 
@@ -66,8 +66,9 @@
 **Note:** Invitations apply to:
 
 - Workspace membership (always requires invitation) ✅
-- Group chats outside workspaces (requires invitation) ❌ Not yet implemented
+- Group chats outside workspaces (requires invitation) ❌ To be implemented in Sub-Phase 6.5
 - Group chats within workspaces: NO invitation needed (any member can add others directly) N/A
+- Direct messages: NO invitation needed (anyone can start a direct message with anyone) N/A
 
 **Sub-Phase 5: Workspace Chats**
 
@@ -92,6 +93,15 @@
   3. Workspace member (for workspace chat) → AI access in that workspace
   4. None of above → upgrade required
 - ✅ Comprehensive unit tests for AI access helpers (`functions/src/utils/__tests__/aiAccessHelpers.test.ts`)
+
+**Sub-Phase 6.5: Group Chat Member Management & Invitations**
+
+- ❌ Add member functionality (instant add by email)
+- ❌ Convert to invitation system (accept/decline/spam reporting)
+- ❌ Direct message spam reporting (5 reports/month threshold)
+- ❌ Unified invitations screen (workspace + group chat)
+
+**📄 Detailed Requirements:** See [PRD-SUPPLEMENT-SUB-PHASE-6.5-GROUP-CHAT-INVITES.md](./PRD-SUPPLEMENT-SUB-PHASE-6.5-GROUP-CHAT-INVITES.md)
 
 **UI/UX Improvements (Throughout Sub-Phases 1-6)**
 
@@ -122,7 +132,14 @@
   - Result: Trial/subscription status now correctly updates on reload
   - See commits `a6ab4c2`, `fb179ce`, `8cdf204` for implementation details
 
-### ❌ Not Yet Implemented (Sub-Phases 7+)
+### ❌ Not Yet Implemented (Sub-Phases 6.5+)
+
+**Sub-Phase 6.5: Group Chat Member Management & Invitations** (See [detailed plan](./PRD-SUPPLEMENT-SUB-PHASE-6.5-GROUP-CHAT-INVITES.md))
+
+- ❌ Add member functionality for non-workspace group chats
+- ❌ Group chat invitation system (accept/decline/spam reporting)
+- ❌ Direct message spam reporting (5 reports/month threshold)
+- ❌ Unified invitations screen (workspace + group chat invitations)
 
 **Sub-Phase 7: Workspace Admin Features**
 
@@ -133,13 +150,13 @@
 
 **📄 Detailed Requirements:** See [PRD-SUPPLEMENT-SUB-PHASE-7-WORKSPACE-ADMIN.md](./PRD-SUPPLEMENT-SUB-PHASE-7-WORKSPACE-ADMIN.md)
 
-**Sub-Phase 8: Spam Prevention**
+**Sub-Phase 8: Spam Prevention Extensions**
 
-- ❌ Spam reporting for group chat invitations (non-workspace)
-- ❌ Spam reporting for unwanted messages
+- ❌ Enhanced spam reporting UI (warnings at 3, 4 strikes)
+- ❌ Spam strike decay notifications
 - ❌ Spam appeal Cloud Function (Enterprise tier)
 
-**Note:** Workspace invitation spam reporting is **already complete** (implemented in Sub-Phase 4), including strike tracking, 1-month decay, automatic ban on 5 strikes, and blocking workspace/group creation for banned users.
+**Note:** Core spam prevention (workspace invitations, group chat invitations, direct message spam) is implemented in Sub-Phases 4 and 6.5. Sub-Phase 8 adds polish and appeal mechanisms.
 
 **Sub-Phase 9: Production Sign-In**
 
