@@ -1,248 +1,249 @@
 # MessageAI - Source Code Metrics
 
-**Generated:** October 26, 2025
-
-## Summary
-
-- **Total Source Files:** 90 files
-- **Total Lines (with comments & blanks):** 12,177 lines
-- **Code Only (excluding comments & blank lines):** ~9,525 lines
-- **Average Lines per File:** 135 lines
-
-**Scope:** All TypeScript/JavaScript source files, excluding:
-- Test files (`__tests__/`, `*.test.*`, `*.spec.*`)
-- Node modules (`node_modules/`)
-- Build artifacts (`lib/`)
+**Generated:** October 26, 2025  
+**Tool:** [cloc v2.06](https://github.com/AlDanial/cloc) (Count Lines of Code)
 
 ---
 
-## Files by Line Count (Largest First)
+## Summary (Source Code Only, Excluding Tests)
 
-| Lines | File |
-|------:|------|
-| 1,052 | `./app/chat/[id].tsx` |
-| 539 | `./components/ActionItemsModal.tsx` |
-| 397 | `./components/MeetingSchedulerModal.tsx` |
-| 357 | `./scripts/populateTestData.js` |
-| 350 | `./scripts/deleteData.js` |
-| 338 | `./app/(tabs)/new-chat.tsx` |
-| 316 | `./components/SearchModal.tsx` |
-| 302 | `./functions/src/utils/aiTools.ts` |
-| 291 | `./functions/src/ai/embeddings.ts` |
-| 286 | `./scripts/createPerformanceTestData.js` |
-| 271 | `./components/MessageBubble.tsx` |
-| 270 | `./app/(auth)/register.tsx` |
-| 249 | `./app/(auth)/login.tsx` |
-| 240 | `./services/aiService.ts` |
-| 240 | `./app/(tabs)/index.tsx` |
-| 225 | `./functions/src/ai/actionItems.ts` |
-| 224 | `./components/SummaryModal.tsx` |
-| 217 | `./components/ErrorFallback.tsx` |
-| 217 | `./components/DecisionsModal.tsx` |
-| 208 | `./components/AIFeaturesMenu.tsx` |
-| 203 | `./services/firestoreService.ts` |
-| 193 | `./functions/src/ai/proactiveMeeting.ts` |
-| 192 | `./services/authService.ts` |
-| 187 | `./components/ConversationItem.tsx` |
-| 181 | `./components/MessageList.tsx` |
-| 180 | `./scripts/testMessageBurst.js` |
-| 170 | `./components/GroupParticipantsModal.tsx` |
-| 168 | `./utils/timeFormat.ts` |
-| 157 | `./components/MessageInput.tsx` |
-| 148 | `./scripts/reEmbed.js` |
-| 143 | `./functions/src/utils/conversationHelpers.ts` |
-| 133 | `./functions/src/ai/search.ts` |
-| 125 | `./scripts/addSchedulingMessagesAuto.js` |
-| 124 | `./functions/src/ai/decisions.ts` |
-| 123 | `./scripts/cleanupPerformanceTestData.js` |
-| 122 | `./functions/src/ai/summarization.ts` |
-| 120 | `./app/_layout.tsx` |
-| 118 | `./types/index.ts` |
-| 117 | `./functions/src/ai/priority.ts` |
-| 115 | `./scripts/addSchedulingMessages.js` |
-| 112 | `./utils/errorLogger.ts` |
-| 110 | `./services/aiCacheService.ts` |
-| 109 | `./styles/commonModalStyles.ts` |
-| 107 | `./scripts/viewDebugLogs.js` |
-| 106 | `./hooks/useAIFeature.ts` |
-| 95 | `./services/failedMessagesService.ts` |
-| 94 | `./utils/validators.ts` |
-| 84 | `./utils/errorTranslator.ts` |
-| 81 | `./services/notificationService.ts` |
-| 80 | `./scripts/checkEmbeddings.js` |
-| 77 | `./scripts/clearAICache.js` |
-| 76 | `./store/authStore.ts` |
-| 73 | `./functions/src/utils/rateLimit.ts` |
-| 73 | `./functions/src/utils/anthropic.ts` |
-| 71 | `./components/ErrorBoundary.tsx` |
-| 65 | `./components/UserStatusBadge.tsx` |
-| 63 | `./functions/src/utils/pinecone.ts` |
-| 55 | `./scripts/clearDebugLogs.js` |
-| 55 | `./functions/src/utils/validation.ts` |
-| 49 | `./utils/featureFlags.ts` |
-| 49 | `./firebase.config.ts` |
-| 48 | `./components/OfflineBanner.tsx` |
-| 47 | `./utils/conversationHelpers.ts` |
-| 47 | `./app/index.tsx` |
-| 45 | `./functions/src/utils/security.ts` |
-| 40 | `./components/TypingIndicator.tsx` |
-| 39 | `./store/chatStore.ts` |
-| 39 | `./functions/src/utils/caching.ts` |
-| 38 | `./utils/colors.ts` |
-| 38 | `./functions/src/utils/priorityHeuristics.ts` |
-| 37 | `./services/presenceService.ts` |
-| 36 | `./functions/jest.config.js` |
-| 35 | `./app/(tabs)/_layout.tsx` |
-| 34 | `./functions/.eslintrc.js` |
-| 33 | `./utils/constants.ts` |
-| 33 | `./functions/src/utils/openai.ts` |
-| 33 | `./components/modals/ErrorState.tsx` |
-| 31 | `./utils/dateFormat.ts` |
-| 29 | `./jest.config.js` |
-| 27 | `./utils/colorHelpers.ts` |
-| 25 | `./components/modals/LoadingState.tsx` |
-| 25 | `./components/modals/EmptyState.tsx` |
-| 24 | `./functions/src/index.ts` |
-| 23 | `./components/modals/ModalHeader.tsx` |
-| 21 | `./app/(auth)/_layout.tsx` |
-| 17 | `./components/index.ts` |
-| 15 | `./functions/src/utils/timeout.ts` |
-| 14 | `./.expo/types/router.d.ts` |
-| 10 | `./eslint.config.js` |
-| 2 | `./expo-env.d.ts` |
+| Metric | Value |
+|--------|------:|
+| **Total Files** | 91 |
+| **Total Lines** | 12,248 |
+| **Code Lines** | 9,403 (77%) |
+| **Comment Lines** | 1,378 (11%) |
+| **Blank Lines** | 1,467 (12%) |
+| **TypeScript Files** | 75 files, 7,935 lines |
+| **JavaScript Files** | 15 files, 1,405 lines |
+| **Firestore Rules** | 1 file, 63 lines |
+
+**Code Density:** 77% code, 23% comments + whitespace
 
 ---
 
-## Top 10 Largest Files
+## Language Breakdown (Source Code)
 
-1. **app/chat/[id].tsx** (1,052 lines) - Main chat screen with messaging, pagination, AI features
-2. **components/ActionItemsModal.tsx** (539 lines) - Action items extraction and management UI
-3. **components/MeetingSchedulerModal.tsx** (397 lines) - Smart meeting time suggestions UI
-4. **scripts/populateTestData.js** (357 lines) - Test data generation script
-5. **scripts/deleteData.js** (350 lines) - Data cleanup utility
-6. **app/(tabs)/new-chat.tsx** (338 lines) - New chat creation (direct + group)
-7. **components/SearchModal.tsx** (316 lines) - Semantic search UI
-8. **functions/src/utils/aiTools.ts** (302 lines) - AI tool definitions for Claude
-9. **functions/src/ai/embeddings.ts** (291 lines) - Embedding generation pipeline
-10. **scripts/createPerformanceTestData.js** (286 lines) - Performance test data script
-
----
-
-## Breakdown by Category
-
-### Frontend (App & Components)
-- **App Screens:** 2,336 lines (7 files)
-- **Components:** 3,116 lines (21 files)
-- **Services:** 921 lines (6 files)
-- **Stores:** 115 lines (2 files)
-- **Utils:** 568 lines (10 files)
-- **Styles:** 109 lines (1 file)
-- **Hooks:** 106 lines (1 file)
-- **Types:** 118 lines (1 file)
-
-**Frontend Subtotal:** ~7,389 lines
-
-### Backend (Cloud Functions)
-- **AI Features:** 1,174 lines (7 files)
-- **Utils:** 601 lines (12 files)
-- **Index:** 24 lines (1 file)
-
-**Backend Subtotal:** ~1,799 lines
-
-### Scripts & Config
-- **Scripts:** 2,231 lines (13 files)
-- **Config:** 110 lines (4 files)
-
-**Scripts Subtotal:** ~2,341 lines
-
----
-
-## Commands to Reproduce
-
-### Count All Source Files (Excluding Tests)
-```bash
-find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \) \
-  ! -path "*/node_modules/*" \
-  ! -path "*/__tests__/*" \
-  ! -path "*/lib/*" \
-  ! -name "*.test.*" \
-  ! -name "*.spec.*" \
-  | wc -l
+```
+-------------------------------------------------------------------------------
+Language                     files          blank        comment           code
+-------------------------------------------------------------------------------
+TypeScript                      75           1138           1168           7935
+JavaScript                      15            317            210           1405
+Snakemake                        1             12              0             63
+-------------------------------------------------------------------------------
+SUM:                            91           1467           1378           9403
+-------------------------------------------------------------------------------
 ```
 
-### Get Line Counts Sorted by Size
-```bash
-find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \) \
-  ! -path "*/node_modules/*" \
-  ! -path "*/__tests__/*" \
-  ! -path "*/lib/*" \
-  ! -name "*.test.*" \
-  ! -name "*.spec.*" \
-  -exec wc -l {} + \
-  | sort -rn
+---
+
+## Top 20 Largest Source Files
+
+| Lines | Blank | Comment | Code | File |
+|------:|------:|--------:|-----:|------|
+| 1,052 | 167 | 104 | 781 | `./app/chat/[id].tsx` |
+| 397 | 29 | 0 | 368 | `./components/MeetingSchedulerModal.tsx` |
+| 539 | 33 | 177 | 329 | `./components/ActionItemsModal.tsx` |
+| 338 | 31 | 6 | 301 | `./app/(tabs)/new-chat.tsx` |
+| 316 | 22 | 8 | 286 | `./components/SearchModal.tsx` |
+| 357 | 45 | 36 | 276 | `./scripts/populateTestData.js` |
+| 302 | 23 | 24 | 255 | `./functions/src/utils/aiTools.ts` |
+| 271 | 18 | 4 | 249 | `./components/MessageBubble.tsx` |
+| 270 | 18 | 7 | 245 | `./app/(auth)/register.tsx` |
+| 350 | 67 | 54 | 229 | `./scripts/deleteData.js` |
+| 249 | 17 | 7 | 225 | `./app/(auth)/login.tsx` |
+| 286 | 38 | 30 | 218 | `./scripts/createPerformanceTestData.js` |
+| 224 | 14 | 0 | 210 | `./components/SummaryModal.tsx` |
+| 291 | 43 | 39 | 209 | `./functions/src/ai/embeddings.ts` |
+| 217 | 14 | 0 | 203 | `./components/DecisionsModal.tsx` |
+| 217 | 14 | 10 | 193 | `./components/ErrorFallback.tsx` |
+| 240 | 32 | 24 | 184 | `./app/(tabs)/index.tsx` |
+| 208 | 12 | 17 | 179 | `./components/AIFeaturesMenu.tsx` |
+| 225 | 31 | 15 | 179 | `./functions/src/ai/actionItems.ts` |
+| 187 | 18 | 8 | 161 | `./components/ConversationItem.tsx` |
+
+---
+
+## Test Files Summary
+
+| Metric | Value |
+|--------|------:|
+| **Total Test Files** | 23 |
+| **Total Lines** | 4,359 |
+| **Code Lines** | 3,270 (75%) |
+| **Comment Lines** | 245 (6%) |
+| **Blank Lines** | 844 (19%) |
+
+**Note:** Tests have lower comment density (6% vs 11% in source) as they are more code-focused.
+
+---
+
+## Top 15 Largest Test Files
+
+| Lines | Blank | Comment | Code | File |
+|------:|------:|--------:|-----:|------|
+| 363 | 76 | 8 | 279 | `./services/__tests__/failedMessagesService.test.ts` |
+| 304 | 70 | 15 | 219 | `./utils/__tests__/errorLogger.test.ts` |
+| 262 | 41 | 22 | 199 | `./functions/src/__tests__/integration/caching.integration.test.ts` |
+| 292 | 71 | 27 | 194 | `./components/__tests__/MessageList.burst.test.tsx` |
+| 250 | 52 | 6 | 192 | `./utils/__tests__/timeFormat.smart-dates.test.ts` |
+| 252 | 48 | 20 | 184 | `./app/__tests__/chat.pagination.test.ts` |
+| 251 | 66 | 4 | 181 | `./functions/src/__tests__/conversationHelpers.test.ts` |
+| 228 | 37 | 10 | 181 | `./store/__tests__/chatStore.test.ts` |
+| 209 | 34 | 6 | 169 | `./utils/__tests__/validators.test.ts` |
+| 211 | 41 | 5 | 165 | `./utils/__tests__/conversationHelpers.test.ts` |
+| 238 | 43 | 31 | 164 | `./functions/src/__tests__/integration/rateLimit.integration.test.ts` |
+| 212 | 32 | 19 | 161 | `./functions/src/__tests__/integration/security.integration.test.ts` |
+| 193 | 40 | 5 | 148 | `./utils/__tests__/errorTranslator.test.ts` |
+| 180 | 32 | 26 | 122 | `./scripts/testMessageBurst.js` |
+| 146 | 27 | 3 | 116 | `./functions/src/ai/__tests__/actionItems.test.ts` |
+
+---
+
+## Combined Totals (Source + Tests)
+
+```
+-------------------------------------------------------------------------------
+Language                     files          blank        comment           code
+-------------------------------------------------------------------------------
+TypeScript                      97           1950           1387          11083
+JavaScript                      16            349            236           1527
+Snakemake                        1             12              0             63
+-------------------------------------------------------------------------------
+SUM:                           114           2311           1623          12673
+-------------------------------------------------------------------------------
 ```
 
-### Count Lines Excluding Comments & Blank Lines
-```bash
-find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \) \
-  ! -path "*/node_modules/*" \
-  ! -path "*/__tests__/*" \
-  ! -path "*/lib/*" \
-  ! -name "*.test.*" \
-  ! -name "*.spec.*" \
-  -exec cat {} + \
-  | grep -v '^\s*\/\/' \
-  | grep -v '^\s*\*' \
-  | grep -v '^\s*$' \
-  | wc -l
-```
+| Metric | Source | Tests | Total |
+|--------|-------:|------:|------:|
+| **Files** | 91 | 23 | 114 |
+| **Code Lines** | 9,403 | 3,270 | 12,673 |
+| **Comment Lines** | 1,378 | 245 | 1,623 |
+| **Blank Lines** | 1,467 | 844 | 2,311 |
+| **Total Lines** | 12,248 | 4,359 | 16,607 |
 
-**Note:** The comment-stripping command is approximate. It removes:
-- Lines starting with `//` (single-line comments)
-- Lines starting with `*` (multi-line comment content)
-- Blank lines
+**Test Coverage:** 3,270 lines of test code for 9,403 lines of source (35% ratio)
 
-It does NOT remove inline comments (e.g., `const x = 5; // comment`), so the actual code-only count may be slightly lower.
+---
+
+## Breakdown by Component Type
+
+### Frontend (7,935 TypeScript lines)
+- **App Screens:** 1,862 lines (5 main screens)
+- **Components:** 3,668 lines (27 components including AI modals)
+- **Services:** 644 lines (7 services)
+- **Stores:** 83 lines (2 Zustand stores)
+- **Utils:** 547 lines (11 utility modules)
+- **Styles/Hooks/Types:** 1,131 lines
+
+### Backend (1,405 TypeScript + 122 JS = 1,527 lines)
+- **AI Features:** 906 lines (7 Cloud Functions)
+- **Utils:** 399 lines (12 utility modules)
+- **Config/Setup:** 222 lines
+
+### Scripts (1,283 JavaScript lines)
+- **Test Data:** 624 lines (3 scripts)
+- **Performance Testing:** 340 lines (3 scripts)
+- **Utilities:** 319 lines (7 scripts)
 
 ---
 
 ## Analysis
 
 ### Largest Component
-**chat/[id].tsx** is by far the largest file (1,052 lines), containing:
-- Message fetching & pagination logic
+**`chat/[id].tsx`** (781 code lines, 1,052 total) is the heart of the app:
+- Message fetching & pagination
 - Real-time listeners (messages, typing, presence)
-- AI features integration (6 modals)
-- Message send/retry/delete
-- Scroll management
+- 6 AI feature integrations
+- Message send/retry/delete with error handling
+- Scroll management for inverted FlatList
 - Read receipt calculations
 
-**Recommendation:** Consider refactoring into smaller modules.
+**Recommendation:** Well-structured for a main screen, but consider extracting pagination logic (~150 lines) into a custom hook.
 
 ### AI Features
-The 6 AI modals total **2,195 lines**:
-- ActionItemsModal: 539 lines
-- MeetingSchedulerModal: 397 lines
-- SearchModal: 316 lines
-- SummaryModal: 224 lines
-- DecisionsModal: 217 lines
-- AIFeaturesMenu: 208 lines (not a modal, but AI UI)
+6 AI modals total **1,670 code lines**:
+- ActionItemsModal: 329 lines
+- MeetingSchedulerModal: 368 lines
+- SearchModal: 286 lines
+- SummaryModal: 210 lines
+- DecisionsModal: 203 lines
+- AIFeaturesMenu: 179 lines
+- ErrorFallback: 193 lines
 
-### Scripts
-13 utility scripts total **2,231 lines**, mostly for:
-- Test data generation/cleanup
-- Data manipulation
-- Performance testing
-- Development utilities
+### Test Quality
+- **265 total tests** (mentioned in README)
+- **3,270 lines of test code** (35% of source code)
+- Comprehensive coverage of:
+  - Error handling (53 tests, 646 lines)
+  - Backend integration (199 + 164 + 161 = 524 lines)
+  - Component logic (194 + 184 = 378 lines)
+  - Utility functions (192 + 169 + 148 = 509 lines)
 
-### Code Density
-- **Total lines:** 12,177
-- **Code-only:** ~9,525 (78%)
-- **Comments & whitespace:** ~2,652 (22%)
+### Code Quality Metrics
+- **77% code density** (23% comments/whitespace) - Excellent balance
+- **11% comment ratio** in source - Well-documented
+- **6% comment ratio** in tests - Appropriate (tests are self-documenting)
+- **Low comment ratio** in AI modals (0-8%) - Could use more inline docs
 
-This indicates good code documentation with ~22% comments/whitespace, which is healthy for maintainability.
+---
+
+## Commands to Reproduce
+
+### Install cloc (macOS)
+```bash
+brew install cloc
+```
+
+### Source Code Metrics (Excluding Tests)
+```bash
+cloc . \
+  --exclude-dir=node_modules,lib,.expo \
+  --exclude-ext=json,lock,md,txt,yml,yaml \
+  --not-match-f='test|spec' \
+  --quiet
+```
+
+### Source Code by File (Sorted by Code Lines)
+```bash
+cloc . \
+  --exclude-dir=node_modules,lib,.expo \
+  --exclude-ext=json,lock,md,txt,yml,yaml \
+  --not-match-f='test|spec' \
+  --by-file \
+  --quiet
+```
+
+### Test Files Only
+```bash
+cloc . \
+  --exclude-dir=node_modules,lib,.expo \
+  --exclude-ext=json,lock,md,txt,yml,yaml \
+  --match-f='test|spec' \
+  --by-file \
+  --quiet
+```
+
+### All Files (Source + Tests)
+```bash
+cloc . \
+  --exclude-dir=node_modules,lib,.expo \
+  --exclude-ext=json,lock,md,txt,yml,yaml \
+  --quiet
+```
+
+---
+
+## Key Takeaways
+
+1. **Total Codebase:** 12,673 lines of actual code (excluding comments/blanks)
+2. **Source Code:** 9,403 lines across 91 files
+3. **Test Code:** 3,270 lines across 23 files (35% ratio - excellent!)
+4. **TypeScript Dominance:** 87% of codebase (11,083 / 12,673)
+5. **Well-Documented:** 11% comment ratio in source code
+6. **Balanced Architecture:** Frontend (74%), Backend (14%), Scripts (12%)
 
 ---
 
 **Last Updated:** October 26, 2025
-
