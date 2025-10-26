@@ -6,7 +6,9 @@
 
 ### Sunday 10/26
 
-my real test user is <adamisom@hey.com> with display name "adam3-Hey"
+5:55pm sub-phases 4-6 of phase4-paid-tier are implemented but not yet tested (whereas sub-phases 1-3 have had basic manual testing)
+
+4:00pm my real test user is <adamisom@hey.com> with display name "adam3-Hey"
 
 ### Saturday 10/25
 
