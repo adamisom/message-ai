@@ -89,7 +89,7 @@ export const UpgradeToProModal: React.FC<UpgradeToProModalProps> = ({
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity}
+            </TouchableOpacity>
           </View>
 
           <ScrollView

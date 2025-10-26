@@ -9,14 +9,17 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "eslint app services store utils --ext .ts,.tsx",
+    "lint:functions": "cd functions && npm run lint",
     "type-check": "tsc --noEmit",
+    "type-check:functions": "cd functions && npm run type-check",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:functions": "cd functions && npm test",
     "test:integration": "cd functions && npm run test:integration",
     "validate": "npm run lint && npm run type-check && npm test",
-    "validate:all": "npm run lint && npm run type-check && npm test && npm run test:functions"
+    "validate:all": "npm run lint && npm run type-check && npm test && cd functions && npm run lint && npm run type-check && npm test",
+    "validate:functions": "cd functions && npm run lint && npm run type-check && npm test"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
