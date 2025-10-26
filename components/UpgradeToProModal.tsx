@@ -3,7 +3,7 @@
  * Shows upgrade prompt when free/trial users try to access AI features
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
@@ -12,8 +12,11 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebase.config';
 
 interface UpgradeToProModalProps {
   visible: boolean;
@@ -28,8 +31,10 @@ export const UpgradeToProModal: React.FC<UpgradeToProModalProps> = ({
   trialDaysRemaining,
   reason,
 }) => {
+  const [isUpgrading, setIsUpgrading] = useState(false);
+
   const handleUpgrade = async () => {
-    // MVP: Dummy payment - instant upgrade
+    // MVP: Dummy payment - instant upgrade via Cloud Function
     Alert.alert(
       'Upgrade to Pro',
       'MVP Mode: Instant upgrade (no real payment)\n\nIn production, this would open Stripe payment flow.',
@@ -38,13 +43,25 @@ export const UpgradeToProModal: React.FC<UpgradeToProModalProps> = ({
         {
           text: 'Upgrade Now',
           onPress: async () => {
-            // TODO: Call Cloud Function to upgrade user
-            // For now, just show success
-            Alert.alert(
-              'Success!',
-              'You\'ve been upgraded to Pro! (MVP simulation)',
-              [{ text: 'OK', onPress: onClose }]
-            );
+            setIsUpgrading(true);
+            try {
+              const upgradeToPro = httpsCallable(functions, 'upgradeToPro');
+              const result = await upgradeToPro({});
+              
+              Alert.alert(
+                'Success!',
+                'You\'ve been upgraded to Pro! Refresh to see changes.',
+                [{ text: 'OK', onPress: onClose }]
+              );
+            } catch (error: any) {
+              Alert.alert(
+                'Error',
+                `Failed to upgrade: ${error.message}`,
+                [{ text: 'OK' }]
+              );
+            } finally {
+              setIsUpgrading(false);
+            }
           },
         },
       ]
@@ -133,12 +150,19 @@ export const UpgradeToProModal: React.FC<UpgradeToProModalProps> = ({
 
             {/* CTA Button */}
             <TouchableOpacity
-              style={styles.upgradeButton}
+              style={[styles.upgradeButton, isUpgrading && styles.upgradeButtonDisabled]}
               onPress={handleUpgrade}
               activeOpacity={0.8}
+              disabled={isUpgrading}
             >
-              <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
-              <Ionicons name="arrow-forward" size={20} color="#FFF" />
+              {isUpgrading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <>
+                  <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#FFF" />
+                </>
+              )}
             </TouchableOpacity>
 
             {/* MVP Note */}
@@ -293,6 +317,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginRight: 8,
+  },
+  upgradeButtonDisabled: {
+    opacity: 0.6,
   },
   mvpNote: {
     fontSize: 12,
