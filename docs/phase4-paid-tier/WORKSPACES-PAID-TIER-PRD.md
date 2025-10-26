@@ -132,10 +132,11 @@
 
 **Sub-Phase 8: Spam Prevention**
 
-- ❌ Spam reporting system (beyond invitations)
-- ❌ Strike tracking with decay (already partially implemented for invitations)
-- ❌ Automatic ban on 5 strikes (already implemented for invitation spam)
+- ❌ Spam reporting for group chat invitations (non-workspace)
+- ❌ Spam reporting for unwanted messages
 - ❌ Spam appeal Cloud Function (Enterprise tier)
+
+**Note:** Workspace invitation spam reporting is **already complete** (implemented in Sub-Phase 4), including strike tracking, 1-month decay, automatic ban on 5 strikes, and blocking workspace/group creation for banned users.
 
 **Sub-Phase 9: Production Sign-In**
 
@@ -1938,49 +1939,45 @@ function getInitials(displayName: string): string {
 - Verify pro-rated billing calculations
 - Test payment failure scenarios
 
-### Sub-Phase 8: Spam Prevention (Week 3)
+### Sub-Phase 8: Spam Prevention (Week 3-4)
 
-**Goal:** Implement strike system
+**Goal:** Extend spam reporting beyond workspace invitations
 
-**Tasks:**
+**Status:** ✅ Workspace invitation spam reporting **COMPLETE** in Sub-Phase 4
 
-1. Add spam reporting to invitation flow
-2. Create Cloud Function to increment strikes
-3. Add strike limit enforcement (5 strikes)
-4. Add notification on ban
-5. Block workspace/group chat creation for banned users
+**Already Implemented (Sub-Phase 4):**
 
-**Testing:**
-
-- Report spam invitations
-- Verify strike counter increments
-- Test 5-strike ban
-- Verify banned user can't create workspaces/groups
-
-### Sub-Phase 8: Spam Prevention (Week 3) - ALREADY IMPLEMENTED
-
-**Status:** ✅ Partially Complete (invitation spam reporting done, general spam reporting pending)
-
-**Already Implemented:**
-
-- Spam reporting for workspace invitations (`reportWorkspaceInvitationSpam`)
-- Strike tracking with 1-month decay
-- Automatic ban on 5 strikes
-- Banned users blocked from creating workspaces
+- ✅ Spam reporting for workspace invitations (`reportWorkspaceInvitationSpam`)
+- ✅ Strike tracking with 1-month decay (`spamReportsReceived` array)
+- ✅ Automatic ban on 5 strikes (`spamBanned` flag)
+- ✅ Banned users blocked from creating workspaces
+- ✅ Cloud Function validation and enforcement
+- ✅ UI for reporting spam in invitations screen
 
 **Remaining Work:**
 
-1. Extend spam reporting to general messages/chats (beyond invitations)
-2. Add spam report button in message context menus
-3. Create Cloud Function `reportMessageSpam` (similar to invitation spam)
-4. Add spam appeal Cloud Function (Enterprise tier, future)
+1. **Group Chat Invitations (Non-Workspace):**
+   - Add spam reporting for group chat invitations outside workspaces
+   - Create `reportGroupChatInvitationSpam` Cloud Function
+   - Reuse existing spam strike infrastructure
+   
+2. **Message-Level Spam Reporting:**
+   - Add "Report Spam" option in message context menu
+   - Create `reportMessageSpam` Cloud Function
+   - Apply same strike logic as invitations
+
+3. **Spam Appeal (Future/Enterprise):**
+   - Cloud Function for users to appeal spam bans
+   - Admin review workflow
+   - Grace period considerations
 
 **Testing:**
 
-- Report spam messages in group chats
-- Verify strike counter increments for message spam
-- Test 5-strike ban still works
-- Verify banned user restrictions persist
+- Report spam for group chat invitations (outside workspace)
+- Report individual messages as spam
+- Verify existing workspace invitation spam reporting still works
+- Verify strike counter increments correctly for all spam types
+- Test 5-strike ban enforcement
 
 ### Sub-Phase 9: Production Sign-In (Week 5)
 
@@ -1994,16 +1991,16 @@ function getInitials(displayName: string): string {
    - Integrate Firebase Phone Auth
    - SMS verification flow
    - Link phone number to existing accounts
-   
+
 2. **OAuth Providers:**
    - **LinkedIn OAuth:** For professional teams, easy onboarding
    - **Okta OAuth:** For enterprise customers with existing SSO
-   
+
 3. **Multi-Auth Support:**
    - Allow users to link multiple auth methods
    - Primary email for workspace invitations
    - Unified user profile across auth methods
-   
+
 4. **UI Updates:**
    - Login screen with provider selection
    - "Sign in with LinkedIn" button
@@ -2156,7 +2153,7 @@ function getInitials(displayName: string): string {
    - Submit for TestFlight beta testing
    - Address App Review feedback
    - Submit for production release
-   
+
 2. **Android Play Store:**
    - Create Google Play Console account
    - Prepare store listing (description, graphics, screenshots)
