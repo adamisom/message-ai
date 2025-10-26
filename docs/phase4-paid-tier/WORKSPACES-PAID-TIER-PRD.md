@@ -10,48 +10,106 @@
 
 ## 🎯 Implementation Progress
 
-### ✅ Completed (Sub-Phases 1-3)
+**Last Updated:** October 26, 2025  
+**Current Branch:** `PaidTier`  
+**Overall Status:** Sub-Phases 1-6 Complete ✅ | Sub-Phases 7+ Pending ❌
 
-**Phase 1: Free Trial & Billing Foundation**
+### ✅ Completed (Sub-Phases 1-6)
 
-- ✅ 5-day free trial for new users
-- ✅ Trial initialization Cloud Function (`startFreeTrial`)
-- ✅ Upgrade to Pro Cloud Function (`upgradeToPro`) - MVP mode (no real payments)
+**Sub-Phase 1: Free Trial & Billing Foundation**
+
+- ✅ 5-day free trial for all new users (auto-granted on signup)
+- ✅ Trial tracking fields (`trialStartedAt`, `trialEndsAt`) in user documents
+- ✅ 500 user MVP limit (enforced in `authService.registerUser`)
+- ✅ Mock upgrade flow (instant Pro access without payment)
+- ✅ Trial/Pro status display on profile screen
+- ✅ Cloud Function: `startFreeTrial` (manual trial activation)
+- ✅ Cloud Function: `upgradeToPro` (MVP mode, no real payments)
 - ✅ Trial management script (`manageTrial.js`) for testing
-- ✅ User profile screen with trial/subscription status display
-- ✅ `UpgradeToProModal` with trial and upgrade options
-- ✅ Profile button component in tab navigation
-- ✅ 500 user MVP limit (enforced in `registerUser()`)
+- ✅ `UpgradeToProModal` component with pricing and features
 
-**Phase 2: Workspaces Core**
+**Sub-Phase 2: Workspaces Core**
 
-- ✅ Workspace creation/deletion
-- ✅ Workspace listing screen
-- ✅ Firestore schema for workspaces
+- ✅ Workspace creation (Pro users only, 5 workspace limit per user)
+- ✅ Cloud Function: `createWorkspace` (validation, capacity limits, billing calculation)
+- ✅ Cloud Function: `deleteWorkspace` (cascading delete of conversations, member notifications)
+- ✅ Firestore schema: `workspaces` collection with full billing fields
+- ✅ Security rules: Admin-only write access, member read access
+- ✅ Workspace list screen (`app/(tabs)/workspaces.tsx`)
+- ✅ Workspace settings screen (`app/workspace/[id]/settings.tsx`)
+- ✅ Unique workspace name validation (case-insensitive, per-user)
+- ✅ Workspace switcher UI (current workspace indicator)
 - ✅ Trial users blocked from creating workspaces (`TrialWorkspaceModal`)
-- ✅ Workspace info bar (clickable, conditional for free users)
-- ✅ Security rules for workspaces
 
-**Phase 3: Admin Features**
+**Sub-Phase 3: Admin Features**
 
-- ✅ Action item assignment Cloud Function (`assignActionItem`)
-- ✅ Admin-only action item assignment in `ActionItemsModal`
-- ✅ Workspace admin validation
+- ✅ Member management screen (`app/workspace/[id]/members.tsx`)
+- ✅ Action item assignment to workspace members (admin-only)
+- ✅ Cloud Function: `assignActionItem` (admin validation, Firestore updates)
+- ✅ Member picker modal in ActionItemsModal component
+- ✅ Workspace permissions helper (`utils/workspacePermissions.ts`)
+- ✅ Optimistic UI updates for action item assignment
 
-**UI/UX Improvements**
+**Sub-Phase 4: Invitations System**
+
+- ✅ Workspace invitation Cloud Functions:
+  - `acceptWorkspaceInvitation` (adds member, updates user's workspacesMemberOf)
+  - `declineWorkspaceInvitation` (marks invitation as declined)
+  - `reportWorkspaceInvitationSpam` (increments spam strikes, potential ban)
+- ✅ Invitations management screen (`app/workspace/invitations.tsx`)
+- ✅ Spam strike tracking with 1-month decay
+- ✅ Invitation badge on profile button (upper-left, red, shows count up to 9+)
+- ✅ Notifications section on profile screen (displays pending workspace invitations)
+- ✅ Invitations banner on workspaces list screen
+- ✅ Real-time invitation count updates (30s polling + screen focus refresh)
+
+**Note:** Invitations apply to:
+
+- Workspace membership (always requires invitation) ✅
+- Group chats outside workspaces (requires invitation) ❌ Not yet implemented
+- Group chats within workspaces: NO invitation needed (any member can add others directly) N/A
+
+**Sub-Phase 5: Workspace Chats**
+
+- ✅ Create chats within workspaces (both direct and group)
+- ✅ Workspace chat list view (filtered by workspaceId)
+- ✅ Workspace-scoped conversations (with workspaceId, workspaceName, isWorkspaceChat fields)
+- ✅ Workspace context banner in New Chat screen
+- ✅ Workspace badge indicator on conversation items (building icon)
+- ✅ Filter toggle: Show workspace chats OR non-workspace chats
+- ✅ Empty states for workspace/non-workspace views
+- ✅ Updated conversation creation functions (`createOrOpenConversation`, `createGroupConversation`)
+- ✅ Context persistence across tab navigation
+
+**Sub-Phase 6: AI Feature Gating**
+
+- ✅ Lock AI features for free users in non-workspace chats
+- ✅ Sparkle menu upgrade prompts for free users
+- ✅ Workspace chat AI access for free members (via `canAccessAIFeatures` in Cloud Functions)
+- ✅ Cloud Function AI access logic checks:
+  1. Pro subscriber → full access
+  2. Active trial → full access
+  3. Workspace member (for workspace chat) → AI access in that workspace
+  4. None of above → upgrade required
+- ✅ Comprehensive unit tests for AI access helpers (`functions/src/utils/__tests__/aiAccessHelpers.test.ts`)
+
+**UI/UX Improvements (Throughout Sub-Phases 1-6)**
 
 - ✅ Logout button moved to profile screen (with icon)
 - ✅ Tab title styling improvements (20px, bold)
 - ✅ Workspace create button centered and enlarged
 - ✅ Improved spacing on Chats and Workspaces screens
-- ✅ Bottom nav reordered: Chats | New Chat | Workspaces (Oct 26)
-- ✅ Help modal with refresh button and support info (Oct 26)
-- ✅ "Start Trial" button functionality (direct trial start, no modal) (Oct 26)
-- ✅ All screens use `refreshUserProfile()` for consistent refresh pattern (Oct 26)
+- ✅ Bottom nav reordered: Chats | New Chat | Workspaces
+- ✅ Help modal with refresh button and support info
+- ✅ "Start Trial" button functionality (direct trial start, no modal)
+- ✅ All screens use `refreshUserProfile()` for consistent refresh pattern
+- ✅ Profile button in top-right navigation
+- ✅ Invitation notification badge with count
+- ✅ Workspace banner in conversations list
 
-### 🚧 Known Issues
+### 🐛 Known Issues - RESOLVED
 
-**~Critical: Trial Status Not Updating on App Reload~ ✅ RESOLVED**
+**Critical: Trial Status Not Updating on App Reload ✅ RESOLVED**
 
 - ~~Symptom: Trial/subscription status doesn't persist correctly after app reload~~
 - ~~Root cause: Presence tracking writes interfered with `getUserProfile()` fetch~~
@@ -63,37 +121,6 @@
   - Merge strategy combines cached data with fresh server data
   - Result: Trial/subscription status now correctly updates on reload
   - See commits `a6ab4c2`, `fb179ce`, `8cdf204` for implementation details
-
-### 🚧 Partially Implemented (Sub-Phases 4-6)
-
-**Sub-Phase 4: Invitations System (Workspaces & Group Chats)**
-
-- ✅ Workspace invitation Cloud Functions (`acceptWorkspaceInvitation`, `declineWorkspaceInvitation`, `reportWorkspaceInvitationSpam`)
-- ✅ Invitations management screen (`app/workspace/invitations.tsx`)
-- ✅ Member management UI (`app/workspace/[id]/members.tsx`, `app/workspace/[id]/settings.tsx`)
-- ✅ Spam strike tracking with 1-month decay
-- ✅ **Invitation badge on profile button** (upper left position with count)
-- ✅ **Notifications section on profile screen** (displays pending workspace invitations)
-- ❌ Group chat invitations (non-workspace chats only - workspace members can directly add)
-
-**Note:** Invitations apply to:
-- Workspace membership (always requires invitation) ✅
-- Group chats outside workspaces (requires invitation) ❌
-- Group chats within workspaces: NO invitation needed (any member can add others directly) N/A
-
-**Sub-Phase 5: Workspace Chats**
-
-- ✅ Create chats within workspaces
-- ✅ Workspace chat list view (filtered by workspaceId)
-- ✅ Workspace-scoped conversations (with workspaceId, workspaceName, isWorkspaceChat fields)
-- ✅ Workspace context banner in New Chat screen
-- ✅ Workspace badge indicator on conversation items
-
-**Sub-Phase 6: AI Feature Gating**
-
-- ✅ Lock AI features for free users in non-workspace chats
-- ✅ Sparkle menu upgrade prompts for free users
-- ✅ Workspace chat AI access for free members (via `canAccessAIFeatures` in Cloud Functions)
 
 ### ❌ Not Yet Implemented (Sub-Phases 7+)
 
