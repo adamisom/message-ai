@@ -6,6 +6,7 @@ export { SearchModal } from './SearchModal';
 export { SummaryModal } from './SummaryModal';
 
 // Phase 4: Paid Tier Components
+export { ProfileButton } from './ProfileButton';
 export { TrialBanner } from './TrialBanner';
 export { UpgradeToProModal } from './UpgradeToProModal';
 

@@ -751,6 +751,7 @@ The profile is accessible from **all tab screens** via a circular button in the 
 The User Profile feature is broken down into **4 logical sub-phases** for sequential implementation:
 
 **See [TASK-LIST-PHASE4.md, Appendix A (lines 1067-1293)](./TASK-LIST-PHASE4.md#L1067-L1293) for:**
+
 - Sub-Phase 4.1: Profile Button Component (1-2 hours)
 - Sub-Phase 4.2: Profile Screen Structure (2-3 hours)
 - Sub-Phase 4.3: Feature List & Action Buttons (2-3 hours)
