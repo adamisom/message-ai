@@ -201,42 +201,22 @@ export const getUserProfile = async (
   uid: string
 ): Promise<UserProfile | null> => {
   try {
-    console.log('[getUserProfile] 🌐 Waiting for pending writes to complete...');
     // Wait for any pending writes (like presence updates) to complete
-    // This ensures we get the actual server data, not pending local writes
+    // This ensures we get clean server data without local pending writes interfering
     await waitForPendingWrites(db);
-    console.log('[getUserProfile] ✅ Pending writes complete');
     
     const docRef = doc(db, 'users', uid);
     // Use getDocFromServer to bypass local cache and get fresh data from server
     // This ensures we always get the latest subscription/trial status
-    console.log('[getUserProfile] 🌐 Fetching from SERVER (bypassing cache)...');
     const docSnap = await getDocFromServer(docRef);
 
     if (docSnap.exists()) {
-      const data = docSnap.data();
-      console.log('[getUserProfile] ✅ Got data from server');
-      console.log('[getUserProfile] 📊 FULL DATA DUMP:', JSON.stringify(data, null, 2));
-      console.log('[getUserProfile] Raw data keys (from server):', Object.keys(data).sort());
-      console.log('[getUserProfile] Critical fields:', {
-        isPaidUser: data.isPaidUser,
-        subscriptionTier: data.subscriptionTier,
-        trialUsed: data.trialUsed,
-        hasTrialEndsAt: !!data.trialEndsAt,
-        trialEndsAt: data.trialEndsAt,
-        trialStartedAt: data.trialStartedAt,
-      });
-      console.log('[getUserProfile] Has isPaidUser field?', 'isPaidUser' in data);
-      console.log('[getUserProfile] Has subscriptionTier field?', 'subscriptionTier' in data);
-      console.log('[getUserProfile] Metadata - fromCache?', docSnap.metadata.fromCache);
-      console.log('[getUserProfile] Metadata - hasPendingWrites?', docSnap.metadata.hasPendingWrites);
-      return data as UserProfile;
+      return docSnap.data() as UserProfile;
     }
 
-    console.warn('[getUserProfile] ⚠️ Document does not exist');
     return null;
   } catch (error: any) {
-    console.error('[getUserProfile] ❌ Error fetching profile:', error);
+    console.error('[getUserProfile] Error fetching profile:', error);
     throw new Error('Failed to fetch user profile');
   }
 };
