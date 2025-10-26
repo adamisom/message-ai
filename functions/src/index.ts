@@ -6,27 +6,22 @@ admin.initializeApp();
 
 // Phase 0: Embeddings
 export {
-  batchEmbedMessages,
-  retryFailedEmbeddings,
-  monitorRetryQueue,
-  incrementMessageCounter,
+    batchEmbedMessages, incrementMessageCounter, monitorRetryQueue, retryFailedEmbeddings
 } from './ai/embeddings';
 
 // Phase 1: AI Features
-export {semanticSearch} from './ai/search';
-export {quickPriorityCheckTrigger, batchAnalyzePriority} from './ai/priority';
-export {generateSummary} from './ai/summarization';
-export {extractActionItems} from './ai/actionItems';
-export {trackDecisions} from './ai/decisions';
+export { extractActionItems } from './ai/actionItems';
+export { trackDecisions } from './ai/decisions';
+export { batchAnalyzePriority, quickPriorityCheckTrigger } from './ai/priority';
+export { semanticSearch } from './ai/search';
+export { generateSummary } from './ai/summarization';
 
 // Phase 3: Advanced AI Capability
-export {analyzeMeetingScheduling} from './ai/proactiveMeeting';
+export { analyzeMeetingScheduling } from './ai/proactiveMeeting';
 
 // Phase 4: Workspaces & Paid Tier
 export {
-  createWorkspace,
-  deleteWorkspace,
-  acceptWorkspaceInvitation,
-  reportWorkspaceInvitationSpam,
+    acceptWorkspaceInvitation, createWorkspace,
+    deleteWorkspace, reportWorkspaceInvitationSpam
 } from './workspaces';
 

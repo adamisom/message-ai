@@ -3,8 +3,8 @@
  * Phase 4: Workspaces & Paid Tier
  */
 
-import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import * as functions from 'firebase-functions';
 
 const db = admin.firestore();
 
@@ -314,12 +314,13 @@ export const acceptWorkspaceInvitation = functions.https.onCall(async (data, con
   // 8. Get user info
   const userDoc = await db.collection('users').doc(context.auth.uid).get();
   const user = userDoc.data()!;
+  const currentUserUid = context.auth.uid; // Store for use in transaction
 
   // 9. Add user to workspace in transaction
   await db.runTransaction(async (transaction) => {
     transaction.update(workspaceRef, {
-      members: admin.firestore.FieldValue.arrayUnion(context.auth.uid),
-      [`memberDetails.${context.auth.uid}`]: {
+      members: admin.firestore.FieldValue.arrayUnion(currentUserUid),
+      [`memberDetails.${currentUserUid}`]: {
         displayName: user.displayName,
         email: user.email,
         joinedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -327,7 +328,7 @@ export const acceptWorkspaceInvitation = functions.https.onCall(async (data, con
       },
     });
 
-    transaction.update(db.collection('users').doc(context.auth.uid), {
+    transaction.update(db.collection('users').doc(currentUserUid), {
       workspacesMemberOf: admin.firestore.FieldValue.arrayUnion(invitation.workspaceId),
     });
 
@@ -383,6 +384,7 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
   }
 
   const inviter = inviterDoc.data()!;
+  const reporterUid = context.auth.uid; // Store for use in transaction
 
   // 5. Add spam report and update strikes in transaction
   await db.runTransaction(async (transaction) => {
@@ -400,7 +402,7 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
 
     // Add new report
     activeReports.push({
-      reportedBy: context.auth.uid,
+      reportedBy: reporterUid,
       reason: 'workspace',
       timestamp: now,
       workspaceId: invitation.workspaceId,
