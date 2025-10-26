@@ -18,6 +18,87 @@ import { calculateSubscriptionEndDate } from '../utils/subscriptionHelpers';
 const db = admin.firestore();
 
 /**
+ * Start free trial for user
+ * Grants 5-day trial with full Pro access
+ */
+export const startFreeTrial = functions.https.onCall(async (data, context) => {
+  // 1. Authentication check
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+  console.log(`🔍 Starting trial for user: ${userId}`);
+
+  try {
+    // 2. Get user document
+    const userRef = db.collection('users').doc(userId);
+    const userDoc = await userRef.get();
+
+    console.log(`📄 User doc exists: ${userDoc.exists}`);
+
+    if (!userDoc.exists) {
+      console.error(`❌ User not found: ${userId}`);
+      throw new functions.https.HttpsError('not-found', `User document not found for UID: ${userId}`);
+    }
+
+    const user = userDoc.data()!;
+    console.log(`👤 User data:`, {
+      email: user.email,
+      isPaidUser: user.isPaidUser,
+      trialUsed: user.trialUsed,
+      trialEndsAt: user.trialEndsAt,
+    });
+
+    // 3. Check if already used trial
+    if (user.trialUsed === true) {
+      throw new functions.https.HttpsError('failed-precondition', 'Trial already used');
+    }
+
+    // 4. Check if already Pro
+    if (user.isPaidUser === true) {
+      throw new functions.https.HttpsError('failed-precondition', 'Already a Pro subscriber');
+    }
+
+    // 5. Check if already in trial
+    if (user.trialEndsAt) {
+      const now = Date.now();
+      const trialEndsAt = user.trialEndsAt.toMillis();
+      if (now < trialEndsAt) {
+        throw new functions.https.HttpsError('failed-precondition', 'Already in active trial');
+      }
+    }
+
+    // 6. Start trial
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const trialEndDate = new Date(Date.now() + (5 * 24 * 60 * 60 * 1000)); // 5 days from now
+
+    await userRef.update({
+      trialStartedAt: now,
+      trialEndsAt: admin.firestore.Timestamp.fromDate(trialEndDate),
+      trialUsed: true,
+      updatedAt: now,
+    });
+
+    console.log(`✅ User ${userId} started 5-day trial`);
+
+    return {
+      success: true,
+      message: 'Trial started successfully!',
+      trialEndsAt: trialEndDate.toISOString(),
+      daysRemaining: 5,
+    };
+
+  } catch (error: any) {
+    console.error('Error starting trial:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'Failed to start trial');
+  }
+});
+
+/**
  * Upgrade user to Pro subscription
  * MVP: Instant upgrade (dummy payment)
  */

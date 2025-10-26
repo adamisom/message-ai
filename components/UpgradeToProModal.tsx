@@ -3,24 +3,27 @@
  * Shows upgrade prompt when free/trial users try to access AI features
  */
 
-import React, { useState } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { httpsCallable } from 'firebase/functions';
+import React, { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { functions } from '../firebase.config';
+import { useAuthStore } from '../store/authStore';
 
 interface UpgradeToProModalProps {
   visible: boolean;
   onClose: () => void;
+  onUpgradeSuccess?: () => void;
+  onTrialStart?: () => void;
   trialDaysRemaining?: number;
   reason?: string;
 }
@@ -28,10 +31,17 @@ interface UpgradeToProModalProps {
 export const UpgradeToProModal: React.FC<UpgradeToProModalProps> = ({
   visible,
   onClose,
+  onUpgradeSuccess,
+  onTrialStart,
   trialDaysRemaining,
   reason,
 }) => {
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [isStartingTrial, setIsStartingTrial] = useState(false);
+  const user = useAuthStore((state: any) => state.user);
+
+  // Check if user is eligible for free trial
+  const isTrialEligible = !user?.trialUsed && !trialDaysRemaining;
 
   const handleUpgrade = async () => {
     // MVP: Dummy payment - instant upgrade via Cloud Function
@@ -50,8 +60,14 @@ export const UpgradeToProModal: React.FC<UpgradeToProModalProps> = ({
               
               Alert.alert(
                 'Success!',
-                'You\'ve been upgraded to Pro! Refresh to see changes.',
-                [{ text: 'OK', onPress: onClose }]
+                'You\'ve been upgraded to Pro! 🎉',
+                [{ 
+                  text: 'OK', 
+                  onPress: () => {
+                    onClose();
+                    onUpgradeSuccess?.();
+                  }
+                }]
               );
             } catch (error: any) {
               Alert.alert(
@@ -68,30 +84,62 @@ export const UpgradeToProModal: React.FC<UpgradeToProModalProps> = ({
     );
   };
 
+  const handleStartTrial = async () => {
+    // MVP: Start 5-day trial via Cloud Function
+    Alert.alert(
+      'Start Free Trial',
+      'Start your 5-day free trial with full Pro access?\n\nNo credit card required.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start Trial',
+          onPress: async () => {
+            setIsStartingTrial(true);
+            try {
+              const startFreeTrial = httpsCallable(functions, 'startFreeTrial');
+              const result = await startFreeTrial({});
+              
+              Alert.alert(
+                'Trial Started!',
+                'Enjoy 5 days of full Pro access! 🎉',
+                [{ 
+                  text: 'OK', 
+                  onPress: () => {
+                    onClose();
+                    onTrialStart?.();
+                  }
+                }]
+              );
+            } catch (error: any) {
+              Alert.alert(
+                'Error',
+                `Failed to start trial: ${error.message}`,
+                [{ text: 'OK' }]
+              );
+            } finally {
+              setIsStartingTrial(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const features = [
-    { icon: 'sparkles', text: 'AI Summaries' },
-    { icon: 'checkbox-outline', text: 'Action Item Extraction' },
-    { icon: 'bulb-outline', text: 'Decision Tracking' },
-    { icon: 'search-outline', text: 'Semantic Search' },
-    { icon: 'calendar-outline', text: 'Meeting Scheduler' },
+    { icon: 'checkbox-outline', text: 'Track Action Items & Decisions' },
+    { icon: 'sparkles', text: 'AI Summaries & Semantic Search' },
+    { icon: 'calendar-outline', text: 'Meeting Scheduler & Auto-Detection of Urgent Messages' },
   ];
 
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
           <ScrollView
             style={styles.content}
             contentContainerStyle={styles.contentContainer}
@@ -100,19 +148,13 @@ export const UpgradeToProModal: React.FC<UpgradeToProModalProps> = ({
             {/* Hero Section */}
             <View style={styles.heroSection}>
               <View style={styles.iconContainer}>
-                <Ionicons name="star" size={48} color="#FFD700" />
+                <Ionicons name="star" size={28} color="#FFD700" />
               </View>
               <Text style={styles.title}>Upgrade to Pro</Text>
               
-              {trialDaysRemaining !== undefined && trialDaysRemaining > 0 ? (
-                <Text style={styles.subtitle}>
-                  {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} left in your trial
-                </Text>
-              ) : (
-                <Text style={styles.subtitle}>
-                  Unlock powerful AI features
-                </Text>
-              )}
+              <Text style={styles.subtitle}>
+                Unlock powerful AI features and private workspaces for your team
+              </Text>
             </View>
 
             {/* Reason (if provided) */}
@@ -125,28 +167,22 @@ export const UpgradeToProModal: React.FC<UpgradeToProModalProps> = ({
 
             {/* Features List */}
             <View style={styles.featuresContainer}>
-              <Text style={styles.featuresTitle}>What you'll get:</Text>
+              <Text style={styles.featuresTitle}>AI Features:</Text>
               {features.map((feature, index) => (
                 <View key={index} style={styles.featureItem}>
-                  <Ionicons name={feature.icon as any} size={24} color="#007AFF" />
+                  <Ionicons name={feature.icon as any} size={20} color="#007AFF" />
                   <Text style={styles.featureText}>{feature.text}</Text>
-                  <Ionicons name="checkmark-circle" size={20} color="#34C759" />
+                  <Ionicons name="checkmark-circle" size={16} color="#34C759" />
                 </View>
               ))}
             </View>
 
             {/* Pricing */}
             <View style={styles.pricingContainer}>
-              <Text style={styles.priceAmount}>$9.99</Text>
+              <Text style={styles.priceAmount}>$3</Text>
               <Text style={styles.pricePeriod}>/ month</Text>
             </View>
-
-            {/* Benefits */}
-            <View style={styles.benefitsContainer}>
-              <Text style={styles.benefitItem}>✓ Cancel anytime</Text>
-              <Text style={styles.benefitItem}>✓ Unlimited AI requests</Text>
-              <Text style={styles.benefitItem}>✓ Create up to 5 workspaces</Text>
-            </View>
+            <Text style={styles.cancelAnytime}>Cancel anytime</Text>
 
             {/* CTA Button */}
             <TouchableOpacity
@@ -170,10 +206,47 @@ export const UpgradeToProModal: React.FC<UpgradeToProModalProps> = ({
               MVP Mode: Instant upgrade for testing
             </Text>
 
+            {/* Free Trial Button (if eligible) */}
+            {isTrialEligible && (
+              <>
+                <TouchableOpacity
+                  style={[styles.trialButton, isStartingTrial && styles.trialButtonDisabled]}
+                  onPress={handleStartTrial}
+                  activeOpacity={0.8}
+                  disabled={isStartingTrial}
+                >
+                  {isStartingTrial ? (
+                    <ActivityIndicator color="#007AFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="gift-outline" size={20} color="#007AFF" />
+                      <Text style={styles.trialButtonText}>Start 5-Day Free Trial</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <Text style={styles.trialNote}>
+                  No credit card required
+                </Text>
+              </>
+            )}
+
             {/* Footer */}
             <TouchableOpacity onPress={onClose} style={styles.maybeLaterButton}>
               <Text style={styles.maybeLaterText}>Maybe Later</Text>
             </TouchableOpacity>
+
+            {/* Divider */}
+            <View style={styles.divider} />
+
+            {/* Workspace Features */}
+            <View style={styles.workspaceFeaturesContainer}>
+              <Text style={styles.workspaceFeaturesTitle}>Workspace Features:</Text>
+              <Text style={styles.workspaceFeatureItem}>✓ Create up to 5 private workspaces</Text>
+              <Text style={styles.workspaceFeatureItem}>✓ Invite up to 25 members per workspace</Text>
+              <Text style={styles.workspaceFeatureItem}>✓ Assign action items to your team within chats</Text>
+              <Text style={styles.workspaceFeatureItem}>✓ Edit and save AI-generated text & high-priority markers on messages</Text>
+              <Text style={styles.workspacePricingNote}>50¢ per member per workspace</Text>
+            </View>
           </ScrollView>
         </View>
       </View>
@@ -185,52 +258,46 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40, // Increased padding from 20
   },
   modalContainer: {
     backgroundColor: '#FFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
-    paddingBottom: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-  },
-  closeButton: {
-    padding: 4,
+    borderRadius: 20,
+    width: '100%',
+    maxWidth: 540,
+    maxHeight: '80%', // Add back max height with more breathing room
+    paddingBottom: 4,
   },
   content: {
-    flex: 1,
+    maxHeight: '100%',
   },
   contentContainer: {
-    padding: 24,
+    padding: 20,
+    paddingBottom: 12,
   },
   heroSection: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#FFF9E6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#000',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
   },
@@ -249,63 +316,78 @@ const styles = StyleSheet.create({
     color: '#007AFF',
   },
   featuresContainer: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   featuresTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#000',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
   featureText: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
+    marginLeft: 10,
+    fontSize: 13,
     color: '#333',
   },
   pricingContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 4,
   },
   priceAmount: {
-    fontSize: 48,
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#007AFF',
   },
   pricePeriod: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#666',
     marginLeft: 4,
   },
-  benefitsContainer: {
-    backgroundColor: '#F8F8F8',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 24,
+  cancelAnytime: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginBottom: 16,
   },
-  benefitItem: {
+  workspaceFeaturesContainer: {
+    marginBottom: 4,
+  },
+  workspaceFeaturesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 10,
+  },
+  workspaceFeatureItem: {
     fontSize: 14,
     color: '#333',
     marginBottom: 8,
   },
+  workspacePricingNote: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
   upgradeButton: {
     flexDirection: 'row',
     backgroundColor: '#007AFF',
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
     shadowColor: '#007AFF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -322,19 +404,59 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   mvpNote: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#999',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  trialButton: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF',
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  trialButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  trialButtonDisabled: {
+    opacity: 0.6,
+  },
+  trialNote: {
+    fontSize: 11,
+    color: '#999',
+    textAlign: 'center',
+    marginBottom: 12,
     fontStyle: 'italic',
   },
   maybeLaterButton: {
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#DDD',
+    borderRadius: 8,
+    backgroundColor: '#FAFAFA',
   },
   maybeLaterText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
+    fontWeight: '500',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E5E5',
+    marginBottom: 16,
   },
 });
 

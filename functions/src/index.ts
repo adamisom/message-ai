@@ -21,10 +21,10 @@ export { analyzeMeetingScheduling } from './ai/proactiveMeeting';
 
 // Phase 4: Workspaces & Paid Tier
 export {
-     acceptWorkspaceInvitation, createWorkspace,
-     deleteWorkspace, reportWorkspaceInvitationSpam
+    acceptWorkspaceInvitation, createWorkspace,
+    deleteWorkspace, reportWorkspaceInvitationSpam
 } from './workspaces';
 
 // Phase 4: Billing (MVP dummy payment)
-export { upgradeToPro, downgradeToFree } from './billing';
+export { downgradeToFree, startFreeTrial, upgradeToPro } from './billing';
 

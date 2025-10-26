@@ -56,7 +56,7 @@ export function AIFeaturesMenu({
     // Phase 4: Check AI access before allowing feature
     if (!canAccessAI) {
       onClose();
-      setTimeout(onUpgradeRequired, 100);
+      setTimeout(onUpgradeRequired, 300); // Increased delay for modal transition
       return;
     }
 
@@ -91,10 +91,18 @@ export function AIFeaturesMenu({
 
           {/* Phase 4: Access locked banner (if no access) */}
           {!canAccessAI && (
-            <View style={styles.lockedBanner}>
+            <TouchableOpacity 
+              style={styles.lockedBanner}
+              onPress={() => {
+                onClose();
+                setTimeout(onUpgradeRequired, 300); // Increased delay for modal transition
+              }}
+              activeOpacity={0.7}
+            >
               <Text style={styles.lockedIcon}>🔒</Text>
               <Text style={styles.lockedText}>Upgrade to Pro to unlock AI features</Text>
-            </View>
+              <Text style={styles.lockedArrow}>›</Text>
+            </TouchableOpacity>
           )}
 
           <TouchableOpacity
@@ -259,15 +267,24 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginVertical: 8,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
   },
   lockedIcon: {
     fontSize: 16,
     marginRight: 8,
   },
   lockedText: {
+    flex: 1,
     fontSize: 13,
     color: '#F57C00',
     fontWeight: '500',
+  },
+  lockedArrow: {
+    fontSize: 20,
+    color: '#F57C00',
+    fontWeight: '600',
+    marginLeft: 4,
   },
 });
 

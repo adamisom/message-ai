@@ -16,14 +16,26 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { UpgradeToProModal } from '../../components/UpgradeToProModal';
+import { getUserProfile } from '../../services/authService';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { Workspace } from '../../types';
 import { Colors } from '../../utils/colors';
 
+// Helper to check if user is in active trial
+function isInTrial(user: any): boolean {
+  if (!user?.trialEndsAt) return false;
+  const now = Date.now();
+  const trialEndsAt = typeof user.trialEndsAt === 'number'
+    ? user.trialEndsAt
+    : user.trialEndsAt.toMillis?.() || 0;
+  return now < trialEndsAt;
+}
+
 export default function WorkspacesScreen() {
   const router = useRouter();
-  const user = useAuthStore((state: any) => state.user);
+  const { user, setUser } = useAuthStore();
   const {
     workspaces,
     loading: isLoading,
@@ -33,6 +45,7 @@ export default function WorkspacesScreen() {
   } = useWorkspaceStore();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
     if (user?.uid) {
@@ -55,10 +68,10 @@ export default function WorkspacesScreen() {
   };
 
   const handleCreateWorkspace = () => {
-    // Check if user is Pro
-    if (!user?.isPaidUser) {
-      // Show upgrade modal (would be implemented)
-      alert('Pro subscription required to create workspaces');
+    // Check if user is Pro or in trial
+    if (!user?.isPaidUser && !isInTrial(user)) {
+      // Show upgrade modal
+      setShowUpgradeModal(true);
       return;
     }
 
@@ -157,20 +170,63 @@ export default function WorkspacesScreen() {
         </View>
       )}
 
-      {/* Info Box */}
-      <View style={styles.infoBox}>
-        <Ionicons name="information-circle" size={20} color={Colors.primary} />
-        <View style={styles.infoTextContainer}>
-          <Text style={styles.infoText}>
-            Workspaces give your team shared chats with full AI features
-          </Text>
-          <Text style={styles.infoSubtext}>
-            {user?.isPaidUser
-              ? `You can create up to 5 workspaces`
-              : 'Upgrade to Pro to create workspaces'}
-          </Text>
-        </View>
-      </View>
+      {/* Info Box - Only show for free users (not Pro, not in trial) */}
+      {!user?.isPaidUser && !isInTrial(user) && (
+        <TouchableOpacity
+          style={styles.infoBox}
+          onPress={() => setShowUpgradeModal(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="information-circle" size={20} color={Colors.primary} />
+          <View style={styles.infoTextContainer}>
+            <Text style={styles.infoText}>
+              Workspaces give your team shared chats with full AI features
+            </Text>
+            <Text style={styles.infoSubtext}>
+              Upgrade to Pro to create workspaces
+            </Text>
+          </View>
+          <Ionicons name="arrow-forward" size={20} color={Colors.primary} style={styles.infoArrow} />
+        </TouchableOpacity>
+      )}
+
+      {/* Upgrade to Pro Modal */}
+      <UpgradeToProModal
+        visible={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onUpgradeSuccess={async () => {
+          setShowUpgradeModal(false);
+          // Refresh user data from Firestore to get new Pro status
+          if (user?.uid) {
+            try {
+              const updatedUser = await getUserProfile(user.uid);
+              if (updatedUser) {
+                await setUser(updatedUser);
+                // Reload workspaces to reflect new Pro status
+                await loadWorkspaces(user.uid);
+              }
+            } catch (error) {
+              console.error('Failed to refresh user data after upgrade:', error);
+            }
+          }
+        }}
+        onTrialStart={async () => {
+          setShowUpgradeModal(false);
+          // Refresh user data from Firestore to get trial status
+          if (user?.uid) {
+            try {
+              const updatedUser = await getUserProfile(user.uid);
+              if (updatedUser) {
+                await setUser(updatedUser);
+                // Reload workspaces to reflect new trial status
+                await loadWorkspaces(user.uid);
+              }
+            } catch (error) {
+              console.error('Failed to refresh user data after trial start:', error);
+            }
+          }
+        }}
+      />
     </ScrollView>
   );
 }
@@ -413,6 +469,7 @@ const styles = StyleSheet.create({
   },
   infoBox: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#E3F2FD',
     padding: 16,
     borderRadius: 8,
@@ -431,6 +488,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.primary,
     opacity: 0.8,
+  },
+  infoArrow: {
+    marginLeft: 8,
   },
 });
 

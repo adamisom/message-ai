@@ -2,20 +2,20 @@ import { Ionicons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  startAfter,
-  updateDoc
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    limit,
+    onSnapshot,
+    orderBy,
+    query,
+    serverTimestamp,
+    setDoc,
+    startAfter,
+    updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -31,8 +31,10 @@ import OfflineBanner from '../../components/OfflineBanner';
 import { SearchModal } from '../../components/SearchModal';
 import { SummaryModal } from '../../components/SummaryModal';
 import TypingIndicator from '../../components/TypingIndicator';
+import { UpgradeToProModal } from '../../components/UpgradeToProModal';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
+import { getUserProfile } from '../../services/authService';
 import { FailedMessagesService } from '../../services/failedMessagesService';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
@@ -41,7 +43,7 @@ import { ErrorLogger } from '../../utils/errorLogger';
 
 export default function ChatScreen() {
   const { id: conversationId } = useLocalSearchParams();
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const navigation = useNavigation();
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
@@ -67,7 +69,7 @@ export default function ChatScreen() {
   const [showActionItemsModal, setShowActionItemsModal] = useState(false);
   const [showDecisionsModal, setShowDecisionsModal] = useState(false);
   const [showMeetingSchedulerModal, setShowMeetingSchedulerModal] = useState(false);
-  // const [showUpgradeModal, setShowUpgradeModal] = useState(false); // TODO: Phase 4
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   
   // Jump to message functionality
   const messageListRef = useRef<MessageListRef>(null);
@@ -1023,19 +1025,7 @@ export default function ChatScreen() {
         onOpenMeetingScheduler={() => setShowMeetingSchedulerModal(true)}
         isGroupChat={conversation.type === 'group'}
         canAccessAI={canAccessAI}
-        onUpgradeRequired={() => {
-          Alert.alert(
-            'Upgrade to Pro',
-            'Upgrade to Pro to unlock AI features in all your chats.\n\nFree users can still use AI features in workspace chats!',
-            [
-              { text: 'Maybe Later', style: 'cancel' },
-              { text: 'Upgrade to Pro', onPress: () => {
-                // TODO: Navigate to upgrade screen
-                Alert.alert('Coming Soon', 'Upgrade flow will be implemented here');
-              }}
-            ]
-          );
-        }}
+        onUpgradeRequired={() => setShowUpgradeModal(true)}
       />
 
       {/* AI Feature Modals */}
@@ -1068,6 +1058,44 @@ export default function ChatScreen() {
         visible={showMeetingSchedulerModal}
         conversationId={conversationId as string}
         onClose={() => setShowMeetingSchedulerModal(false)}
+      />
+
+      {/* Upgrade to Pro Modal */}
+      <UpgradeToProModal
+        visible={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onUpgradeSuccess={async () => {
+          setShowUpgradeModal(false);
+          // Refresh user data from Firestore to get new Pro status
+          if (user?.uid) {
+            try {
+              const updatedUser = await getUserProfile(user.uid);
+              if (updatedUser) {
+                await setUser(updatedUser);
+                Alert.alert('Success!', 'Welcome to Pro! 🎉\n\nYou now have AI features everywhere.');
+              }
+            } catch (error) {
+              console.error('Failed to refresh user data after upgrade:', error);
+              Alert.alert('Success!', 'Upgrade successful! Please restart the app to see changes.');
+            }
+          }
+        }}
+        onTrialStart={async () => {
+          setShowUpgradeModal(false);
+          // Refresh user data from Firestore to get trial status
+          if (user?.uid) {
+            try {
+              const updatedUser = await getUserProfile(user.uid);
+              if (updatedUser) {
+                await setUser(updatedUser);
+                Alert.alert('Trial Started!', 'Enjoy 5 days of full Pro access! 🎉');
+              }
+            } catch (error) {
+              console.error('Failed to refresh user data after trial start:', error);
+              Alert.alert('Trial Started!', 'Please restart the app to see changes.');
+            }
+          }
+        }}
       />
     </View>
     </ErrorBoundary>
