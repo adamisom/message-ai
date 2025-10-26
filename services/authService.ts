@@ -16,8 +16,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  Timestamp,
-  waitForPendingWrites
+  Timestamp
 } from 'firebase/firestore';
 import { auth, db } from '../firebase.config';
 import { setUserOffline, setUserOnline } from './presenceService';
@@ -201,10 +200,6 @@ export const getUserProfile = async (
   uid: string
 ): Promise<UserProfile | null> => {
   try {
-    // Wait for any pending writes (like presence updates) to complete
-    // This ensures we get clean server data without local pending writes interfering
-    await waitForPendingWrites(db);
-    
     const docRef = doc(db, 'users', uid);
     // Use getDocFromServer to bypass local cache and get fresh data from server
     // This ensures we always get the latest subscription/trial status
