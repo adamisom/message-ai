@@ -10,6 +10,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { setUserOffline, setUserOnline } from '../services/presenceService';
 import { 
   requestNotificationPermissions, 
@@ -96,22 +97,24 @@ export default function RootLayout() {
   }, [user]);
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Stack.Screen name="index" />
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen 
-        name="chat/[id]" 
-        options={{ 
-          title: 'Chat',
-          headerShown: true,
-          headerBackTitle: 'Back'
-        }} 
-      />
-    </Stack>
+    <ErrorBoundary level="app">
+      <Stack
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="chat/[id]" 
+          options={{ 
+            title: 'Chat',
+            headerShown: true,
+            headerBackTitle: 'Back'
+          }} 
+        />
+      </Stack>
+    </ErrorBoundary>
   );
 }

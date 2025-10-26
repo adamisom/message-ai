@@ -58,6 +58,13 @@ export const commonModalStyles = StyleSheet.create({
     justifyContent: 'center',
     padding: 32,
   },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.error,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
   errorText: {
     color: Colors.error,
     fontSize: 14,

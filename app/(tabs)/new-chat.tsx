@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 import {
     createGroupConversation,
     createOrOpenConversation,
@@ -178,7 +179,8 @@ export default function NewChat() {
   };
 
   return (
-    <View style={styles.container}>
+    <ErrorBoundary level="screen">
+      <View style={styles.container}>
       {/* Mode toggle */}
       <View style={styles.modeToggle}>
         <Button
@@ -255,6 +257,7 @@ export default function NewChat() {
         </View>
       )}
     </View>
+    </ErrorBoundary>
   );
 }
 

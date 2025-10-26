@@ -14,6 +14,8 @@ interface MessageListProps {
   } | null;
   highlightedMessageId?: string | null;
   onLoadMore?: () => void;
+  onRetryMessage?: (messageId: string) => void;
+  onDeleteMessage?: (messageId: string) => void;
   isLoadingMore?: boolean;
   hasMoreMessages?: boolean;
   onScrollToBottom?: () => void; // Callback when user scrolls to bottom
@@ -33,6 +35,8 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
   getReadDetails,
   highlightedMessageId,
   onLoadMore,
+  onRetryMessage,
+  onDeleteMessage,
   isLoadingMore = false,
   hasMoreMessages = false,
   onScrollToBottom,
@@ -131,6 +135,8 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
           readStatus={getReadStatus ? getReadStatus(item) : null}
           readDetails={getReadDetails ? getReadDetails(item) : null}
           isHighlighted={highlightedMessageId === item.id}
+          onRetry={onRetryMessage}
+          onDelete={onDeleteMessage}
         />
       )}
       contentContainerStyle={styles.container}

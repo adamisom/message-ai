@@ -3,6 +3,7 @@ import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/fir
 import { useEffect, useRef, useState } from 'react';
 import { Button, FlatList, StyleSheet, Text, View } from 'react-native';
 import ConversationItem from '../../components/ConversationItem';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { db } from '../../firebase.config';
 import { logoutUser } from '../../services/authService';
 import { scheduleMessageNotification } from '../../services/notificationService';
@@ -169,40 +170,42 @@ export default function ConversationsList() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Button title="Logout" onPress={handleLogout} />
+    <ErrorBoundary level="screen">
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Button title="Logout" onPress={handleLogout} />
+        </View>
+        
+        {isLoading ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>Loading conversations...</Text>
+          </View>
+        ) : conversations.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No conversations yet</Text>
+            <Text style={styles.emptySubtext}>
+              Tap &quot;New Chat&quot; to start a conversation
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={conversations}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <ConversationItem
+                conversation={item}
+                currentUserId={user?.uid || ''}
+                userStatuses={userStatuses}
+                onPress={() => {
+                  console.log('🔗 [ConversationsList] Navigating to chat:', item.id);
+                  router.push(`/chat/${item.id}` as any);
+                }}
+              />
+            )}
+          />
+        )}
       </View>
-      
-      {isLoading ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>Loading conversations...</Text>
-        </View>
-      ) : conversations.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No conversations yet</Text>
-          <Text style={styles.emptySubtext}>
-            Tap &quot;New Chat&quot; to start a conversation
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={conversations}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ConversationItem
-              conversation={item}
-              currentUserId={user?.uid || ''}
-              userStatuses={userStatuses}
-              onPress={() => {
-                console.log('🔗 [ConversationsList] Navigating to chat:', item.id);
-                router.push(`/chat/${item.id}` as any);
-              }}
-            />
-          )}
-        />
-      )}
-    </View>
+    </ErrorBoundary>
   );
 }
 

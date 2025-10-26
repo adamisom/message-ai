@@ -220,7 +220,7 @@ export function ActionItemsModal({
 
         {/* Error State */}
         {error && !loading && (
-          <ErrorState message={error} onRetry={reload} />
+          <ErrorState error={error} onRetry={reload} />
         )}
 
         {/* Action Items List */}

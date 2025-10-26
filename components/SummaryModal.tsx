@@ -95,7 +95,7 @@ export function SummaryModal({
 
         {/* Error State */}
         {error && !loading && (
-          <ErrorState message={error} onRetry={reload} />
+          <ErrorState error={error} onRetry={reload} />
         )}
 
         {/* Summary Content */}

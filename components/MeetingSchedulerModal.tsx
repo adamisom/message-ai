@@ -150,7 +150,7 @@ export function MeetingSchedulerModal({
 
         {/* Error State */}
         {error && !loading && (
-          <ErrorState message={error} onRetry={reload} />
+          <ErrorState error={error} onRetry={reload} />
         )}
 
         {/* Meeting Suggestions Content */}

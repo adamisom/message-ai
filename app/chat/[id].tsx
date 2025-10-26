@@ -22,6 +22,7 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
 import { DecisionsModal } from '../../components/DecisionsModal';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
 import { MeetingSchedulerModal } from '../../components/MeetingSchedulerModal';
 import MessageInput from '../../components/MessageInput';
@@ -863,7 +864,8 @@ export default function ChatScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ErrorBoundary level="screen">
+      <View style={styles.container}>
       <OfflineBanner />
       <MessageList
         ref={messageListRef}
@@ -953,6 +955,7 @@ export default function ChatScreen() {
         onClose={() => setShowMeetingSchedulerModal(false)}
       />
     </View>
+    </ErrorBoundary>
   );
 }
 

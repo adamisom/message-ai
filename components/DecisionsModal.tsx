@@ -59,7 +59,7 @@ export function DecisionsModal({
 
         {/* Error State */}
         {error && !loading && (
-          <ErrorState message={error} onRetry={reload} />
+          <ErrorState error={error} onRetry={reload} />
         )}
 
         {/* Decisions List */}
