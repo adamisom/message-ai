@@ -119,18 +119,36 @@ function generateMessage() {
   return message;
 }
 
-// Create participants
-const PARTICIPANTS = [
-  { uid: 'test_alice', displayName: 'Alice (Test)', email: 'alice.test@example.com' },
-  { uid: 'test_bob', displayName: 'Bob (Test)', email: 'bob.test@example.com' },
-  { uid: 'test_charlie', displayName: 'Charlie (Test)', email: 'charlie.test@example.com' },
-  { uid: 'test_diana', displayName: 'Diana (Test)', email: 'diana.test@example.com' },
-];
+// Create participants - fetch real users from Firestore
+async function getParticipants() {
+  console.log('👥 Fetching real users from Firestore...');
+  const usersSnapshot = await db.collection('users').limit(4).get();
+  
+  if (usersSnapshot.empty) {
+    console.error('❌ No users found in database!');
+    process.exit(1);
+  }
+  
+  const participants = usersSnapshot.docs.map(doc => ({
+    uid: doc.id,
+    displayName: doc.data().displayName || doc.data().email || 'Unknown',
+    email: doc.data().email || `${doc.id}@example.com`,
+  }));
+  
+  console.log(`✓ Found ${participants.length} users:`);
+  participants.forEach(p => console.log(`   - ${p.displayName} (${p.uid})`));
+  console.log('');
+  
+  return participants;
+}
 
 async function createPerformanceTestData() {
   console.log('🚀 Creating performance test data...\n');
   
   try {
+    // Get real participants from database
+    const PARTICIPANTS = await getParticipants();
+    
     // Check if test conversation already exists
     const existingConvs = await db.collection('conversations')
       .where('name', '==', TEST_CONVERSATION_NAME)
