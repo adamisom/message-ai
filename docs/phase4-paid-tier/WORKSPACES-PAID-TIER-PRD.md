@@ -1902,46 +1902,43 @@ function getInitials(displayName: string): string {
 - Usage statistics (AI requests, workspace activity)
 - In-app notifications bell (replace or complement profile button)
 
-### Sub-Phase 5: Admin Features - Assignment (Week 2-3)
+### Sub-Phase 7: Paid User Capabilities (Week 3)
 
-**Goal:** Enable action item assignment for admins
-
-**Tasks:**
-
-1. Update `assignActionItem` Cloud Function
-2. Add admin check before allowing assignment
-3. Update ActionItemsModal with assignment UI
-4. Add participant picker
-5. Implement optimistic updates
-6. Add "My Tasks" aggregation view (optional)
-
-**Testing:**
-
-- Admin assigns action items
-- Non-admin sees read-only items
-- Assignment persists across devices
-
-### Sub-Phase 6: Admin Features - Edit & Save (Week 3)
-
-**Goal:** Enable editing AI content for admins
+**Goal:** Enable Pro users to customize AI content and prioritize messages
 
 **Tasks:**
 
-1. Create edit modals for summaries, decisions, action items
-2. Add "Edit & Save" buttons (admin only)
-3. Implement save logic (replace AI version)
-4. Update Firestore with edit tracking
-5. Display "edited by admin" badges
-6. Preserve original AI versions
+1. **Edit/Save AI-Generated Content:**
+   - Create edit modals for summaries, decisions, action items
+   - Add "Edit & Save" buttons (Pro users in personal chats, admins in workspace chats)
+   - Implement save logic (replace AI version)
+   - Update Firestore with edit tracking
+   - Display "edited by user" badges
+   - Consider preserving original AI versions for rollback
+
+2. **High-Priority Message Markers:**
+   - Allow Pro users to manually mark messages as high-priority
+   - Update message schema with `userMarkedPriority: boolean`
+   - Display user-marked priority badges alongside AI-detected priority
+   - Add rate limiting to prevent abuse
+
+3. **Capacity Expansion Flow:**
+   - Create expansion modal (admin tries to add member beyond capacity)
+   - Calculate pro-rated billing for mid-month expansion
+   - Process payment and update `maxUsersThisMonth`
+   - Handle payment failures gracefully
+   - Add billing event logging
 
 **Testing:**
 
-- Admin edits summaries
-- Admin edits decisions
-- Admin edits action items
-- Members see edited versions
+- Pro user edits AI content in personal chats
+- Workspace admin edits AI content in workspace chats
+- Pro user manually marks messages as high-priority
+- Admin expands workspace capacity mid-month
+- Verify pro-rated billing calculations
+- Test payment failure scenarios
 
-### Sub-Phase 7: Spam Prevention (Week 3)
+### Sub-Phase 8: Spam Prevention (Week 3)
 
 **Goal:** Implement strike system
 
@@ -1960,25 +1957,30 @@ function getInitials(displayName: string): string {
 - Test 5-strike ban
 - Verify banned user can't create workspaces/groups
 
-### Sub-Phase 8: Billing Logic (Week 4)
+### Sub-Phase 8: Spam Prevention (Week 3) - ALREADY IMPLEMENTED
 
-**Goal:** Implement max user tracking, billing calculations
+**Status:** ✅ Partially Complete (invitation spam reporting done, general spam reporting pending)
 
-**Tasks:**
+**Already Implemented:**
 
-1. Track `maxUsersThisMonth` per workspace
-2. Create Cloud Function for monthly billing
-3. Implement workspace read-only state (payment lapsed)
-4. Implement 30-day deletion countdown
-5. Add billing UI in settings
-6. Create admin dashboard for billing
+- Spam reporting for workspace invitations (`reportWorkspaceInvitationSpam`)
+- Strike tracking with 1-month decay
+- Automatic ban on 5 strikes
+- Banned users blocked from creating workspaces
+
+**Remaining Work:**
+
+1. Extend spam reporting to general messages/chats (beyond invitations)
+2. Add spam report button in message context menus
+3. Create Cloud Function `reportMessageSpam` (similar to invitation spam)
+4. Add spam appeal Cloud Function (Enterprise tier, future)
 
 **Testing:**
 
-- Add/remove members (verify max tracking)
-- Simulate payment lapse (read-only state)
-- Verify 30-day deletion
-- Manual billing calculation test
+- Report spam messages in group chats
+- Verify strike counter increments for message spam
+- Test 5-strike ban still works
+- Verify banned user restrictions persist
 
 ### Sub-Phase 9: Production Sign-In (Week 5)
 
@@ -2098,26 +2100,45 @@ function getInitials(displayName: string): string {
 
 ---
 
-### Sub-Phase 12: Billing & Admin (Week 5)
+### Sub-Phase 12: Billing & Admin (Week 5-6)
 
-**Goal:** Implement real Stripe integration and billing flows
+**Goal:** Implement real Stripe integration and complete billing infrastructure
 
 **Tasks:**
 
-1. Integrate Stripe SDK
-2. Create subscription management endpoints
-3. Implement payment failure handling
-4. Add capacity upgrade/downgrade flows
-5. Build subscription management screen
-6. Webhook handlers for Stripe events
-7. Pro-rated billing calculations
+1. **Stripe Integration:**
+   - Integrate Stripe SDK (client + server)
+   - Create subscription management Cloud Functions
+   - Webhook handlers for Stripe events (payment success, failure, cancellation)
+   - Handle subscription lifecycle (trial → paid, paid → lapsed, reactivation)
+
+2. **Billing Logic:**
+   - Track `maxUsersThisMonth` per workspace (already in schema)
+   - Monthly billing reconciliation Cloud Function (runs on 1st of month)
+   - Pro-rated billing calculations for mid-month changes
+   - Workspace read-only state on payment lapse (30-day grace period)
+   - Auto-delete workspace after 30 days of non-payment
+
+3. **Admin UI:**
+   - Build subscription management screen (`app/subscription.tsx` - currently placeholder)
+   - Billing history display
+   - Payment method management
+   - Usage statistics (workspace members, AI requests, storage)
+
+4. **Capacity Downgrade:**
+   - Admin requests downgrade → takes effect NEXT billing cycle (no pro-rated refunds)
+   - Verify actual members <= new capacity before approving downgrade
+   - Notify admin if downgrade blocked due to member count
 
 **Testing:**
 
+- End-to-end Stripe payment flow (trial → paid)
 - Add/remove members (verify max tracking)
-- Simulate payment lapse (read-only state)
-- Verify 30-day deletion
-- Manual billing calculation test
+- Simulate payment lapse (workspace becomes read-only)
+- Verify 30-day deletion countdown
+- Test capacity downgrade with member validation
+- Verify pro-rated billing for mid-month workspace expansion
+- Test Stripe webhook handlers
 
 ---
 
