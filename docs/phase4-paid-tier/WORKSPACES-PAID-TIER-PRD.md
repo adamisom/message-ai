@@ -132,9 +132,9 @@
 
 **Sub-Phase 8: Spam Prevention**
 
-- ❌ Spam reporting system
-- ❌ Strike tracking (with 1-month decay)
-- ❌ Automatic ban on 5 strikes
+- ❌ Spam reporting system (beyond invitations)
+- ❌ Strike tracking with decay (already partially implemented for invitations)
+- ❌ Automatic ban on 5 strikes (already implemented for invitation spam)
 - ❌ Spam appeal Cloud Function (Enterprise tier)
 
 **Sub-Phase 9: Billing & Admin**
@@ -143,6 +143,29 @@
 - ❌ Capacity upgrade/downgrade flows
 - ❌ Payment failure handling
 - ❌ Subscription management screen (placeholder exists)
+
+**Sub-Phase 10: Export Workspace**
+
+- ❌ Export workspace data to JSON
+- ❌ Export workspace data to Markdown
+- ❌ Admin-only export functionality
+- ❌ Email or download export file
+
+**Sub-Phase 11: Polish & Testing**
+
+- ❌ Loading states and animations
+- ❌ Edge case handling
+- ❌ Analytics tracking
+- ❌ Performance testing
+- ❌ E2E test suite
+- ❌ Improve 'New Chat' UX (auto-detect direct/group based on user count)
+
+**Sub-Phase 12: Production Sign-In**
+
+- ❌ Phone number authentication
+- ❌ LinkedIn OAuth
+- ❌ Okta OAuth
+- ❌ Multi-auth support and account linking
 
 ---
 
@@ -1950,7 +1973,58 @@ function getInitials(displayName: string): string {
 - Verify 30-day deletion
 - Manual billing calculation test
 
-### Phase 9: Polish & Testing (Week 4)
+### Phase 9: Export Workspace (Week 4)
+
+**Goal:** Enable workspace admins to export all workspace data
+
+**Tasks:**
+
+1. Create `exportWorkspace` Cloud Function
+2. Generate JSON export:
+   - All workspace members (emails + display names)
+   - All workspace chats with messages
+   - Timestamps and metadata
+3. Generate Markdown export (alternative format):
+   - Human-readable conversation format
+   - Member list at top
+   - Chat threads organized by conversation
+4. Email export file to admin or provide download link
+5. Add "Export Workspace" button in workspace settings (admin only)
+
+**Export Format Examples:**
+
+```json
+{
+  "workspaceId": "ws_123",
+  "workspaceName": "Engineering Team",
+  "exportedAt": "2025-10-26T12:00:00Z",
+  "members": [
+    {"email": "alice@company.com", "displayName": "Alice Smith"},
+    {"email": "bob@company.com", "displayName": "Bob Jones"}
+  ],
+  "conversations": [
+    {
+      "id": "conv_456",
+      "type": "group",
+      "participants": ["alice@company.com", "bob@company.com"],
+      "messages": [
+        {"sender": "Alice Smith", "text": "Hello", "timestamp": "2025-10-26T10:00:00Z"}
+      ]
+    }
+  ]
+}
+```
+
+**Testing:**
+
+- Export workspace with multiple chats
+- Verify JSON structure
+- Verify Markdown formatting
+- Test with large workspaces (edge cases)
+
+---
+
+### Phase 10: Polish & Testing (Week 4)
 
 **Goal:** UI polish, edge cases, E2E testing
 
@@ -1962,12 +2036,58 @@ function getInitials(displayName: string): string {
 4. Performance testing (50 members, multiple workspaces)
 5. E2E test suite
 6. Documentation updates
+7. **Improve 'New Chat' UX:** Remove direct/group mode toggle, auto-detect based on number of users added
 
 **Testing:**
 
 - Full user journey tests
 - Performance benchmarks
 - Security audit
+
+---
+
+### Phase 11: Production Sign-In (Week 5)
+
+**Goal:** Support enterprise-grade authentication options
+
+**Rationale:** Not all companies/teams have sophisticated identity providers like Okta. Supporting multiple auth methods ensures broader adoption.
+
+**Tasks:**
+
+1. **Phone Number Authentication:**
+   - Integrate Firebase Phone Auth
+   - SMS verification flow
+   - Link phone number to existing accounts
+
+2. **OAuth Providers:**
+   - **LinkedIn OAuth:** For professional teams, easy onboarding
+   - **Okta OAuth:** For enterprise customers with existing SSO
+
+3. **Multi-Auth Support:**
+   - Allow users to link multiple auth methods
+   - Primary email for workspace invitations
+   - Unified user profile across auth methods
+
+4. **UI Updates:**
+   - Login screen with provider selection
+   - "Sign in with LinkedIn" button
+   - "Sign in with Okta" button
+   - "Sign in with Phone" option
+   - Email/password (existing)
+
+**Security Considerations:**
+
+- Account linking validation
+- Email verification for OAuth accounts
+- Prevent duplicate accounts
+- SSO session management
+
+**Testing:**
+
+- Test each auth provider independently
+- Test account linking flows
+- Test workspace invitations with different auth methods
+- Edge case: User signs up with email, later links LinkedIn
 
 ---
 
