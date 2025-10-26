@@ -20,6 +20,9 @@ export default function ConversationsList() {
   
   // Phase 6: Track previous conversations to detect new messages
   const previousConversationsRef = useRef<Record<string, string>>({});
+  
+  // Track if initial load has completed
+  const [isLoading, setIsLoading] = useState(true);
 
   console.log('📋 [ConversationsList] Rendering with', conversations.length, 'conversations');
 
@@ -42,6 +45,9 @@ export default function ConversationsList() {
       q, 
       (snapshot) => {
         console.log('📬 [ConversationsList] Received', snapshot.docs.length, 'conversations from Firestore');
+        
+        // Mark loading as complete once we get first snapshot
+        setIsLoading(false);
         
         const convos = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -168,7 +174,11 @@ export default function ConversationsList() {
         <Button title="Logout" onPress={handleLogout} />
       </View>
       
-      {conversations.length === 0 ? (
+      {isLoading ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>Loading conversations...</Text>
+        </View>
+      ) : conversations.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No conversations yet</Text>
           <Text style={styles.emptySubtext}>

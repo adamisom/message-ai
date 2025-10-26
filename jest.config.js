@@ -3,6 +3,7 @@ module.exports = {
   testEnvironment: 'node',
   testMatch: [
     '**/__tests__/**/*.test.ts',
+    '**/__tests__/**/*.test.tsx',
   ],
   testPathIgnorePatterns: [
     '/node_modules/',
@@ -18,6 +19,11 @@ module.exports = {
     '!**/node_modules/**',
     '!**/__tests__/**',
   ],
-  moduleFileExtensions: ['ts', 'js'],
+  moduleFileExtensions: ['ts', 'tsx', 'js'],
+  globals: {
+    'ts-jest': {
+      jsx: 'react',
+    },
+  },
 };
 
