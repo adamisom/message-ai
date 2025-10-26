@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-end',
     paddingHorizontal: 16,
     paddingVertical: 10,
     marginBottom: 20,
