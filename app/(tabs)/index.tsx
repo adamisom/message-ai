@@ -11,7 +11,7 @@ import { useChatStore } from '../../store/chatStore';
 import { UserStatusInfo } from '../../types';
 
 export default function ConversationsList() {
-  const { user } = useAuthStore();
+  const { user, loading } = useAuthStore();
   const { conversations, setConversations } = useChatStore();
   const router = useRouter();
   
@@ -24,12 +24,13 @@ export default function ConversationsList() {
   // Track if initial load has completed
   const [isLoading, setIsLoading] = useState(true);
 
-  console.log('📋 [ConversationsList] Rendering with', conversations.length, 'conversations');
+  console.log('📋 [ConversationsList] Rendering with', conversations.length, 'conversations, loading:', loading, 'user:', user?.uid);
 
   // Real-time listener for conversations
   useEffect(() => {
-    if (!user) {
-      console.log('⚠️ [ConversationsList] No user, skipping listener setup');
+    // Wait for auth to finish loading AND user to be present
+    if (loading || !user) {
+      console.log('⚠️ [ConversationsList] Waiting for auth...', { loading, hasUser: !!user });
       return;
     }
 
@@ -159,7 +160,7 @@ export default function ConversationsList() {
       console.log('🔌 [ConversationsList] Cleaning up status listeners');
       unsubscribes.forEach(unsub => unsub());
     };
-  }, [user, conversations]);
+  }, [user, conversations, loading]);
 
   return (
     <ErrorBoundary level="screen">
