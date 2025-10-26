@@ -124,11 +124,14 @@
 
 ### ❌ Not Yet Implemented (Sub-Phases 7+)
 
-**Sub-Phase 7: Paid User Capabilities**
+**Sub-Phase 7: Workspace Admin Features**
 
-- ❌ Edit/save AI-generated content
-- ❌ High-priority message markers
-- ❌ Capacity expansion flow for workspaces
+- ❌ Edit/save AI-generated content (Pro users in personal chats, admins in workspace chats)
+- ❌ Manual urgency markers (admin override, 5 per conversation)
+- ❌ Pinned messages (5 per group chat, workspace chats only)
+- ❌ Capacity expansion flow for workspaces (pro-rated billing)
+
+**📄 Detailed Requirements:** See [PRD-SUPPLEMENT-SUB-PHASE-7-WORKSPACE-ADMIN.md](./PRD-SUPPLEMENT-SUB-PHASE-7-WORKSPACE-ADMIN.md)
 
 **Sub-Phase 8: Spam Prevention**
 
@@ -1903,43 +1906,48 @@ function getInitials(displayName: string): string {
 - Usage statistics (AI requests, workspace activity)
 - In-app notifications bell (replace or complement profile button)
 
-### Sub-Phase 7: Paid User Capabilities (Week 3)
+### Sub-Phase 7: Workspace Admin Features (Week 3-4)
 
-**Goal:** Enable Pro users to customize AI content and prioritize messages
+**Goal:** Enable workspace admins to customize AI content, manage message priorities, and expand capacity
 
-**Tasks:**
+**📄 Full Requirements:** [PRD-SUPPLEMENT-SUB-PHASE-7-WORKSPACE-ADMIN.md](./PRD-SUPPLEMENT-SUB-PHASE-7-WORKSPACE-ADMIN.md)
 
-1. **Edit/Save AI-Generated Content:**
-   - Create edit modals for summaries, decisions, action items
-   - Add "Edit & Save" buttons (Pro users in personal chats, admins in workspace chats)
-   - Implement save logic (replace AI version)
-   - Update Firestore with edit tracking
-   - Display "edited by user" badges
-   - Consider preserving original AI versions for rollback
+**Features:**
 
-2. **High-Priority Message Markers:**
-   - Allow Pro users to manually mark messages as high-priority
-   - Update message schema with `userMarkedPriority: boolean`
-   - Display user-marked priority badges alongside AI-detected priority
-   - Add rate limiting to prevent abuse
+1. **Edit & Save AI-Generated Content:**
+   - Pro users can edit in personal chats
+   - Workspace admins can edit in workspace chats
+   - Save custom versions of summaries, decisions, action items
+   - Toggle between saved and fresh AI analysis
+   - Original AI version preserved for reference
 
-3. **Capacity Expansion Flow:**
-   - Create expansion modal (admin tries to add member beyond capacity)
-   - Calculate pro-rated billing for mid-month expansion
-   - Process payment and update `maxUsersThisMonth`
-   - Handle payment failures gracefully
-   - Add billing event logging
+2. **Manual Urgency Markers:**
+   - Admin can mark up to 5 messages as urgent per conversation
+   - Admin-marked urgency overrides AI priority detection
+   - Admin can disable auto-urgency workspace-wide
+   - Tap message → toolbar appears → "Mark Urgent" option
+
+3. **Pinned Messages:**
+   - Admin can pin up to 5 messages per group chat
+   - All members can view pinned messages
+   - Pin icon (top-left) opens modal with "Jump to Message" buttons
+   - Admin can un-pin or replace pins
+
+4. **Capacity Expansion Flow:**
+   - Admin tries to add member beyond capacity → expansion modal
+   - Pro-rated billing calculation (e.g., $0.25 for 15 days remaining)
+   - Payment failure → workspace becomes read-only
+   - Billing events logged for audit trail
 
 **Testing:**
 
-- Pro user edits AI content in personal chats
-- Workspace admin edits AI content in workspace chats
-- Pro user manually marks messages as high-priority
-- Admin expands workspace capacity mid-month
-- Verify pro-rated billing calculations
-- Test payment failure scenarios
+- Edit AI content and verify saved versions persist
+- Mark messages urgent and verify AI respects admin override
+- Pin messages and test jump-to-message navigation
+- Expand workspace capacity and verify pro-rated billing
+- Test payment failure scenarios (read-only mode)
 
-### Sub-Phase 8: Spam Prevention (Week 3-4)
+---
 
 **Goal:** Extend spam reporting beyond workspace invitations
 
@@ -1960,7 +1968,7 @@ function getInitials(displayName: string): string {
    - Add spam reporting for group chat invitations outside workspaces
    - Create `reportGroupChatInvitationSpam` Cloud Function
    - Reuse existing spam strike infrastructure
-   
+
 2. **Message-Level Spam Reporting:**
    - Add "Report Spam" option in message context menu
    - Create `reportMessageSpam` Cloud Function
