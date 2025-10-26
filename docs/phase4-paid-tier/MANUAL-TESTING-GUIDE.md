@@ -11,7 +11,7 @@ Last Updated: October 26, 2025
 - ✅ Sub-Phase 3: Admin Action Item Assignment (Tests 23-28)
 - ✅ Sub-Phase 4: Invitation Notifications (Tests 15-22)
 - ✅ Sub-Phase 5: Workspace Chats (Tests 29-36)
-- 🚧 Sub-Phase 6: AI Feature Gating (tests will be added after implementation)
+- ✅ Sub-Phase 6: AI Feature Gating (Tests 37-42)
 
 ---
 
@@ -1017,7 +1017,147 @@ _________________________________
 
 ## Sub-Phase 6: AI Feature Gating Tests
 
-*Tests will be added after Sub-Phase 6 implementation is complete...*
+### ✅ Test 37: Free User AI Access in Workspace Chat (3 min)
+
+**Prerequisites:** 
+- Free user (expired trial, not Pro)
+- Member of an active workspace
+- Workspace chat with messages
+
+**Steps:**
+1. Login as free user (e.g., expire adam3's trial: set `trialEndsAt` to yesterday in Firestore)
+2. Verify user is NOT Pro: Check Firestore `isPaidUser: false`
+3. Select workspace from Workspaces tab
+4. Open workspace chat
+5. Tap Sparkle (✨) menu
+6. Tap "Summarize Thread"
+
+**Expected Results:**
+- ✓ Sparkle menu opens without errors
+- ✓ NO upgrade prompt shown
+- ✓ AI summary generates successfully
+- ✓ Free user can access AI features in workspace chats
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
+
+---
+
+### ✅ Test 38: Free User Blocked in Non-Workspace Chat (2 min)
+
+**Prerequisites:** Same free user from Test 37
+
+**Steps:**
+1. Clear workspace filter (tap "View All")
+2. Open a non-workspace personal chat
+3. Tap Sparkle (✨) menu
+4. Tap any AI feature
+
+**Expected Results:**
+- ✓ Upgrade modal appears
+- ✓ Message: "Upgrade to Pro or join a workspace to access AI features"
+- ✓ AI feature does NOT execute
+- ✓ Free user blocked from AI in non-workspace chats
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
+
+---
+
+### ✅ Test 39: Pro User AI Access Everywhere (2 min)
+
+**Prerequisites:** Pro user (adam1-gmail)
+
+**Steps:**
+1. Login as Pro user
+2. Test AI in non-workspace chat
+3. Test AI in workspace chat
+
+**Expected Results:**
+- ✓ AI works in non-workspace chats (no upgrade prompt)
+- ✓ AI works in workspace chats
+- ✓ Pro users have unrestricted AI access
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
+
+---
+
+### ✅ Test 40: Workspace Payment Lapsed (2 min)
+
+**Prerequisites:** 
+- Workspace with payment lapsed (set `isActive: false` in Firestore)
+- Free member of that workspace
+
+**Steps:**
+1. Login as free user
+2. Open workspace chat
+3. Attempt to use AI feature
+
+**Expected Results:**
+- ✓ Error: "Workspace payment lapsed - read-only mode"
+- ✓ AI feature blocked even for workspace members
+- ✓ Clear error message about payment status
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
+
+---
+
+### ✅ Test 41: Trial User AI Access (1 min)
+
+**Prerequisites:** Active trial user (adam3 or adam4 with trial active)
+
+**Steps:**
+1. Login as trial user
+2. Test AI in non-workspace chat
+3. Test AI in workspace chat
+
+**Expected Results:**
+- ✓ Trial banner shows: "✨ X days left in trial"
+- ✓ AI works in non-workspace chats
+- ✓ AI works in workspace chats
+- ✓ No upgrade prompts during active trial
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
+
+---
+
+### ✅ Test 42: Cloud Function Authorization (2 min)
+
+**Prerequisites:** Free user (expired trial), workspace chat
+
+**Steps:**
+1. Login as free user
+2. Open workspace chat in Firestore Console
+3. Note the `conversationId` and `workspaceId`
+4. Verify user is in workspace members array
+5. Call AI feature via Sparkle menu
+
+**Expected Results:**
+- ✓ Cloud Function checks:
+  - User exists ✓
+  - User not Pro → checks workspace
+  - Conversation has workspaceId → loads workspace
+  - User in workspace.members → grants access ✓
+- ✓ AI feature executes successfully
+- ✓ Server-side validation working correctly
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
 
 ---
 
@@ -1124,10 +1264,13 @@ firebase deploy --only functions
 | 34 | Workspace Badge | ⬜ | |
 | 35 | Context Persistence | ⬜ | |
 | 36 | Empty States | ⬜ | |
-
-**Future Tests (to be added after implementation):**
-
-- Sub-Phase 6 Tests: TBD
+| **Sub-Phase 6** | | | |
+| 37 | Free User Workspace AI | ⬜ | |
+| 38 | Free User Blocked Non-WS | ⬜ | |
+| 39 | Pro User AI Everywhere | ⬜ | |
+| 40 | Workspace Payment Lapsed | ⬜ | |
+| 41 | Trial User AI Access | ⬜ | |
+| 42 | Cloud Function Auth | ⬜ | |
 
 **Overall Status:** ⬜ Pass | ⬜ Fail | ⬜ Partial
 
@@ -1191,7 +1334,7 @@ Before merging `PaidTier` branch to `main`:
 - [ ] All Sub-Phase 3 tests passing (Tests 23-28)
 - [ ] All Sub-Phase 4 tests passing (Tests 15-22)
 - [ ] All Sub-Phase 5 tests passing (Tests 29-36)
-- [ ] All Sub-Phase 6 tests passing (TBD)
+- [ ] All Sub-Phase 6 tests passing (Tests 37-42)
 - [ ] No critical bugs found
 - [ ] Automated tests passing (25/25 unit, 8/8 manual)
 - [ ] Cloud Functions deployed and tested

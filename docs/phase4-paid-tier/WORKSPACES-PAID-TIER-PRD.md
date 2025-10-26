@@ -83,15 +83,17 @@
 
 **Sub-Phase 5: Workspace Chats**
 
-- ❌ Create chats within workspaces
-- ❌ Workspace chat list view
-- ❌ Workspace-scoped conversations
+- ✅ Create chats within workspaces
+- ✅ Workspace chat list view (filtered by workspaceId)
+- ✅ Workspace-scoped conversations (with workspaceId, workspaceName, isWorkspaceChat fields)
+- ✅ Workspace context banner in New Chat screen
+- ✅ Workspace badge indicator on conversation items
 
 **Sub-Phase 6: AI Feature Gating**
 
 - ✅ Lock AI features for free users in non-workspace chats
 - ✅ Sparkle menu upgrade prompts for free users
-- ❌ Workspace chat AI access for free members (blocked by Sub-Phase 5)
+- ✅ Workspace chat AI access for free members (via `canAccessAIFeatures` in Cloud Functions)
 
 ### ❌ Not Yet Implemented (Sub-Phases 7+)
 
