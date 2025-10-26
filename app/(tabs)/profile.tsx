@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,7 +18,7 @@ import {
   View,
 } from 'react-native';
 import { UpgradeToProModal } from '../../components';
-import { getUserProfile } from '../../services/authService';
+import { getUserProfile, logoutUser } from '../../services/authService';
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../utils/colors';
 
@@ -52,7 +53,7 @@ function formatDate(timestamp: any): string {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, setUser } = useAuthStore();
+  const { user, setUser, logout } = useAuthStore();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
@@ -175,6 +176,26 @@ export default function ProfileScreen() {
   const handleManageSubscription = () => {
     router.push('/subscription' as any);
   };
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            console.log('👋 [ProfileScreen] Logging out');
+            await logoutUser();
+            logout();
+            router.replace('/(auth)/login');
+          },
+        },
+      ]
+    );
+  };
   
   return (
     <ScrollView
@@ -182,6 +203,16 @@ export default function ProfileScreen() {
       contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
     >
+      {/* Logout Button at Top */}
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={handleLogout}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+        <Text style={styles.logoutButtonText}>Logout</Text>
+      </TouchableOpacity>
+
       {/* Profile Header */}
       <View style={styles.headerSection}>
         {/* Large Avatar with Initials */}
@@ -306,6 +337,25 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 20,
     paddingBottom: 40,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#DC2626',
+    borderRadius: 8,
+    backgroundColor: '#FFF',
+  },
+  logoutButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#DC2626',
+    marginLeft: 8,
   },
   loadingContainer: {
     flex: 1,

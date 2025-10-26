@@ -5,7 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { UserProfile } from '../services/authService';
+import { UserProfile, getUserProfile } from '../services/authService';
 
 interface AuthState {
   user: UserProfile | null;
@@ -57,6 +57,8 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   /**
    * Restore session from AsyncStorage on app launch
+   * Fetches fresh user data from Firestore after restoring cached data
+   * to ensure trial/subscription status is always up-to-date
    */
   restoreSession: async () => {
     try {
@@ -65,17 +67,40 @@ export const useAuthStore = create<AuthState>((set) => ({
       console.log('[authStore] AsyncStorage data:', userJson ? 'Found user data' : 'No user data');
       
       if (userJson) {
-        const user = JSON.parse(userJson) as UserProfile;
-        console.log('[authStore] Parsed user object:', {
-          uid: user?.uid,
-          email: user?.email,
-          displayName: user?.displayName,
+        const cachedUser = JSON.parse(userJson) as UserProfile;
+        console.log('[authStore] Parsed cached user object:', {
+          uid: cachedUser?.uid,
+          email: cachedUser?.email,
+          displayName: cachedUser?.displayName,
         });
         
         // Validate that the user object has required fields
-        if (user && user.uid && user.email) {
-          console.log('[authStore] ✅ Valid user, restoring session');
-          set({ user, loading: false });
+        if (cachedUser && cachedUser.uid && cachedUser.email) {
+          console.log('[authStore] ✅ Valid cached user, setting immediately');
+          // Set cached user with loading: false so components can render
+          set({ user: cachedUser, loading: false });
+          
+          // Fetch fresh user data in background to get latest trial/subscription status
+          console.log('[authStore] 🔄 Fetching fresh user data from Firestore...');
+          try {
+            const freshUser = await getUserProfile(cachedUser.uid);
+            if (freshUser) {
+              console.log('[authStore] ✅ Got fresh user data, updating cache and state');
+              // Update AsyncStorage with fresh data
+              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
+              // Update state (loading already false)
+              set({ user: freshUser });
+            } else {
+              // User no longer exists in Firestore, clear session
+              console.warn('[authStore] ⚠️ User not found in Firestore, clearing session');
+              await AsyncStorage.removeItem(STORAGE_KEY);
+              set({ user: null });
+            }
+          } catch (fetchError) {
+            console.error('[authStore] ❌ Failed to fetch fresh user data:', fetchError);
+            // Keep cached user if fetch fails - app still works with potentially stale data
+            console.log('[authStore] 📦 Continuing with cached user data');
+          }
         } else {
           console.warn('[authStore] ⚠️ Invalid user data in AsyncStorage, clearing');
           await AsyncStorage.removeItem(STORAGE_KEY);

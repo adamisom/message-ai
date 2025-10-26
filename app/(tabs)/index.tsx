@@ -1,18 +1,17 @@
 import { useRouter } from 'expo-router';
 import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { Button, FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import ConversationItem from '../../components/ConversationItem';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { db } from '../../firebase.config';
-import { logoutUser } from '../../services/authService';
 import { scheduleMessageNotification } from '../../services/notificationService';
 import { useAuthStore } from '../../store/authStore';
 import { useChatStore } from '../../store/chatStore';
 import { UserStatusInfo } from '../../types';
 
 export default function ConversationsList() {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const { conversations, setConversations } = useChatStore();
   const router = useRouter();
   
@@ -162,20 +161,9 @@ export default function ConversationsList() {
     };
   }, [user, conversations]);
 
-  const handleLogout = async () => {
-    console.log('👋 [ConversationsList] Logging out');
-    await logoutUser();
-    logout();
-    router.replace('/(auth)/login');
-  };
-
   return (
     <ErrorBoundary level="screen">
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Button title="Logout" onPress={handleLogout} />
-        </View>
-        
         {isLoading ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Loading conversations...</Text>
@@ -213,11 +201,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  header: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   emptyState: {
     flex: 1,
