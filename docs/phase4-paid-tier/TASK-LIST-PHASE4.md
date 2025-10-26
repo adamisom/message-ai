@@ -1062,3 +1062,232 @@ This task list breaks down the implementation of Workspaces, Paid Tier, and Admi
 - Focus on core features, skip nice-to-haves
 - Test thoroughly before user release
 
+---
+
+## Appendix A: User Profile Sub-Phases
+
+### Sub-Phase 4.1: Profile Button Component
+
+**Goal:** Create reusable profile button component and integrate into navigation
+
+**Tasks:**
+1. Create `components/ProfileButton.tsx`
+   - Accept `currentRoute` prop to determine selected state
+   - Implement initials extraction logic (see code below)
+   - Add tap handler to navigate to profile
+   - Style normal and selected states
+2. Update `app/(tabs)/_layout.tsx`
+   - Import `ProfileButton`
+   - Add `headerRight` option to all tab screens
+   - Pass current route to button for selected state
+3. Test button appearance and navigation
+
+**Initials Extraction Logic:**
+
+```typescript
+function getInitials(displayName: string): string {
+  if (!displayName) return '?';
+  
+  const words = displayName.trim().split(' ');
+  
+  if (words.length > 1) {
+    // Multiple words: take first letter of first two words
+    return (words[0][0] + words[1][0]).toUpperCase();
+  } else {
+    // Single word: take first letter only
+    return words[0][0].toUpperCase();
+  }
+}
+
+// Examples:
+// "Adam Isom" → "AI"
+// "John" → "J"
+// "Bob Smith Jr" → "BS"
+```
+
+**Acceptance Criteria:**
+- ✅ Button appears on all tab screens (Chats, New Chat, Workspaces, Profile)
+- ✅ Shows correct initials for all users
+- ✅ Selected state visible on profile screen
+- ✅ Tapping button navigates to profile
+- ✅ Button position consistent across all screens
+
+**Estimated Time:** 1-2 hours
+
+---
+
+### Sub-Phase 4.2: Profile Screen Structure
+
+**Goal:** Create profile screen with header, avatar, and user info
+
+**Tasks:**
+1. Create `app/(tabs)/profile.tsx`
+   - Set `href: null` in tab config (hidden from tab bar)
+   - Implement scroll view with proper layout
+2. Add profile header section
+   - Large circular avatar with initials (80x80px)
+   - Display name (20px bold)
+   - Email (14px gray)
+3. Add status badge component
+   - Badge with icon and text
+   - Conditional rendering (Pro/Trial/Free)
+   - Status detail text (trial countdown or expiry date)
+4. Test layout and scrolling
+
+**Acceptance Criteria:**
+- ✅ Profile screen accessible via button
+- ✅ Screen hidden from tab bar
+- ✅ Avatar displays correct initials
+- ✅ Display name and email shown correctly
+- ✅ Status badge shows correct type and styling
+- ✅ Status detail shows countdown/expiry as appropriate
+- ✅ Layout responsive and scrollable
+
+**Estimated Time:** 2-3 hours
+
+---
+
+### Sub-Phase 4.3: Feature List & Action Buttons
+
+**Goal:** Display Pro features and contextual action buttons
+
+**Tasks:**
+1. Extract feature list component (or create shared constant)
+   - Import from `UpgradeToProModal` or create shared file
+   - Ensure identical content (AI + Workspace features)
+2. Implement "Your Pro Features" section
+   - Section header
+   - AI Features subheader and list
+   - Workspace Features subheader and list
+   - Pricing note
+3. Add action buttons based on user status (see status logic below)
+   - Implement `getUserStatus` logic
+   - Render "Start Free Trial" button (if eligible)
+   - Render "Upgrade to Pro" button (if free/trial expired)
+   - Render "Manage Subscription" button (if Pro)
+4. Connect buttons to existing modals/actions
+   - "Start Trial" → `UpgradeToProModal` with trial button
+   - "Upgrade to Pro" → `UpgradeToProModal`
+   - "Manage Subscription" → Navigate to subscription screen
+5. Test button visibility and actions
+
+**Status Display Logic:**
+
+```typescript
+// Determine status badge and action buttons
+function getUserStatus(user: User): {
+  badge: string;
+  badgeColor: string;
+  detail: string | null;
+  actions: Action[];
+} {
+  const now = Date.now();
+  
+  // Pro User
+  if (user.isPaidUser) {
+    const expiryDate = formatDate(user.subscriptionEndsAt);
+    return {
+      badge: "💎 Pro User",
+      badgeColor: "#007AFF", // Blue
+      detail: `Expires: ${expiryDate}`,
+      actions: [
+        { label: "Manage Subscription", type: "primary", route: "/subscription" }
+      ]
+    };
+  }
+  
+  // Trial User (active trial)
+  if (user.trialEndsAt && now < user.trialEndsAt.toMillis()) {
+    const daysRemaining = Math.ceil(
+      (user.trialEndsAt.toMillis() - now) / (1000 * 60 * 60 * 24)
+    );
+    return {
+      badge: "🎉 Trial User",
+      badgeColor: "#FFD700", // Gold
+      detail: `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`,
+      actions: [] // No buttons during active trial
+    };
+  }
+  
+  // Free User (trial expired or never had trial)
+  const actions: Action[] = [];
+  
+  // Show "Start Free Trial" if eligible (never used trial)
+  if (!user.trialUsed) {
+    actions.push({
+      label: "Start 5-Day Free Trial",
+      type: "outlined",
+      action: "startTrial"
+    });
+  }
+  
+  // Always show "Upgrade to Pro" for free users (after trial expires)
+  actions.push({
+    label: "Upgrade to Pro",
+    type: "primary",
+    action: "upgrade"
+  });
+  
+  return {
+    badge: "🔓 Free User",
+    badgeColor: "#8E8E93", // Gray
+    detail: null,
+    actions
+  };
+}
+```
+
+**Acceptance Criteria:**
+- ✅ Feature list displays completely and correctly
+- ✅ Feature list matches upgrade modal exactly
+- ✅ Correct buttons show for each user type
+- ✅ Free users (no trial) see trial + upgrade buttons
+- ✅ Free users (in trial) see no buttons
+- ✅ Free users (trial expired) see upgrade button only
+- ✅ Pro users see manage subscription button
+- ✅ Buttons navigate/open correct modals
+
+**Estimated Time:** 2-3 hours
+
+---
+
+### Sub-Phase 4.4: Subscription Management Screen (Placeholder)
+
+**Goal:** Create placeholder subscription management screen for future
+
+**Tasks:**
+1. Create `app/subscription.tsx`
+   - Modal presentation style
+   - Header with back button
+2. Add subscription details section
+   - Plan name (Pro)
+   - Price ($3/month)
+   - Next billing date
+3. Add placeholder buttons
+   - "Change Payment Method" (disabled, gray)
+   - "Cancel Subscription" (disabled, gray)
+   - "Coming soon" text under each
+4. Add navigation from profile screen
+5. Test modal presentation and back navigation
+
+**Acceptance Criteria:**
+- ✅ Screen accessible from "Manage Subscription" button
+- ✅ Modal presentation works correctly
+- ✅ Subscription details display for Pro users
+- ✅ Buttons are disabled with "Coming soon" note
+- ✅ Back button returns to profile
+- ✅ Clear indication this is placeholder
+
+**Estimated Time:** 1-2 hours
+
+---
+
+**Total Estimated Time:** 6-10 hours
+
+**Implementation Order:** 4.1 → 4.2 → 4.3 → 4.4 (sequential, each builds on previous)
+
+**Dependencies:**
+- Sub-Phase 4.2 requires 4.1 (button to navigate to profile)
+- Sub-Phase 4.3 requires 4.2 (screen structure to add features to)
+- Sub-Phase 4.4 requires 4.3 (button to navigate to subscription)
+

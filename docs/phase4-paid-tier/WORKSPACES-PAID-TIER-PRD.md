@@ -61,12 +61,13 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 4. [AI Feature Access Control](#ai-feature-access-control)
 5. [Admin-Only Features](#admin-only-features)
 6. [Spam Prevention](#spam-prevention)
-7. [Data Model](#data-model)
-8. [User Flows](#user-flows)
-9. [UI/UX Specifications](#uiux-specifications)
-10. [Security & Permissions](#security--permissions)
-11. [Implementation Phases](#implementation-phases)
-12. [Future Enhancements](#future-enhancements)
+7. [User Profile & Status](#user-profile--status)
+8. [Data Model](#data-model)
+9. [User Flows](#user-flows)
+10. [UI/UX Specifications](#uiux-specifications)
+11. [Security & Permissions](#security--permissions)
+12. [Implementation Phases](#implementation-phases)
+13. [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -158,6 +159,7 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
   - Admin wants to downgrade to 8 seats → Must first remove members to fit new capacity
   
 **UI Guidance:**
+
 - During workspace creation: "You're selecting capacity for [10] members. You'll pay for all seats even if not filled. You can expand later if needed."
 - Expansion prompt: "Expand workspace from 10 to 15 members? Additional charge: $X.XX (pro-rated for this month)"
 - Downgrade flow: "You have 10 members but want 8 seats. Remove 2 members first, then downgrade capacity."
@@ -599,7 +601,7 @@ function getActiveStrikes(user: User): number {
 
 - **Rate limiting:** Max 20 invitations per day per user
 - **Verification:** Email verification required to create workspaces
-- **Warning system:** 
+- **Warning system:**
   - Notification at 3 active strikes: "⚠️ You have 3 spam reports. Be careful - 5 strikes will restrict workspace/group creation."
   - Notification at 4 active strikes: "⚠️ You have 4 spam reports. One more will restrict your account."
   - Notification at 5 strikes: "🚫 Your account is restricted from creating workspaces and group chats due to spam reports."
@@ -607,9 +609,160 @@ function getActiveStrikes(user: User): number {
 
 ---
 
-## 7. Data Model
+## 7. User Profile & Status
 
-### 7.1 New Firestore Collections
+### 7.1 Overview
+
+The User Profile screen provides users with a central location to:
+
+- View their account status (Free, Trial, or Pro)
+- See what Pro features they have access to
+- Manage their subscription
+- Access account actions (upgrade, start trial)
+
+The profile is accessible from **all tab screens** via a circular button in the top-right corner displaying the user's initials.
+
+### 7.2 Profile Button
+
+**Location:** Top-right corner of all tab screens (Chats, New Chat, Workspaces, Profile)
+
+**Appearance:**
+
+- Circular button (36x36px)
+- Displays user initials (1-2 characters)
+- Background color: `#007AFF` (primary blue)
+- Text color: white
+- Border: 2px white border for contrast
+
+**States:**
+
+- **Normal:** Blue background, white text, tap to navigate to profile
+- **Selected:** When on profile screen, show visual indicator (e.g., `#005BBF` darker blue or border highlight)
+
+**Initials Logic:** See [TASK-LIST-PHASE4.md, lines 1085-1106](./TASK-LIST-PHASE4.md#L1085-L1106)
+
+### 7.3 Profile Screen UI
+
+**Navigation:** Tab screen (hidden from tab bar), accessible only via profile button
+
+**UI Schematic:**
+
+```
+┌─────────────────────────────┐
+│  ← Profile            [AI]  │ (Header with back button, profile button selected)
+├─────────────────────────────┤
+│                             │
+│    [AI]  (large circle)     │ (Initials - 80x80px, clickable in future for profile pic)
+│                             │
+│    Adam Isom                │ (Display Name - 20px, bold)
+│    adam@hey.com             │ (Email - 14px, gray)
+│                             │
+│    🎉 Trial User            │ (Status badge - 16px, yellow bg)
+│    4 days remaining         │ (Status detail - 14px, gray)
+│                             │
+│    OR                       │
+│                             │
+│    💎 Pro User              │ (Status badge - 16px, blue bg)
+│    Expires: Oct 26, 2026    │ (Subscription expiry - 14px, gray)
+│                             │
+│    OR                       │
+│                             │
+│    🔓 Free User             │ (Status badge - 16px, gray bg)
+│                             │
+├─────────────────────────────┤
+│  Your Pro Features          │ (Section header - 18px, bold)
+│                             │
+│  AI Features:               │ (Subheader - 16px, bold)
+│  ✓ Track Action Items &     │
+│    Decisions                │ (14px, 8px spacing)
+│  ✓ AI Summaries & Semantic  │
+│    Search                   │
+│  ✓ Meeting Scheduler &      │
+│    Auto-Detection of        │
+│    Urgent Messages          │
+│                             │
+│  Workspace Features:        │ (Subheader - 16px, bold)
+│  ✓ Create up to 5 private   │
+│    workspaces               │ (14px, 8px spacing)
+│  ✓ Invite up to 25 members  │
+│    per workspace            │
+│  ✓ Assign action items to   │
+│    your team within chats   │
+│  ✓ Edit and save AI-        │
+│    generated text & high-   │
+│    priority markers on      │
+│    messages                 │
+│                             │
+│  50¢ per member per         │
+│  workspace                  │ (12px, italic, gray)
+│                             │
+│  [Upgrade to Pro]           │ (Free users after trial - blue button)
+│  [Start 5-Day Free Trial]   │ (Free users, trial eligible - blue outlined)
+│  [Manage Subscription]      │ (Pro users - blue button)
+│                             │
+└─────────────────────────────┘
+```
+
+### 7.4 Status Display Logic
+
+**Status Badge & Action Buttons:** See [TASK-LIST-PHASE4.md, lines 1174-1238](./TASK-LIST-PHASE4.md#L1174-L1238) for complete implementation logic.
+
+### 7.5 Feature List Display
+
+**Content:** Copy exact feature list from `UpgradeToProModal.tsx` (AI Features + Workspace Features). Display for all user types to remind Pro users of features and motivate free users.
+
+### 7.6 Subscription Management Screen (Future)
+
+**Route:** `/subscription` (modal presentation)
+
+**UI:**
+
+```
+┌─────────────────────────────┐
+│  ← Manage Subscription  [X] │
+├─────────────────────────────┤
+│                             │
+│  Subscription Details       │
+│                             │
+│  Plan: Pro                  │
+│  Price: $3/month            │
+│  Next billing: Oct 26, 2025 │
+│                             │
+│  [Change Payment Method]    │ (Disabled, gray)
+│  (Coming soon)              │
+│                             │
+│  [Cancel Subscription]      │ (Disabled, gray)
+│  (Coming soon)              │
+│                             │
+└─────────────────────────────┘
+```
+
+**Implementation:** Placeholder only - buttons disabled with "Coming soon" note
+
+**Future Implementation:**
+
+- Integrate with Stripe billing portal
+- Handle cancellation flow (immediate or end of period)
+- Update payment method
+- View billing history
+
+### 7.7 Implementation Sub-Phases
+
+The User Profile feature is broken down into **4 logical sub-phases** for sequential implementation:
+
+**See [TASK-LIST-PHASE4.md, Appendix A (lines 1067-1293)](./TASK-LIST-PHASE4.md#L1067-L1293) for:**
+- Sub-Phase 4.1: Profile Button Component (1-2 hours)
+- Sub-Phase 4.2: Profile Screen Structure (2-3 hours)
+- Sub-Phase 4.3: Feature List & Action Buttons (2-3 hours)
+- Sub-Phase 4.4: Subscription Management Screen (1-2 hours)
+
+**Total:** 6-10 hours | **Order:** Sequential (4.1 → 4.2 → 4.3 → 4.4)
+
+---
+
+## 8. Data Model
+
+### 8.1 New Firestore Collections
 
 #### `/users/{uid}` (Extended)
 
@@ -781,7 +934,7 @@ function getActiveStrikes(user: User): number {
 }
 ```
 
-### 7.2 Indexes Required
+### 8.2 Indexes Required
 
 ```javascript
 // firestore.indexes.json
@@ -817,9 +970,9 @@ function getActiveStrikes(user: User): number {
 
 ---
 
-## 8. User Flows
+## 9. User Flows
 
-### 8.1 Create Workspace (Admin)
+### 9.1 Create Workspace (Admin)
 
 ```
 [Pro User - Main Screen]
@@ -1004,9 +1157,9 @@ Push notification: "Alice invited you to 'Marketing Team'"
 
 ---
 
-## 9. UI/UX Specifications
+## 10. UI/UX Specifications
 
-### 9.1 Navigation Structure
+### 10.1 Navigation Structure
 
 ```
 Main Screen (Tabs)
@@ -1169,9 +1322,9 @@ Tap to respond
 
 ---
 
-## 10. Security & Permissions
+## 11. Security & Permissions
 
-### 10.1 Firestore Security Rules
+### 11.1 Firestore Security Rules
 
 ```javascript
 rules_version = '2';
@@ -1335,7 +1488,7 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 
 ---
 
-## 11. Implementation Phases
+## 12. Implementation Phases
 
 ### Phase 1: Foundation (Week 1)
 
@@ -1400,7 +1553,187 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 - Verify member limits
 - Delete workspace (verify cascading delete)
 
-### Phase 4: Admin Features - Assignment (Week 2-3)
+### Phase 4: User Profile & Status (Week 2)
+
+**Goal:** Create user profile screen with status display and feature overview
+
+**UI Schematic:**
+
+```
+┌─────────────────────────────┐
+│  ← Profile            [AI]  │ (Header with back button, profile button selected)
+├─────────────────────────────┤
+│                             │
+│    [AI]  (large circle)     │ (Initials - clickable in future for profile pic)
+│                             │
+│    Adam Isom                │ (Display Name)
+│    adam@hey.com             │ (Email)
+│                             │
+│    🎉 Trial User            │ (Status badge)
+│    4 days remaining         │ (Trial countdown)
+│                             │
+│    OR                       │
+│                             │
+│    💎 Pro User              │ (Status badge)
+│    Expires: Oct 26, 2026    │ (Subscription expiry)
+│                             │
+│    OR                       │
+│                             │
+│    🔓 Free User             │ (Status badge)
+│                             │
+├─────────────────────────────┤
+│  Your Pro Features          │ (Section header)
+│                             │
+│  AI Features:               │
+│  ✓ Track Action Items &     │
+│    Decisions                │
+│  ✓ AI Summaries & Semantic  │
+│    Search                   │
+│  ✓ Meeting Scheduler &      │
+│    Auto-Detection of        │
+│    Urgent Messages          │
+│                             │
+│  Workspace Features:        │
+│  ✓ Create up to 5 private   │
+│    workspaces               │
+│  ✓ Invite up to 25 members  │
+│    per workspace            │
+│  ✓ Assign action items to   │
+│    your team within chats   │
+│  ✓ Edit and save AI-        │
+│    generated text & high-   │
+│    priority markers on      │
+│    messages                 │
+│                             │
+│  50¢ per member per         │
+│  workspace                  │
+│                             │
+│  [Upgrade to Pro]           │ (Free users after trial)
+│  [Start 5-Day Free Trial]   │ (Free users, trial eligible)
+│  [Manage Subscription]      │ (Pro users)
+│                             │
+└─────────────────────────────┘
+```
+
+**Tasks:**
+
+1. **Profile Button Component**
+   - Create `components/ProfileButton.tsx`
+   - Circular button with user initials (max 2 chars, or 1 if no space in name)
+   - Position in top-right of tab screens via header config
+   - Selected state styling when on profile screen (highlighted/different color)
+   - Navigate to `/profile` on tap
+
+2. **Profile Screen**
+   - Create `app/(tabs)/profile.tsx`
+   - Hidden from tab bar (`href: null`)
+   - Accessible only via profile button
+
+3. **Profile Header Config**
+   - Update `app/(tabs)/_layout.tsx`
+   - Add `headerRight` option for all tabs (Chats, New Chat, Workspaces, Profile)
+   - Render `<ProfileButton />` with current route context
+
+4. **Profile Content**
+   - Large circle with initials at top (future: clickable for profile pic upload)
+   - Display name and email
+   - Status badge with appropriate icon:
+     - 💎 Pro User (blue badge) + expiry date
+     - 🎉 Trial User (yellow badge) + days remaining
+     - 🔓 Free User (gray badge)
+   - "Your Pro Features" section (copy from UpgradeToProModal)
+   - Action buttons based on status:
+     - **Free (no trial):** "Start 5-Day Free Trial" (if eligible) + "Upgrade to Pro"
+     - **Free (in trial):** No buttons (trial active)
+     - **Free (trial expired):** "Upgrade to Pro"
+     - **Pro:** "Manage Subscription"
+
+5. **Subscription Management Screen (Future)**
+   - Create `app/subscription.tsx` (modal presentation)
+   - Navigate from "Manage Subscription" button
+   - Show two placeholder buttons:
+     - "Change Payment Method" (disabled, coming soon)
+     - "Cancel Subscription" (disabled, coming soon)
+   - Note in UI: "Feature coming soon"
+
+**Status Display Logic:**
+
+```typescript
+// Pro User
+if (user.isPaidUser) {
+  badge = "💎 Pro User"
+  detail = `Expires: ${formatDate(user.subscriptionEndsAt)}`
+  action = "Manage Subscription"
+}
+
+// Trial User
+else if (user.trialEndsAt && now < user.trialEndsAt) {
+  badge = "🎉 Trial User"
+  detail = `${daysRemaining} days remaining`
+  action = null // No button during trial
+}
+
+// Free User (trial expired or never had trial)
+else {
+  badge = "🔓 Free User"
+  detail = null
+  action = user.trialUsed ? "Upgrade to Pro" : "Start 5-Day Free Trial"
+}
+```
+
+**Initials Logic:**
+
+```typescript
+function getInitials(displayName: string): string {
+  if (!displayName) return '?';
+  
+  const words = displayName.trim().split(' ');
+  
+  if (words.length > 1) {
+    // Multiple words: take first letter of first two words
+    return (words[0][0] + words[1][0]).toUpperCase();
+  } else {
+    // Single word: take first letter only
+    return words[0][0].toUpperCase();
+  }
+}
+
+// Examples:
+// "Adam Isom" → "AI"
+// "John" → "J"
+// "Bob Smith Jr" → "BS"
+```
+
+**Feature List Display:**
+
+- Show complete list from `UpgradeToProModal` (AI Features + Workspace Features)
+- Display identically for all user types (no graying out for free users)
+- Purpose: Remind Pro users of their features, motivate free users to upgrade
+
+**Testing:**
+
+- Profile button appears on all tab screens
+- Profile button shows correct initials
+- Profile button has selected state on profile screen
+- Clicking profile button navigates to profile
+- Status badge shows correctly for Pro/Trial/Free
+- Trial countdown accurate
+- Pro expiry date displays correctly
+- Action buttons appear based on user status
+- "Manage Subscription" opens subscription modal
+- Feature list displays correctly
+- Subscription modal shows placeholder buttons
+
+**Future Enhancements:**
+
+- Profile picture upload (tap large circle to change)
+- Cancel subscription implementation
+- Change payment method implementation
+- Subscription history
+- Usage statistics (AI requests, workspace activity)
+- In-app notifications bell (replace or complement profile button)
+
+### Phase 5: Admin Features - Assignment (Week 2-3)
 
 **Goal:** Enable action item assignment for admins
 
@@ -1419,7 +1752,7 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 - Non-admin sees read-only items
 - Assignment persists across devices
 
-### Phase 5: Admin Features - Edit & Save (Week 3)
+### Phase 6: Admin Features - Edit & Save (Week 3)
 
 **Goal:** Enable editing AI content for admins
 
@@ -1439,7 +1772,7 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 - Admin edits action items
 - Members see edited versions
 
-### Phase 6: Spam Prevention (Week 3)
+### Phase 7: Spam Prevention (Week 3)
 
 **Goal:** Implement strike system
 
@@ -1458,7 +1791,7 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 - Test 5-strike ban
 - Verify banned user can't create workspaces/groups
 
-### Phase 7: Billing Logic (Week 4)
+### Phase 8: Billing Logic (Week 4)
 
 **Goal:** Implement max user tracking, billing calculations
 
@@ -1478,7 +1811,7 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 - Verify 30-day deletion
 - Manual billing calculation test
 
-### Phase 8: Polish & Testing (Week 4)
+### Phase 9: Polish & Testing (Week 4)
 
 **Goal:** UI polish, edge cases, E2E testing
 
@@ -1499,24 +1832,27 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 
 ---
 
-## 12. Future Enhancements
+## 13. Future Enhancements
 
 > **Note:** This section documents features that are out of scope for the initial Phase 4 implementation but may be valuable in future iterations.
 
-### 12.0 Deferred Features from Phase 4
+### 13.1 Deferred Features from Phase 4
 
 **Direct Chat Export on Workspace Deletion:**
+
 - Currently: Workspace direct chats are deleted when workspace is deleted
 - Future: Allow members to request email export of their direct chat history before deletion
 - Implementation: Admin triggers deletion → System emails each member a PDF/JSON export of their direct chats → Wait 7 days → Delete workspace
 
 **AI Content Edit History:**
+
 - Currently: Admins can edit/save AI content, but only latest version is preserved (no history)
 - Future: Keep version history for transparency and undo capability
 - Implementation: Store edit history array with timestamps, editor UIDs, and previous versions
 - UI: "View History" button shows changelog, "Revert to Version X" option
 
 **Enhanced Enterprise Sales Funnel:**
+
 - Currently: 25-member limit shows link to Twitter DM
 - Future: Dedicated enterprise inquiry form with:
   - Team size input
@@ -1527,11 +1863,13 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
   - CRM integration (HubSpot, Salesforce)
 
 **Trial Extensions:**
+
 - Currently: Hard 5-day trial, then AI locks to workspace chats only
 - Future: Allow one 3-day extension if user is "close to converting" (e.g., used AI 10+ times)
 - Future: Referral bonuses (invite 3 friends, get 1 month free Pro)
 
 **Workspace Capacity Recommendations:**
+
 - Currently: Basic UI guidance during workspace creation
 - Future: Smart capacity recommendations based on:
   - User's email domain (fetch company size from Clearbit/LinkedIn)
@@ -1539,12 +1877,11 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
   - "Most teams your size choose 10-15 members"
 
 **Spam Strike Appeals:**
+
 - Currently: No appeals process, 1-month decay only
 - Future: "Request Review" button for users who feel unfairly flagged
 - Manual review by support team
 - Evidence submission (screenshots, context)
-
-
 
 ### 12.1 Payment Integration (Stripe)
 
@@ -1713,7 +2050,7 @@ export const handleWorkspaceBilling = functions.pubsub
 ✅ **My Tasks:** Per-workspace + non-workspace views (Pro users only)  
 ✅ **Workspace names:** Must be unique per user  
 ✅ **Workspace notifications:** Push + in-app, deleted after 24h when read  
-✅ **Billing cycle:** 1st of month for everyone  
+✅ **Billing cycle:** 1st of month for everyone
 ✅ **Billing start timing:** Pro-rated from creation date (unless created on 1st)  
 ✅ **Downgrades:** Take effect next billing cycle (no pro-rated refunds)  
 ✅ **Direct chat removal:** Hard delete from conversation list (security rules prevent access)  
