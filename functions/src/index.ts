@@ -22,3 +22,11 @@ export {trackDecisions} from './ai/decisions';
 // Phase 3: Advanced AI Capability
 export {analyzeMeetingScheduling} from './ai/proactiveMeeting';
 
+// Phase 4: Workspaces & Paid Tier
+export {
+  createWorkspace,
+  deleteWorkspace,
+  acceptWorkspaceInvitation,
+  reportWorkspaceInvitationSpam,
+} from './workspaces';
+

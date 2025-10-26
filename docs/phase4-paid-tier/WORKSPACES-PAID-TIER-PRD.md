@@ -19,6 +19,8 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 ### Revenue Model
 
 - **Free Tier:** Basic messaging (direct + group chats) only; AI features only work in workspace chats
+  - **NEW: 5-Day Free Trial** - All new users get full Pro access for 5 days (all AI features everywhere)
+  - After trial: AI locked to workspace chats only (until they upgrade to Pro)
 - **Pro Tier ($3/month):** Unlock all AI features everywhere (personal + workspace chats)
 - **Workspace Tier ($0.50/user/month):** Create workspaces with admin controls and collaborative tools
   - Admin pre-selects max users (2-25) and pays for all seats
@@ -45,7 +47,8 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 **For Free Users:**
 
 - Basic messaging everywhere
-- AI features work ONLY in workspace chats (if invited)
+- **5-day free trial** with full Pro access (AI features everywhere)
+- After trial: AI features work ONLY in workspace chats (if invited)
 - Sparkle Menu (✨) shows upgrade prompt in non-workspace chats
 
 ---
@@ -73,22 +76,23 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 
 **Capabilities:**
 
+- ✅ **5-day free trial** upon signup - full Pro access (all AI features everywhere)
 - ✅ Create unlimited direct chats
 - ✅ Create unlimited group chats (max 25 members each)
 - ✅ Join workspaces as member (if invited)
 - ✅ Send/receive messages normally
-- ✅ **AI features work in workspace chats** (if invited by admin)
-- ❌ AI features disabled in personal/non-workspace chats
-- ❌ Cannot create workspaces (upgrade prompt shown)
+- ✅ **After trial: AI features work in workspace chats** (if invited by admin)
+- ❌ After trial: AI features disabled in personal/non-workspace chats
+- ❌ **Cannot create workspaces** (during OR after trial - Pro subscription required)
 
-**Limitations:**
+**Limitations (After 5-Day Trial):**
 
 - AI features only accessible in workspace chats (critical sales funnel)
 - Sparkle menu (✨) visible everywhere but shows "Upgrade to Pro" in non-workspace chats
-- Cannot assign action items (anywhere)
-- Cannot edit/save AI content (anywhere)
+- Cannot assign action items (workspace admin-only feature)
+- Cannot edit/save AI content (workspace admin-only feature)
 - Workspace mode toggle visible but "Add Workspace" button grayed out
-- Subject to spam strike system (5 strikes = loss of group chat/workspace creation)
+- Subject to spam strike system (strikes decay after 1 month)
 
 ### 1.2 Pro User ($3/month)
 
@@ -148,9 +152,15 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 
 - **Pre-selected capacity model:** Admin chooses max users (2-25) upfront and pays for all seats
 - **Example Scenarios:**
-  - Admin creates workspace for 10 members → Pays $5/month
-  - Admin wants to expand to 15 members mid-month → Prompted to upgrade, pays pro-rated amount
+  - Admin creates workspace with 10-seat capacity → Pays $5/month (even if only 5 members join)
+  - Admin wants to expand to 15 seats mid-month → Prompted to upgrade, pays pro-rated amount
   - Billing: $5 (original) + ($2.50 × days_remaining / days_in_month)
+  - Admin wants to downgrade to 8 seats → Must first remove members to fit new capacity
+  
+**UI Guidance:**
+- During workspace creation: "You're selecting capacity for [10] members. You'll pay for all seats even if not filled. You can expand later if needed."
+- Expansion prompt: "Expand workspace from 10 to 15 members? Additional charge: $X.XX (pro-rated for this month)"
+- Downgrade flow: "You have 10 members but want 8 seats. Remove 2 members first, then downgrade capacity."
   
 **Pro-Rated Billing Examples:**
 
@@ -178,15 +188,30 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 - Track `maxUsersThisMonth` per workspace (admin's chosen capacity)
 - Reset on 1st of month
 - When admin expands: calculate pro-rated charge, process payment, then increment limit
+- When admin downgrades: verify actual members <= new capacity, downgrade takes effect NEXT billing cycle (no pro-rated refunds)
+
+**Billing Start Timing:**
+
+- Workspace created on 1st of month → No pro-rated charge, first bill on 1st of next month
+- Workspace created mid-month (e.g., Jan 15th) → Pro-rated charge for remainder of January (Jan 15-31), then full month bill on Feb 1st
+- Formula: `seatsAdded × $0.50 × (daysRemaining / daysInMonth)`
 
 ### 2.3 Payment Enforcement
 
 **MVP Upgrade Flow (No Real Payment):**
 
-- User clicks "Upgrade to Pro" → Instant upgrade
-- Firestore: Set `isPaidUser: true`
+- User clicks "Upgrade to Pro" → Instant upgrade (no payment required in MVP)
+- Firestore: Set `isPaidUser: true`, `trialEndsAt: null` (no longer in trial)
 - Success message: "✅ Upgrade successful! AI features unlocked. Note: After the MVP period, real payment will be required."
 - No payment capture, instant access
+
+**5-Day Free Trial Flow:**
+
+- New user signs up → Firestore: `trialStartedAt: serverTimestamp()`, `trialEndsAt: now + 5 days`
+- During trial: User has full Pro access (all AI features everywhere)
+- Trial expiring: Notification on Day 3, Day 4, Day 5 morning
+- Trial expired: AI features locked to workspace chats only, upgrade prompt shown
+- Check: `now > trialEndsAt && !isPaidUser` → Show trial expired UI
 
 **500 User MVP Limit:**
 
@@ -204,12 +229,13 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 
 **Subscription Lapse:**
 
-- **Day 0 (payment fails):** Workspace becomes **read-only**
+- **Payment fails:** Workspace becomes **read-only immediately**
   - Members can view messages
   - Cannot send messages or create chats
   - AI features disabled (even for Pro members in that workspace)
-- **Day 30:** Workspace and all associated chats **permanently deleted**
-- **Notification:** Push + in-app notification on Day 0, Day 7, Day 14, Day 29
+- **No deletion:** Workspace remains read-only indefinitely (no 30-day deletion)
+- **Notification:** Push + in-app notification when payment fails
+- **Restoration:** Once payment succeeds, workspace becomes active again
 
 **Workspace Limit Enforcement:**
 
@@ -268,7 +294,9 @@ A **Workspace** is an isolated team environment with:
 
 **Deletion:**
 
-1. **Admin deletes workspace:**
+1. **Admin deletes workspace (immediate, no grace period):**
+   - Confirmation modal shows: "⚠️ This will permanently delete: X group chats (Y messages), Z direct chats (N messages), all action items and AI history. This CANNOT be undone."
+   - User confirms → Immediate deletion
    - All group chats deleted
    - All direct chats deleted
    - All members lose access
@@ -291,9 +319,9 @@ A **Workspace** is an isolated team environment with:
 - **Max 25 members** per workspace (at any given time, no historical tracking)
 - **Max 5 workspaces** per user (admin)
 - **One admin per workspace** (no co-admins, no ownership transfer)
-- **Workspace names** must be unique per user (can have duplicates across users)
+- **Workspace names** must be unique per user for better UX (prevents confusion in dropdowns)
 - **Validation:** If user tries to create workspace with existing name → Error: "Choose unique name (You already have a workspace with that name)"
-- Workspaces stored as subcollection under users: `/users/{uid}/workspaces/{workspaceId}`
+- Workspaces stored in top-level collection: `/workspaces/{workspaceId}` (user document tracks owned workspace IDs via `workspacesOwned` array)
 
 **Enterprise Inquiry:**
 
@@ -318,9 +346,10 @@ A **Workspace** is an isolated team environment with:
 - Only visible to the two participants
 - Tied to workspace (deleted when workspace deleted)
 - **Access rules when member leaves/removed/workspace deleted:**
-  - Member immediately loses access to ALL workspace direct chats
-  - Cannot view or send messages
-  - Other participant (if still in workspace) can still see chat
+  - Member immediately loses access to ALL workspace direct chats (hard delete from their conversation list)
+  - Cannot view or send messages (security rules prevent access)
+  - Chat remains in Firestore for other participant (if still in workspace)
+  - If accessed via cached deep link → "You no longer have access to this chat"
 
 **Non-Workspace Chats:**
 
@@ -361,7 +390,12 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
   // Pro users can access AI everywhere
   if (user.isPaidUser) return true;
   
-  // Free users can only access AI in workspace chats
+  // Users in 5-day trial get full Pro access
+  if (user.trialEndsAt && Date.now() < user.trialEndsAt.toMillis()) {
+    return true; // Trial active
+  }
+  
+  // Free users (after trial) can only access AI in workspace chats
   if (conversation.workspaceId) {
     return isUserInWorkspace(user.uid, conversation.workspaceId);
   }
@@ -373,8 +407,10 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
 
 **UI Behavior:**
 
-- **Free users in personal chats:** Sparkle menu (✨) visible but tapping shows "Upgrade to Pro" modal
-- **Free users in workspace chats:** All AI features work normally
+- **Users in 5-day trial:** All AI features work everywhere (like Pro users)
+- **Trial expiring:** Banner shown on Day 3-5: "Your trial ends in X days. Upgrade to keep AI in personal chats."
+- **Free users (post-trial) in personal chats:** Sparkle menu (✨) visible but tapping features shows "Upgrade to Pro" modal
+- **Free users (post-trial) in workspace chats:** All AI features work normally (view-only, no admin features)
 - **Pro users:** All AI features work everywhere
 
 **Cloud Function Validation:**
@@ -495,11 +531,16 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
 **Mechanics:**
 
 - Global counter: `spamStrikes` (stored in `/users/{uid}`)
-- Max strikes: **5** (permanent)
+- Max strikes: **5**
 - Strike triggers:
   1. User invited to workspace → marks as spam
   2. User added to group chat → marks as spam
-- No appeals, no expiration
+- **Decay system:** Strikes older than 1 month are automatically removed
+  - Tracked with timestamps in `spamReportsReceived` array
+  - Checked/cleaned during:
+    - Spam report submission
+    - User attempts to invite someone to workspace/group chat
+- No appeals process
 
 **Penalties:**
 
@@ -528,21 +569,41 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
 ```typescript
 // Firestore: /users/{uid}
 {
-  spamStrikes: 3,
+  spamStrikes: 3, // Computed field (count of non-expired strikes)
   spamReportsReceived: [
     { reportedBy: 'user123', reason: 'workspace', timestamp, workspaceId },
     { reportedBy: 'user456', reason: 'groupChat', timestamp, conversationId },
     { reportedBy: 'user789', reason: 'workspace', timestamp, workspaceId }
   ],
-  spamBanned: false // Set to true when strikes >= 5
+  spamBanned: false // Set to true when active strikes >= 5
 }
+```
+
+**Decay Logic:**
+
+```typescript
+// When checking strikes, filter out strikes older than 1 month
+function getActiveStrikes(user: User): number {
+  const oneMonthAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+  const activeReports = user.spamReportsReceived.filter(
+    report => report.timestamp.toMillis() > oneMonthAgo
+  );
+  return activeReports.length;
+}
+
+// Update spamStrikes and spamBanned based on active count
+// Clean old reports from array periodically
 ```
 
 ### 6.2 Prevention Measures
 
 - **Rate limiting:** Max 20 invitations per day per user
 - **Verification:** Email verification required to create workspaces
-- **Warning system:** Notification at 3 strikes, 4 strikes
+- **Warning system:** 
+  - Notification at 3 active strikes: "⚠️ You have 3 spam reports. Be careful - 5 strikes will restrict workspace/group creation."
+  - Notification at 4 active strikes: "⚠️ You have 4 spam reports. One more will restrict your account."
+  - Notification at 5 strikes: "🚫 Your account is restricted from creating workspaces and group chats due to spam reports."
+- **Decay notification:** When a strike expires: "✅ A spam strike from 30+ days ago has been removed. You now have X active strikes."
 
 ---
 
@@ -567,17 +628,22 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
   subscriptionEndsAt?: Timestamp,
   stripeCustomerId?: string,              // Future payment integration
   
+  // NEW: Free trial fields
+  trialStartedAt?: Timestamp,             // When 5-day trial began
+  trialEndsAt?: Timestamp,                // When trial expires
+  trialUsed: boolean,                     // True if user already used their trial
+  
   // NEW: Workspace fields
   workspacesOwned: string[],              // Array of workspace IDs (max 5)
   workspacesMemberOf: string[],           // Workspaces user is member of
   
   // NEW: Spam prevention
-  spamStrikes: number,                    // Global counter (max 5)
-  spamBanned: boolean,                    // True if strikes >= 5
+  spamStrikes: number,                    // Active strike count (auto-computed)
+  spamBanned: boolean,                    // True if active strikes >= 5
   spamReportsReceived: Array<{
     reportedBy: string,
     reason: 'workspace' | 'groupChat',
-    timestamp: Timestamp,
+    timestamp: Timestamp,                 // Used for 6-month decay
     workspaceId?: string,
     conversationId?: string
   }>
@@ -603,12 +669,11 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
   createdAt: Timestamp,
   
   // Billing
-  maxUsersThisMonth: number,              // Reset monthly
+  maxUsersThisMonth: number,              // Admin's chosen capacity (pays for all seats)
   billingCycleStart: Timestamp,
-  currentMonthCharge: number,             // $1 × maxUsersThisMonth
+  currentMonthCharge: number,             // $0.50 × maxUsersThisMonth
   isActive: boolean,                      // False if payment lapsed
-  readOnlySince?: Timestamp,              // Set when payment fails
-  deletionScheduledFor?: Timestamp,       // 30 days after readOnlySince
+  readOnlySince?: Timestamp,              // Set when payment fails (no deletion)
   
   // Statistics
   groupChatCount: number,
@@ -1436,6 +1501,51 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 
 ## 12. Future Enhancements
 
+> **Note:** This section documents features that are out of scope for the initial Phase 4 implementation but may be valuable in future iterations.
+
+### 12.0 Deferred Features from Phase 4
+
+**Direct Chat Export on Workspace Deletion:**
+- Currently: Workspace direct chats are deleted when workspace is deleted
+- Future: Allow members to request email export of their direct chat history before deletion
+- Implementation: Admin triggers deletion → System emails each member a PDF/JSON export of their direct chats → Wait 7 days → Delete workspace
+
+**AI Content Edit History:**
+- Currently: Admins can edit/save AI content, but only latest version is preserved (no history)
+- Future: Keep version history for transparency and undo capability
+- Implementation: Store edit history array with timestamps, editor UIDs, and previous versions
+- UI: "View History" button shows changelog, "Revert to Version X" option
+
+**Enhanced Enterprise Sales Funnel:**
+- Currently: 25-member limit shows link to Twitter DM
+- Future: Dedicated enterprise inquiry form with:
+  - Team size input
+  - Use case description
+  - Contact information
+  - Custom pricing calculator
+  - Auto-email to sales team
+  - CRM integration (HubSpot, Salesforce)
+
+**Trial Extensions:**
+- Currently: Hard 5-day trial, then AI locks to workspace chats only
+- Future: Allow one 3-day extension if user is "close to converting" (e.g., used AI 10+ times)
+- Future: Referral bonuses (invite 3 friends, get 1 month free Pro)
+
+**Workspace Capacity Recommendations:**
+- Currently: Basic UI guidance during workspace creation
+- Future: Smart capacity recommendations based on:
+  - User's email domain (fetch company size from Clearbit/LinkedIn)
+  - Average group chat size
+  - "Most teams your size choose 10-15 members"
+
+**Spam Strike Appeals:**
+- Currently: No appeals process, 1-month decay only
+- Future: "Request Review" button for users who feel unfairly flagged
+- Manual review by support team
+- Evidence submission (screenshots, context)
+
+
+
 ### 12.1 Payment Integration (Stripe)
 
 **Setup:**
@@ -1603,7 +1713,11 @@ export const handleWorkspaceBilling = functions.pubsub
 ✅ **My Tasks:** Per-workspace + non-workspace views (Pro users only)  
 ✅ **Workspace names:** Must be unique per user  
 ✅ **Workspace notifications:** Push + in-app, deleted after 24h when read  
-✅ **Billing cycle:** 1st of month for everyone
+✅ **Billing cycle:** 1st of month for everyone  
+✅ **Billing start timing:** Pro-rated from creation date (unless created on 1st)  
+✅ **Downgrades:** Take effect next billing cycle (no pro-rated refunds)  
+✅ **Direct chat removal:** Hard delete from conversation list (security rules prevent access)  
+✅ **Trial limitations:** Cannot create workspaces during trial (Pro subscription required)
 
 ### Open Questions
 
@@ -1809,17 +1923,18 @@ incrementSpamStrikes(userUid: string, reason: 'workspace' | 'groupChat')
 
 ### Scenario 5: Payment Lapse
 
-1. Admin's payment fails
-2. Workspace becomes read-only
+1. Admin's payment fails (simulated in MVP with dummy payment service)
+2. Workspace becomes read-only immediately
 3. Members can view messages
 4. Members cannot send messages
-5. Admin receives notification
-6. 30 days pass without payment
-7. Workspace deleted
-8. All chats deleted
-9. Members notified
+5. AI features disabled
+6. Admin receives notification
+7. Admin updates payment method
+8. Payment succeeds
+9. Workspace becomes active again
+10. Full functionality restored
 
-**Expected Result:** ✅ Workspace deleted after grace period
+**Expected Result:** ✅ Workspace read-only when payment fails, restored when payment succeeds (no deletion)
 
 ### Scenario 6: Workspace Member Limit
 

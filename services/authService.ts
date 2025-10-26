@@ -9,13 +9,21 @@ import {
   signOut,
 } from 'firebase/auth';
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
+  limit,
+  query,
   serverTimestamp,
   setDoc,
+  Timestamp,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase.config';
 import { setUserOffline, setUserOnline } from './presenceService';
+
+// Phase 4: 500 User MVP Limit
+const MAX_MVP_USERS = 500;
 
 /**
  * User profile data structure
@@ -28,11 +36,34 @@ export interface UserProfile {
   lastSeenAt: any; // Firestore Timestamp
   createdAt: any; // Firestore Timestamp
   updatedAt: any; // Firestore Timestamp
+  // Phase 4: Paid tier fields
+  isPaidUser?: boolean;
+  subscriptionTier?: 'free' | 'pro';
+  subscriptionStartedAt?: any;
+  subscriptionEndsAt?: any;
+  // Phase 4: Trial fields
+  trialStartedAt?: any;
+  trialEndsAt?: any;
+  trialUsed?: boolean;
+  // Phase 4: Workspace fields
+  workspacesOwned?: string[];
+  workspacesMemberOf?: string[];
+  // Phase 4: Spam prevention
+  spamStrikes?: number;
+  spamBanned?: boolean;
+  spamReportsReceived?: Array<{
+    reportedBy: string;
+    reason: 'workspace' | 'groupChat';
+    timestamp: any;
+    workspaceId?: string;
+    conversationId?: string;
+  }>;
 }
 
 /**
  * Register a new user with email, password, and display name
  * Creates Firebase Auth account and Firestore user profile
+ * Phase 4: Checks 500 user MVP limit and initializes 5-day trial
  */
 export const registerUser = async (
   email: string,
@@ -40,6 +71,12 @@ export const registerUser = async (
   displayName: string
 ): Promise<UserProfile> => {
   try {
+    // Phase 4: Check 500 user limit
+    const userCount = await getTotalUserCount();
+    if (userCount >= MAX_MVP_USERS) {
+      throw new Error('Sorry: in MVP mode, max users reached. Please check back later.');
+    }
+
     // Create Firebase Auth user
     const userCredential = await createUserWithEmailAndPassword(
       auth,
@@ -48,7 +85,7 @@ export const registerUser = async (
     );
     const user = userCredential.user;
 
-    // Create Firestore user profile
+    // Create Firestore user profile (includes trial initialization)
     const userProfile = await createUserProfile(user.uid, email, displayName);
 
     return userProfile;
@@ -113,6 +150,7 @@ export const logoutUser = async (): Promise<void> => {
 
 /**
  * Create user profile in Firestore
+ * Phase 4: Initializes 5-day free trial
  */
 export const createUserProfile = async (
   uid: string,
@@ -120,6 +158,9 @@ export const createUserProfile = async (
   displayName: string
 ): Promise<UserProfile> => {
   try {
+    const now = new Date();
+    const fiveDaysFromNow = new Date(now.getTime() + (5 * 24 * 60 * 60 * 1000));
+
     const userProfile: UserProfile = {
       uid,
       email: email.toLowerCase().trim(),
@@ -128,6 +169,20 @@ export const createUserProfile = async (
       lastSeenAt: serverTimestamp(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      // Phase 4: Free tier fields
+      isPaidUser: false,
+      subscriptionTier: 'free',
+      // Phase 4: 5-day trial initialization
+      trialStartedAt: serverTimestamp(),
+      trialEndsAt: Timestamp.fromDate(fiveDaysFromNow),
+      trialUsed: true,
+      // Phase 4: Workspace fields
+      workspacesOwned: [],
+      workspacesMemberOf: [],
+      // Phase 4: Spam prevention
+      spamStrikes: 0,
+      spamBanned: false,
+      spamReportsReceived: [],
     };
 
     await setDoc(doc(db, 'users', uid), userProfile);
@@ -190,3 +245,19 @@ const getAuthErrorMessage = (errorCode: string): string => {
   }
 };
 
+/**
+ * Phase 4: Get total user count (for 500 user MVP limit)
+ */
+async function getTotalUserCount(): Promise<number> {
+  try {
+    // Query all users and count them
+    // Note: In production, you'd use Cloud Function counter or aggregation
+    const usersQuery = query(collection(db, 'users'));
+    const snapshot = await getDocs(usersQuery);
+    return snapshot.size;
+  } catch (error) {
+    console.error('Error getting user count:', error);
+    // If error, allow signup (fail open)
+    return 0;
+  }
+}

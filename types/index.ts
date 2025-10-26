@@ -37,6 +37,10 @@ export interface Conversation {
   createdAt?: any;
   creatorId?: string;
   messageCount?: number;
+  // Phase 4: Workspace fields
+  workspaceId?: string;
+  workspaceName?: string;
+  isWorkspaceChat?: boolean;
 }
 
 // ===== USER TYPES =====
@@ -47,6 +51,33 @@ export interface User {
   displayName: string;
   isOnline?: boolean;
   lastSeenAt?: any;
+  
+  // Phase 4: Paid tier fields
+  isPaidUser?: boolean;
+  subscriptionTier?: 'free' | 'pro';
+  subscriptionStartedAt?: any;
+  subscriptionEndsAt?: any;
+  stripeCustomerId?: string;
+  
+  // Phase 4: Free trial fields
+  trialStartedAt?: any;
+  trialEndsAt?: any;
+  trialUsed?: boolean;
+  
+  // Phase 4: Workspace fields
+  workspacesOwned?: string[];
+  workspacesMemberOf?: string[];
+  
+  // Phase 4: Spam prevention
+  spamStrikes?: number;
+  spamBanned?: boolean;
+  spamReportsReceived?: Array<{
+    reportedBy: string;
+    reason: 'workspace' | 'groupChat';
+    timestamp: any;
+    workspaceId?: string;
+    conversationId?: string;
+  }>;
 }
 
 export interface UserStatusInfo {
@@ -115,4 +146,6 @@ export interface SearchResult {
   source?: 'vector' | 'local';
 }
 
+// ===== PHASE 4: WORKSPACE TYPES =====
 
+export * from './workspace';
