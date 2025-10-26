@@ -63,9 +63,31 @@ export class FailedMessagesService {
       const stored = await AsyncStorage.getItem(FAILED_MESSAGES_KEY);
       if (!stored) return [];
       
-      return JSON.parse(stored) as FailedMessageData[];
+      const parsed = JSON.parse(stored);
+      
+      // Validate that parsed data is an array
+      if (!Array.isArray(parsed)) {
+        console.warn('[FailedMessages] Corrupted data (not an array), clearing');
+        await AsyncStorage.removeItem(FAILED_MESSAGES_KEY);
+        return [];
+      }
+      
+      // Filter out any invalid entries (basic validation)
+      const validated = parsed.filter((item: any) => {
+        return item && item.message && item.conversationId && item.failedAt;
+      });
+      
+      // If we filtered out corrupted entries, save the cleaned data
+      if (validated.length !== parsed.length) {
+        console.warn('[FailedMessages] Removed corrupted entries:', parsed.length - validated.length);
+        await AsyncStorage.setItem(FAILED_MESSAGES_KEY, JSON.stringify(validated));
+      }
+      
+      return validated as FailedMessageData[];
     } catch (error) {
-      console.warn('[FailedMessages] Failed to retrieve:', error);
+      console.warn('[FailedMessages] Failed to retrieve, clearing corrupted data:', error);
+      // Clear corrupted data to prevent repeated errors
+      await AsyncStorage.removeItem(FAILED_MESSAGES_KEY);
       return [];
     }
   }

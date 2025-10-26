@@ -3,8 +3,8 @@
  * Global state management for authentication and user session
  */
 
-import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { create } from 'zustand';
 import { UserProfile } from '../services/authService';
 
 interface AuthState {
@@ -60,15 +60,35 @@ export const useAuthStore = create<AuthState>((set) => ({
    */
   restoreSession: async () => {
     try {
+      console.log('[authStore] Starting restoreSession...');
       const userJson = await AsyncStorage.getItem(STORAGE_KEY);
+      console.log('[authStore] AsyncStorage data:', userJson ? 'Found user data' : 'No user data');
+      
       if (userJson) {
         const user = JSON.parse(userJson) as UserProfile;
-        set({ user, loading: false });
+        console.log('[authStore] Parsed user object:', {
+          uid: user?.uid,
+          email: user?.email,
+          displayName: user?.displayName,
+        });
+        
+        // Validate that the user object has required fields
+        if (user && user.uid && user.email) {
+          console.log('[authStore] ✅ Valid user, restoring session');
+          set({ user, loading: false });
+        } else {
+          console.warn('[authStore] ⚠️ Invalid user data in AsyncStorage, clearing');
+          await AsyncStorage.removeItem(STORAGE_KEY);
+          set({ user: null, loading: false });
+        }
       } else {
+        console.log('[authStore] No cached user, setting to null');
         set({ user: null, loading: false });
       }
     } catch (error) {
-      console.error('Failed to restore session:', error);
+      console.error('[authStore] Failed to restore session:', error);
+      // Clear corrupted data
+      await AsyncStorage.removeItem(STORAGE_KEY);
       set({ user: null, loading: false });
     }
   },
