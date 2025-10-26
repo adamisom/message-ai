@@ -20,6 +20,7 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+const TEST_CONVERSATION_ID = 'perf_test_1500'; // Fixed ID matching createPerformanceTestData.js
 const TEST_CONVERSATION_NAME = 'Performance Test - 1500 Messages';
 
 async function cleanupPerformanceTestData() {

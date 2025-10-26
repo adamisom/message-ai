@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import { FlatList, StyleSheet } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import { Message } from '../types';
 import MessageBubble from './MessageBubble';
 
@@ -13,6 +13,10 @@ interface MessageListProps {
     unreadBy: Array<{ uid: string; displayName: string }>;
   } | null;
   highlightedMessageId?: string | null;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
+  hasMoreMessages?: boolean;
+  onScrollToBottom?: () => void; // Callback when user scrolls to bottom
 }
 
 export interface MessageListRef {
@@ -25,7 +29,11 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
   conversationType,
   getReadStatus,
   getReadDetails,
-  highlightedMessageId
+  highlightedMessageId,
+  onLoadMore,
+  isLoadingMore = false,
+  hasMoreMessages = false,
+  onScrollToBottom,
 }, ref) => {
   const flatListRef = useRef<FlatList>(null);
 
@@ -47,6 +55,35 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
     }
   }, [messages.length]);
 
+  // Render loading indicator at the top when fetching older messages
+  const renderListHeader = () => {
+    if (!isLoadingMore && !hasMoreMessages) return null;
+    
+    return (
+      <View style={styles.headerContainer}>
+        {isLoadingMore && <ActivityIndicator size="small" color="#007AFF" />}
+      </View>
+    );
+  };
+
+  // Handle scroll events to detect when user is near the top OR bottom
+  const handleScroll = (event: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    
+    // Check if scrolled near top (within 100px) - trigger load more
+    if (contentOffset.y < 100 && hasMoreMessages && !isLoadingMore && onLoadMore) {
+      console.log('📜 [MessageList] Near top, loading more messages...');
+      onLoadMore();
+    }
+    
+    // Check if scrolled to bottom (within 50px) - trigger onScrollToBottom callback
+    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    if (distanceFromBottom < 50 && onScrollToBottom) {
+      console.log('⬇️ [MessageList] User scrolled to bottom, notifying parent');
+      onScrollToBottom();
+    }
+  };
+
   return (
     <FlatList
       ref={flatListRef}
@@ -63,6 +100,9 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
         />
       )}
       contentContainerStyle={styles.container}
+      ListHeaderComponent={renderListHeader}
+      onScroll={handleScroll}
+      scrollEventThrottle={400}
       onScrollToIndexFailed={(info) => {
         // Handle scroll failures gracefully
         console.warn('Scroll to index failed:', info);
@@ -85,6 +125,11 @@ export default MessageList;
 const styles = StyleSheet.create({
   container: {
     padding: 8,
+  },
+  headerContainer: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

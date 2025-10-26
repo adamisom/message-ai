@@ -27,6 +27,7 @@ admin.initializeApp({
 const db = admin.firestore();
 
 // Test conversation details
+const TEST_CONVERSATION_ID = 'perf_test_1500'; // Fixed ID for idempotency
 const TEST_CONVERSATION_NAME = 'Performance Test - 1500 Messages';
 const MESSAGE_COUNT = 1500;
 
@@ -149,22 +150,17 @@ async function createPerformanceTestData() {
     // Get real participants from database
     const PARTICIPANTS = await getParticipants();
     
-    // Check if test conversation already exists
-    const existingConvs = await db.collection('conversations')
-      .where('name', '==', TEST_CONVERSATION_NAME)
-      .limit(1)
-      .get();
+    // Use fixed conversation ID for idempotency
+    const conversationRef = db.collection('conversations').doc(TEST_CONVERSATION_ID);
+    const convSnap = await conversationRef.get();
     
-    let conversationId;
-    
-    if (!existingConvs.empty) {
-      conversationId = existingConvs.docs[0].id;
-      console.log(`✓ Found existing test conversation: ${conversationId}`);
+    if (convSnap.exists) {
+      console.log(`✓ Found existing test conversation: ${TEST_CONVERSATION_ID}`);
       console.log('  (Skipping conversation creation - idempotent)\n');
     } else {
-      // Create test conversation
+      // Create test conversation with fixed ID
       console.log('📝 Creating test conversation...');
-      const conversationRef = await db.collection('conversations').add({
+      await conversationRef.set({
         name: TEST_CONVERSATION_NAME,
         type: 'group',
         participants: PARTICIPANTS.map(p => p.uid),
@@ -181,20 +177,18 @@ async function createPerformanceTestData() {
         messageCount: 0,
         isPerformanceTest: true, // Flag for easy identification
       });
-      
-      conversationId = conversationRef.id;
-      console.log(`✓ Created conversation: ${conversationId}\n`);
+      console.log(`✓ Created conversation: ${TEST_CONVERSATION_ID}\n`);
     }
     
     // Check how many messages already exist
-    const existingMessages = await db.collection(`conversations/${conversationId}/messages`).count().get();
+    const existingMessages = await db.collection(`conversations/${TEST_CONVERSATION_ID}/messages`).count().get();
     const existingCount = existingMessages.data().count;
     
     if (existingCount >= MESSAGE_COUNT) {
       console.log(`✓ Test conversation already has ${existingCount} messages`);
       console.log('  (Idempotent - no new messages needed)\n');
       console.log(`✅ Performance test data ready!`);
-      console.log(`   Conversation ID: ${conversationId}`);
+      console.log(`   Conversation ID: ${TEST_CONVERSATION_ID}`);
       console.log(`   Message count: ${existingCount}\n`);
       return;
     }
@@ -211,42 +205,52 @@ async function createPerformanceTestData() {
     const startTime = Date.now() - (30 * 24 * 60 * 60 * 1000);
     const timeIncrement = (30 * 24 * 60 * 60 * 1000) / MESSAGE_COUNT; // Spread over 30 days
     
+    let lastMessageText = '';
+    let lastMessageSender = PARTICIPANTS[0];
+    
     for (let batchNum = 0; batchNum < batches; batchNum++) {
       const batch = db.batch();
       const startIdx = batchNum * BATCH_SIZE;
       const endIdx = Math.min(startIdx + BATCH_SIZE, messagesToCreate);
       
       for (let i = startIdx; i < endIdx; i++) {
-        const messageRef = db.collection(`conversations/${conversationId}/messages`).doc();
+        const messageRef = db.collection(`conversations/${TEST_CONVERSATION_ID}/messages`).doc();
         const sender = PARTICIPANTS[Math.floor(Math.random() * PARTICIPANTS.length)];
         const timestamp = new Date(startTime + ((existingCount + i) * timeIncrement));
+        const messageText = generateMessage();
         
         batch.set(messageRef, {
-          text: generateMessage(),
+          text: messageText,
           senderId: sender.uid,
           senderName: sender.displayName,
           createdAt: admin.firestore.Timestamp.fromDate(timestamp),
           readBy: {}, // Empty initially
           type: 'text',
         });
+        
+        // Track the last message for conversation metadata
+        if (i === messagesToCreate - 1) {
+          lastMessageText = messageText;
+          lastMessageSender = sender;
+        }
       }
       
       await batch.commit();
       console.log(`  ✓ Batch ${batchNum + 1}/${batches} complete (${endIdx}/${messagesToCreate} messages)`);
     }
     
-    // Update conversation metadata
+    // Update conversation metadata with actual last message
     const lastTimestamp = new Date(startTime + (MESSAGE_COUNT * timeIncrement));
-    await db.collection('conversations').doc(conversationId).update({
+    await db.collection('conversations').doc(TEST_CONVERSATION_ID).update({
       messageCount: MESSAGE_COUNT,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       lastMessageAt: admin.firestore.Timestamp.fromDate(lastTimestamp), // Required for conversations query
-      lastMessage: generateMessage(),
+      lastMessage: lastMessageText.substring(0, 100), // Simple string preview (consistent with app)
     });
     
     console.log(`\n✅ Performance test data created successfully!`);
     console.log(`\n📊 Summary:`);
-    console.log(`   Conversation ID: ${conversationId}`);
+    console.log(`   Conversation ID: ${TEST_CONVERSATION_ID}`);
     console.log(`   Conversation Name: ${TEST_CONVERSATION_NAME}`);
     console.log(`   Total Messages: ${MESSAGE_COUNT}`);
     console.log(`   Participants: ${PARTICIPANTS.length}`);

@@ -390,7 +390,603 @@ const conversationId = 'performance-test-chat-1500';
 
 ---
 
-## Section 5: Documentation Updates
+## Section 6: Production-Ready Error Handling
+
+### Problem Statement
+
+**Current State:** Errors propagate directly to users, showing technical details like "FirebaseError: Missing or insufficient permissions" which:
+- Confuses non-technical users
+- May scare users away from the app
+- Provides no actionable guidance
+- Looks unprofessional
+
+**Goal:** Implement graceful error handling that:
+- **User-friendly:** Clear, non-technical error messages
+- **Developer-friendly:** Detailed logs for debugging
+- **Resilient:** App never completely crashes from errors
+- **Actionable:** Tells users what they can do
+- **Best practices:** Proper error propagation and boundaries
+
+---
+
+### Architecture: 3-Layer Error Handling System
+
+#### Layer 1: Error Boundaries (Prevent Full App Crashes)
+
+**Implementation:** React Error Boundaries at strategic points
+
+```typescript
+// components/ErrorBoundary.tsx
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback?: (error: Error, reset: () => void) => React.ReactElement;
+  level?: 'app' | 'screen' | 'feature';
+}
+
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps> {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Log to monitoring service (future: Sentry, LogRocket)
+    console.error('[ErrorBoundary]', this.props.level, error, errorInfo);
+  }
+
+  reset = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback(this.state.error, this.reset);
+      }
+      
+      // Default fallback based on level
+      return <ErrorFallback level={this.props.level} onRetry={this.reset} />;
+    }
+
+    return this.props.children;
+  }
+}
+```
+
+**Placement Strategy:**
+
+1. **App-Level Boundary** (`app/_layout.tsx`)
+   - Catches catastrophic errors
+   - Shows full-screen error with app restart option
+   - Last line of defense
+
+2. **Screen-Level Boundaries** (each route)
+   - Catches screen-specific errors
+   - Shows error within screen, allows navigation back
+   - Preserves app navigation
+
+3. **Feature-Level Boundaries** (AI features, modals)
+   - Catches feature-specific errors
+   - Shows error within feature UI
+   - Allows retry without leaving screen
+
+**Example Usage:**
+
+```typescript
+// app/_layout.tsx (App-level)
+export default function RootLayout() {
+  return (
+    <ErrorBoundary level="app">
+      <Stack />
+    </ErrorBoundary>
+  );
+}
+
+// app/chat/[id].tsx (Screen-level)
+export default function ChatScreen() {
+  return (
+    <ErrorBoundary level="screen">
+      <View>
+        {/* Screen content */}
+      </View>
+    </ErrorBoundary>
+  );
+}
+
+// components/ActionItemsModal.tsx (Feature-level)
+export function ActionItemsModal() {
+  return (
+    <Modal>
+      <ErrorBoundary level="feature" fallback={FeatureErrorFallback}>
+        {/* AI feature content */}
+      </ErrorBoundary>
+    </Modal>
+  );
+}
+```
+
+---
+
+#### Layer 2: User-Friendly Error Messages
+
+**Principle:** Translate technical errors into plain English with actionable guidance.
+
+**Implementation: Error Translation Service**
+
+```typescript
+// utils/errorTranslator.ts
+
+export interface UserFriendlyError {
+  title: string;
+  message: string;
+  action?: string;
+  severity: 'info' | 'warning' | 'error' | 'critical';
+}
+
+export function translateError(error: Error): UserFriendlyError {
+  const errorMessage = error.message.toLowerCase();
+  
+  // Network errors
+  if (errorMessage.includes('network') || errorMessage.includes('fetch failed')) {
+    return {
+      title: 'Connection Issue',
+      message: 'Unable to reach the server. Please check your internet connection.',
+      action: 'Retry',
+      severity: 'warning',
+    };
+  }
+  
+  // Firestore permission errors
+  if (errorMessage.includes('permission') || errorMessage.includes('insufficient')) {
+    return {
+      title: 'Access Denied',
+      message: 'You don\'t have permission to perform this action.',
+      action: 'Contact Support',
+      severity: 'error',
+    };
+  }
+  
+  // Rate limiting
+  if (errorMessage.includes('rate limit') || errorMessage.includes('quota exceeded')) {
+    return {
+      title: 'Too Many Requests',
+      message: 'You\'ve reached the usage limit. Please try again in a few minutes.',
+      action: 'Wait',
+      severity: 'warning',
+    };
+  }
+  
+  // Authentication errors
+  if (errorMessage.includes('auth') || errorMessage.includes('unauthenticated')) {
+    return {
+      title: 'Session Expired',
+      message: 'Your session has expired. Please log in again.',
+      action: 'Log In',
+      severity: 'warning',
+    };
+  }
+  
+  // AI service errors
+  if (errorMessage.includes('anthropic') || errorMessage.includes('openai') || errorMessage.includes('ai')) {
+    return {
+      title: 'AI Service Unavailable',
+      message: 'The AI feature is temporarily unavailable. Please try again in a moment.',
+      action: 'Retry',
+      severity: 'warning',
+    };
+  }
+  
+  // Timeout errors
+  if (errorMessage.includes('timeout')) {
+    return {
+      title: 'Request Timed Out',
+      message: 'This is taking longer than expected. Please try again.',
+      action: 'Retry',
+      severity: 'warning',
+    };
+  }
+  
+  // Generic fallback
+  return {
+    title: 'Something Went Wrong',
+    message: 'An unexpected error occurred. Please try again.',
+    action: 'Retry',
+    severity: 'error',
+  };
+}
+```
+
+**Error Display Components:**
+
+```typescript
+// components/ErrorFallback.tsx
+
+interface ErrorFallbackProps {
+  level: 'app' | 'screen' | 'feature';
+  onRetry?: () => void;
+  error?: Error;
+}
+
+export function ErrorFallback({ level, onRetry, error }: ErrorFallbackProps) {
+  const friendly = error ? translateError(error) : null;
+  
+  if (level === 'app') {
+    return <FullScreenError error={friendly} onRetry={onRetry} />;
+  }
+  
+  if (level === 'screen') {
+    return <ScreenError error={friendly} onRetry={onRetry} />;
+  }
+  
+  return <InlineError error={friendly} onRetry={onRetry} />;
+}
+
+// Full-screen error (catastrophic failures)
+function FullScreenError({ error, onRetry }) {
+  return (
+    <View style={styles.fullScreen}>
+      <Text style={styles.errorIcon}>⚠️</Text>
+      <Text style={styles.errorTitle}>
+        {error?.title || 'App Error'}
+      </Text>
+      <Text style={styles.errorMessage}>
+        {error?.message || 'The app encountered an unexpected error.'}
+      </Text>
+      {onRetry && (
+        <TouchableOpacity onPress={onRetry} style={styles.retryButton}>
+          <Text style={styles.retryText}>Restart App</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+// Screen-level error (navigation preserved)
+function ScreenError({ error, onRetry }) {
+  const router = useRouter();
+  
+  return (
+    <View style={styles.screenError}>
+      <Text style={styles.errorIcon}>😕</Text>
+      <Text style={styles.errorTitle}>
+        {error?.title || 'Something Went Wrong'}
+      </Text>
+      <Text style={styles.errorMessage}>
+        {error?.message || 'We couldn\'t load this screen.'}
+      </Text>
+      <View style={styles.buttonRow}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.secondaryButton}>
+          <Text>Go Back</Text>
+        </TouchableOpacity>
+        {onRetry && (
+          <TouchableOpacity onPress={onRetry} style={styles.primaryButton}>
+            <Text>{error?.action || 'Retry'}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// Feature-level error (inline, dismissible)
+function InlineError({ error, onRetry }) {
+  return (
+    <View style={styles.inlineError}>
+      <Text style={styles.inlineTitle}>
+        {error?.title || 'Feature Unavailable'}
+      </Text>
+      <Text style={styles.inlineMessage}>
+        {error?.message || 'This feature is temporarily unavailable.'}
+      </Text>
+      {onRetry && (
+        <TouchableOpacity onPress={onRetry} style={styles.inlineRetry}>
+          <Text>{error?.action || 'Try Again'}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+```
+
+---
+
+#### Layer 3: Developer-Friendly Logging
+
+**Principle:** Preserve detailed error information for debugging while hiding it from users.
+
+**Implementation: Centralized Error Logger**
+
+```typescript
+// utils/errorLogger.ts
+
+export interface ErrorContext {
+  userId?: string;
+  conversationId?: string;
+  feature?: string;
+  action?: string;
+  metadata?: Record<string, any>;
+}
+
+export class ErrorLogger {
+  static log(error: Error, context?: ErrorContext) {
+    const timestamp = new Date().toISOString();
+    const errorDetails = {
+      timestamp,
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      context,
+    };
+    
+    // Development: Log to console with full details
+    if (__DEV__) {
+      console.error('[ErrorLogger]', errorDetails);
+    }
+    
+    // Production: Send to monitoring service (future)
+    // Sentry.captureException(error, { extra: errorDetails });
+    
+    // Store locally for debugging (last 100 errors)
+    this.storeLocally(errorDetails);
+  }
+  
+  private static storeLocally(errorDetails: any) {
+    // Use AsyncStorage to persist errors
+    // Useful for support tickets
+  }
+  
+  static async getRecentErrors(): Promise<any[]> {
+    // Retrieve last 100 errors for debugging
+    // Can be exported and sent to support
+  }
+}
+```
+
+**Usage in Services:**
+
+```typescript
+// services/aiService.ts
+
+export async function generateSummary(conversationId: string): Promise<Summary> {
+  try {
+    const response = await fetch(/* Cloud Function */);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(`Summary generation failed: ${data.error}`);
+    }
+    
+    return data.summary;
+  } catch (error) {
+    // Log with context for developers
+    ErrorLogger.log(error as Error, {
+      userId: getCurrentUserId(),
+      conversationId,
+      feature: 'summary',
+      action: 'generate',
+    });
+    
+    // Re-throw with user-friendly message
+    throw new Error('Failed to generate summary. Please try again.');
+  }
+}
+```
+
+---
+
+### Error Handling Patterns by Feature
+
+#### 1. Message Sending Errors
+
+**Scenario:** Firestore write fails (network, permissions, etc.)
+
+**Current Behavior:** Message stuck in "sending" state
+
+**Improved Behavior:**
+- Show inline error below message bubble
+- "Message failed to send. [Retry] [Delete]"
+- Persist failed message locally
+- Auto-retry when network restored
+
+```typescript
+// app/chat/[id].tsx
+
+const sendMessage = async (text: string) => {
+  try {
+    // Attempt send
+    await addDoc(/* ... */);
+  } catch (error) {
+    // Log for debugging
+    ErrorLogger.log(error as Error, {
+      conversationId,
+      action: 'send_message',
+    });
+    
+    // Update message status to 'failed'
+    updateMessageStatus(tempId, 'failed');
+    
+    // User sees: red "!" icon, can tap to retry
+    // NO error modal, NO full-screen error
+  }
+};
+```
+
+#### 2. AI Feature Errors
+
+**Scenario:** Cloud Function timeout, rate limit, API error
+
+**Current Behavior:** Modal shows technical error
+
+**Improved Behavior:**
+- Show user-friendly error in modal
+- Suggest actionable steps
+- Allow retry without closing modal
+
+```typescript
+// hooks/useAIFeature.ts
+
+export function useAIFeature(feature: string) {
+  const [error, setError] = useState<UserFriendlyError | null>(null);
+  
+  const execute = async (params: any) => {
+    try {
+      setError(null);
+      const result = await callAIFeature(feature, params);
+      return result;
+    } catch (err) {
+      // Translate to user-friendly error
+      const friendly = translateError(err as Error);
+      setError(friendly);
+      
+      // Log for developers
+      ErrorLogger.log(err as Error, {
+        feature,
+        action: 'execute',
+        metadata: params,
+      });
+      
+      // Don't throw - let component handle gracefully
+      return null;
+    }
+  };
+  
+  return { execute, error, retry: execute };
+}
+```
+
+#### 3. Authentication Errors
+
+**Scenario:** Session expired, invalid credentials
+
+**Current Behavior:** App may crash or show confusing errors
+
+**Improved Behavior:**
+- Detect auth errors globally
+- Show friendly "Session expired" message
+- Auto-redirect to login
+- Preserve navigation state
+
+```typescript
+// app/_layout.tsx
+
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    if (!user && requiresAuth(currentRoute)) {
+      // Show toast: "Your session has expired. Please log in again."
+      router.replace('/login');
+    }
+  });
+  
+  return unsubscribe;
+}, []);
+```
+
+#### 4. Network Errors
+
+**Scenario:** Offline or poor connection
+
+**Current Behavior:** Various Firestore errors
+
+**Improved Behavior:**
+- Show persistent offline banner at top of screen
+- Queue actions for when online
+- Show "Waiting for connection..." on buttons
+- Auto-retry when online
+
+```typescript
+// Already implemented with OfflineBanner component
+// Extend to handle action queuing
+```
+
+---
+
+### Implementation Checklist
+
+#### Phase 1: Error Boundaries (2 hours)
+- [ ] Create `ErrorBoundary` component with levels
+- [ ] Create error fallback components (full-screen, screen, inline)
+- [ ] Wrap app root with app-level boundary
+- [ ] Wrap each screen with screen-level boundary
+- [ ] Wrap AI modals with feature-level boundaries
+- [ ] Test with intentional errors
+
+#### Phase 2: Error Translation (1 hour)
+- [ ] Create `errorTranslator.ts` with common error mappings
+- [ ] Create `UserFriendlyError` type
+- [ ] Add error translation to all service calls
+- [ ] Test each error category
+
+#### Phase 3: Developer Logging (1 hour)
+- [ ] Create `ErrorLogger` class
+- [ ] Add logging to all try/catch blocks
+- [ ] Add context to logs (userId, conversationId, etc.)
+- [ ] Test log storage and retrieval
+
+#### Phase 4: Feature-Specific Handling (2 hours)
+- [ ] Update message sending error handling
+- [ ] Update AI feature error handling with retry
+- [ ] Update authentication error handling
+- [ ] Test each scenario
+
+#### Phase 5: Testing & Polish (1 hour)
+- [ ] Test network errors (airplane mode)
+- [ ] Test permission errors
+- [ ] Test rate limiting
+- [ ] Test authentication expiry
+- [ ] Verify no technical errors shown to users
+
+---
+
+### Success Criteria
+
+**User Experience:**
+- ✅ User never sees technical error messages (FirebaseError, etc.)
+- ✅ Every error has a clear, actionable message
+- ✅ App never crashes to home screen
+- ✅ User can always recover from errors (retry, go back, etc.)
+
+**Developer Experience:**
+- ✅ All errors logged with full context
+- ✅ Easy to reproduce issues from logs
+- ✅ Clear error propagation through layers
+- ✅ Consistent error handling patterns
+
+**Best Practices:**
+- ✅ React Error Boundaries at strategic points
+- ✅ Try/catch in all async operations
+- ✅ Error translation layer separates concerns
+- ✅ Centralized logging for monitoring
+- ✅ Graceful degradation (features fail, app continues)
+
+---
+
+### Future Enhancements (Post-MVP)
+
+1. **Error Monitoring Service**
+   - Integrate Sentry or LogRocket
+   - Track error rates and patterns
+   - Alert on critical errors
+
+2. **User Feedback**
+   - "Report a Problem" button on error screens
+   - Include logs with user consent
+   - Auto-populate support tickets
+
+3. **Smart Retry Logic**
+   - Exponential backoff
+   - Circuit breaker pattern
+   - Queue failed actions
+
+4. **Error Analytics**
+   - Track most common errors
+   - Identify patterns by user/device
+   - Proactive bug fixes
+
+---
+
+## Section 7: Documentation Updates
 
 ### Current State
 - ✅ ARCHITECTURE.md is comprehensive and up-to-date
