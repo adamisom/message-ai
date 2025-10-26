@@ -120,7 +120,7 @@ export default function WorkspacesScreen() {
       </View>
 
       {/* Current Workspace Indicator */}
-      {currentWorkspace && (
+      {currentWorkspace && workspaces.find((ws: Workspace) => ws.id === currentWorkspace?.id) && (
         <View style={styles.currentWorkspaceBox}>
           <Ionicons name="checkmark-circle" size={20} color="#34C759" />
           <Text style={styles.currentWorkspaceText}>
