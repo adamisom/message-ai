@@ -18,7 +18,7 @@ import {
   updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
 import { DecisionsModal } from '../../components/DecisionsModal';
@@ -33,9 +33,11 @@ import { SummaryModal } from '../../components/SummaryModal';
 import TypingIndicator from '../../components/TypingIndicator';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
+import { FailedMessagesService } from '../../services/failedMessagesService';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
 import { MESSAGE_LIMIT, MESSAGE_TIMEOUT_MS, TYPING_DEBOUNCE_MS } from '../../utils/constants';
+import { ErrorLogger } from '../../utils/errorLogger';
 
 export default function ChatScreen() {
   const { id: conversationId } = useLocalSearchParams();
@@ -661,6 +663,13 @@ export default function ChatScreen() {
     } catch (error) {
       console.error('❌ [ChatScreen] Send message error:', error);
       
+      // Log error with context
+      ErrorLogger.log(error as Error, {
+        userId: user.uid,
+        conversationId: conversationId as string,
+        action: 'send_message',
+      });
+      
       // Clear timeout
       const existingTimeout = timeoutRefs.current.get(tempId);
       if (existingTimeout) {
@@ -670,6 +679,9 @@ export default function ChatScreen() {
 
       // Mark as failed
       updateMessageStatus(tempId, 'failed');
+      
+      // Save to AsyncStorage for persistence
+      FailedMessagesService.saveFailedMessage(tempMessage, conversationId as string);
     }
   };
 
@@ -677,6 +689,51 @@ export default function ChatScreen() {
     console.log('🔄 [ChatScreen] Updating message status:', messageId, '→', status);
     setMessages(prev => 
       prev.map(m => m.id === messageId ? { ...m, status } : m)
+    );
+  };
+
+  // Retry a failed message
+  const handleRetryMessage = async (messageId: string) => {
+    console.log('🔄 [ChatScreen] Retrying failed message:', messageId);
+    
+    // Find the failed message
+    const failedMessage = messages.find(m => m.id === messageId);
+    if (!failedMessage) {
+      console.warn('⚠️ [ChatScreen] Failed message not found');
+      return;
+    }
+    
+    // Remove from AsyncStorage
+    await FailedMessagesService.removeFailedMessage(messageId);
+    
+    // Remove from UI
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    
+    // Resend
+    await sendMessage(failedMessage.text);
+  };
+
+  // Delete a failed message
+  const handleDeleteMessage = (messageId: string) => {
+    console.log('🗑️ [ChatScreen] Deleting failed message:', messageId);
+    
+    Alert.alert(
+      'Delete Message',
+      'Are you sure you want to delete this failed message?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            // Remove from AsyncStorage
+            await FailedMessagesService.removeFailedMessage(messageId);
+            
+            // Remove from UI
+            setMessages(prev => prev.filter(m => m.id !== messageId));
+          },
+        },
+      ]
     );
   };
 
@@ -876,6 +933,8 @@ export default function ChatScreen() {
         getReadDetails={getReadDetails}
         highlightedMessageId={highlightedMessageId}
         onLoadMore={loadMoreMessages}
+        onRetryMessage={handleRetryMessage}
+        onDeleteMessage={handleDeleteMessage}
         isLoadingMore={isLoadingMore}
         hasMoreMessages={hasMoreMessages}
         onScrollToBottom={handleScrollToBottom}

@@ -46,7 +46,7 @@ export function ActionItemsModal({
   const [itemToAssign, setItemToAssign] = useState<string | null>(null);
   const itemToAssignRef = useRef<string | null>(null);
   
-  const { data, loading, loadingSlowly, error, reload } = useAIFeature({
+  const { data, loading, loadingSlowly, error, reload } = useAIFeature<any>({
     visible,
     conversationId,
     fetchFunction: extractActionItems,

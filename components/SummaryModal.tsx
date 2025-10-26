@@ -29,20 +29,14 @@ export function SummaryModal({
 }: SummaryModalProps) {
   const [messageCount, setMessageCount] = useState(50);
   
-  const result = useAIFeature({
+  const result = useAIFeature<any>({
     visible,
     conversationId,
     fetchFunction: (convId) => generateSummary(convId, messageCount),
     dependencies: [messageCount],
   });
   
-  const { data: summary, loading, loadingSlowly, error, reload } = result as {
-    data: any;
-    loading: boolean;
-    loadingSlowly: boolean;
-    error: string;
-    reload: () => Promise<void>;
-  };
+  const { data: summary, loading, loadingSlowly, error, reload } = result;
 
   const handleClose = () => {
     onClose();

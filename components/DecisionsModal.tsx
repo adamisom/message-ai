@@ -27,7 +27,7 @@ export function DecisionsModal({
   conversationId,
   onClose,
 }: DecisionsModalProps) {
-  const { data, loading, loadingSlowly, error, reload } = useAIFeature({
+  const { data, loading, loadingSlowly, error, reload } = useAIFeature<any>({
     visible,
     conversationId,
     fetchFunction: (convId) => trackDecisions(convId),
