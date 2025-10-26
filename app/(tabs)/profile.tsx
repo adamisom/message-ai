@@ -8,6 +8,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
@@ -17,8 +18,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { UpgradeToProModal } from '../../components';
-import { getUserProfile, logoutUser } from '../../services/authService';
+import { HelpModal, UpgradeToProModal } from '../../components';
+import { logoutUser } from '../../services/authService';
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../utils/colors';
 
@@ -53,9 +54,11 @@ function formatDate(timestamp: any): string {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, setUser, logout } = useAuthStore();
+  const { user, logout, refreshUserProfile } = useAuthStore();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isStartingTrial, setIsStartingTrial] = useState(false);
   
   // Refresh user data when screen is focused
   useFocusEffect(
@@ -64,10 +67,7 @@ export default function ProfileScreen() {
         if (user?.uid) {
           setIsRefreshing(true);
           try {
-            const freshUser = await getUserProfile(user.uid);
-            if (freshUser) {
-              await setUser(freshUser);
-            }
+            await refreshUserProfile();
           } catch (error) {
             console.error('Failed to refresh user data:', error);
           } finally {
@@ -77,8 +77,55 @@ export default function ProfileScreen() {
       };
       
       refreshUser();
-    }, [user?.uid, setUser])
+    }, [user?.uid, refreshUserProfile])
   );
+  
+  // Manual refresh handler
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshUserProfile();
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Start free trial handler
+  const handleStartTrial = async () => {
+    if (isStartingTrial) return; // Prevent double-click
+    
+    setIsStartingTrial(true);
+    try {
+      console.log('🎉 [ProfileScreen] Starting 5-day free trial...');
+      
+      // Call the startFreeTrial Cloud Function
+      const functions = getFunctions();
+      const startTrialFn = httpsCallable(functions, 'startFreeTrial');
+      await startTrialFn();
+      
+      console.log('✅ [ProfileScreen] Trial started successfully');
+      
+      // Refresh user data to get updated trial status
+      await refreshUserProfile();
+      
+      Alert.alert(
+        '🎉 Trial Started!',
+        'You now have 5 days of free access to all Pro features. Enjoy!',
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      console.error('❌ [ProfileScreen] Failed to start trial:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to start trial. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsStartingTrial(false);
+    }
+  };
   
   if (!user || isRefreshing) {
     return (
@@ -148,10 +195,7 @@ export default function ProfileScreen() {
     // Refresh user data
     if (user?.uid) {
       try {
-        const updatedUser = await getUserProfile(user.uid);
-        if (updatedUser) {
-          await setUser(updatedUser);
-        }
+        await refreshUserProfile();
       } catch (error) {
         console.error('Failed to refresh user data after upgrade:', error);
       }
@@ -163,10 +207,7 @@ export default function ProfileScreen() {
     // Refresh user data
     if (user?.uid) {
       try {
-        const updatedUser = await getUserProfile(user.uid);
-        if (updatedUser) {
-          await setUser(updatedUser);
-        }
+        await refreshUserProfile();
       } catch (error) {
         console.error('Failed to refresh user data after trial start:', error);
       }
@@ -203,14 +244,27 @@ export default function ProfileScreen() {
       contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
     >
-      {/* Logout Button at Top */}
-      <TouchableOpacity
-        style={styles.logoutButton}
-        onPress={handleLogout}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.logoutButtonText}>Logout</Text>
-      </TouchableOpacity>
+      {/* Top Button Row */}
+      <View style={styles.topButtonRow}>
+        {/* Help Button (Left) */}
+        <TouchableOpacity
+          style={styles.helpButton}
+          onPress={() => setShowHelpModal(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="help-circle-outline" size={24} color="#007AFF" />
+        </TouchableOpacity>
+
+        {/* Logout Button (Right) */}
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.logoutButtonText}>Logout</Text>
+          <Ionicons name="log-out-outline" size={18} color="#B91C1C" />
+        </TouchableOpacity>
+      </View>
 
       {/* Profile Header */}
       <View style={styles.headerSection}>
@@ -285,12 +339,19 @@ export default function ProfileScreen() {
       <View style={styles.actionsSection}>
         {showTrialButton && (
           <TouchableOpacity
-            style={styles.trialButton}
-            onPress={() => setShowUpgradeModal(true)}
+            style={[styles.trialButton, isStartingTrial && styles.trialButtonDisabled]}
+            onPress={handleStartTrial}
             activeOpacity={0.7}
+            disabled={isStartingTrial}
           >
-            <Ionicons name="gift-outline" size={20} color={Colors.primary} />
-            <Text style={styles.trialButtonText}>Start 5-Day Free Trial</Text>
+            <Ionicons 
+              name={isStartingTrial ? "hourglass-outline" : "gift-outline"} 
+              size={20} 
+              color={isStartingTrial ? '#999' : Colors.primary} 
+            />
+            <Text style={[styles.trialButtonText, isStartingTrial && styles.trialButtonTextDisabled]}>
+              {isStartingTrial ? 'Starting Trial...' : 'Start 5-Day Free Trial'}
+            </Text>
           </TouchableOpacity>
         )}
         
@@ -324,6 +385,14 @@ export default function ProfileScreen() {
         onUpgradeSuccess={handleUpgradeSuccess}
         onTrialStart={handleTrialStart}
       />
+
+      {/* Help Modal */}
+      <HelpModal
+        visible={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+        onRefresh={handleManualRefresh}
+        isRefreshing={isRefreshing}
+      />
     </ScrollView>
   );
 }
@@ -337,18 +406,27 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
+  topButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 20,
+  },
+  helpButton: {
+    padding: 8,
+  },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'flex-end',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#B91C1C',
     borderRadius: 8,
     backgroundColor: '#FFF',
+    gap: 6,
   },
   logoutButtonText: {
     fontSize: 16,
@@ -478,11 +556,18 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  trialButtonDisabled: {
+    opacity: 0.5,
+    borderColor: '#999',
+  },
   trialButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.primary,
     marginLeft: 8,
+  },
+  trialButtonTextDisabled: {
+    color: '#999',
   },
   upgradeButton: {
     flexDirection: 'row',

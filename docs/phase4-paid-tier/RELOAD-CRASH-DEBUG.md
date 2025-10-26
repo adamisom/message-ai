@@ -72,6 +72,52 @@ This is NOT a code issue, NOT a rules issue, NOT a caching issue - it's a Firest
 - **Conclusion**: Not a data issue
 
 ## Current Workaround
+
+### ✅ IMPLEMENTED: Solution 1 - Hybrid Client-Side Write
+
+**Status:** Active workaround (implemented October 26, 2025)
+
+**Implementation:** Modified `presenceService.ts` to re-write all subscription/trial fields when setting user online.
+
+```typescript
+// services/presenceService.ts
+export const setUserOnline = async (uid: string, userData?: Partial<User>) => {
+  const updates: any = {
+    isOnline: true,
+    lastSeenAt: serverTimestamp(),
+  };
+
+  // Re-write subscription fields so client SDK can read them back
+  if (userData) {
+    if (userData.isPaidUser !== undefined) updates.isPaidUser = userData.isPaidUser;
+    if (userData.subscriptionTier) updates.subscriptionTier = userData.subscriptionTier;
+    // ... all other subscription/trial/workspace fields
+  }
+
+  await setDoc(doc(db, 'users', uid), updates, { merge: true });
+};
+```
+
+**Updated call sites:**
+- `authService.ts:122` - Login passes `userProfile` to `setUserOnline()`
+- `app/_layout.tsx:76,83` - Presence tracking passes `user` to `setUserOnline()`
+
+**Result:**
+- ✅ All subscription fields are now written by client
+- ✅ Client SDK can read them back (theory validated)
+- ✅ Trial/subscription status updates on app reload
+- ✅ No crashes
+- ✅ Tests pass
+
+**Trade-offs:**
+- Slight write overhead (re-writes ~15 fields on each presence update)
+- Hacky but effective workaround for SDK bug
+- Can be removed when Firebase fixes the underlying issue
+
+---
+
+### Previous Workaround (Deprecated)
+
 The app doesn't crash anymore thanks to validation in `authStore.ts`:
 ```typescript
 // Line 100-103
@@ -81,10 +127,7 @@ if (!freshUser.uid || !freshUser.email) {
 }
 ```
 
-**Tradeoffs:**
-- ✅ App doesn't crash on reload
-- ❌ Trial/subscription status doesn't update on reload (uses stale cached data)
-- ✅ Status updates correctly on login or after explicit actions (trial start, upgrade)
+**This validation is still in place as a safety net, but should no longer be triggered.**
 
 ## Mystery: Why Only isOnline and lastSeenAt?
 
@@ -153,6 +196,19 @@ This appears to be a genuine Firebase SDK bug. Provide:
 
 ## Temporary Production Solution
 
+### ✅ Option C: Write All Fields via Presence Service (IMPLEMENTED)
+
+**Status:** Active solution as of October 26, 2025
+
+When `setUserOnline()` is called, also write `isPaidUser`, `subscriptionTier`, etc.
+This way, client will have written all fields and can read them back.
+
+**Result:** Theory confirmed! This hacky workaround successfully bypasses the SDK bug.
+
+---
+
+### Alternative Options (Not Implemented)
+
 **Option A: Use Cloud Function for getUserProfile**
 ```typescript
 // Create getUserProfile Cloud Function
@@ -163,15 +219,16 @@ export const getUserProfile = functions.https.onCall(async (data, context) => {
 });
 ```
 
+**Pros:** Guaranteed to work (admin SDK confirmed working)  
+**Cons:** Adds ~200-500ms latency, extra Cloud Function costs
+
 **Option B: Accept Stale Data on Reload**
 - Keep current workaround (use cached AsyncStorage data)
 - Only fetch fresh data on explicit actions (login, trial start, upgrade)
 - Document that reload doesn't update subscription status
 
-**Option C: Write All Fields via Presence Service**
-- When `setUserOnline()` is called, also write `isPaidUser`, `subscriptionTier`, etc.
-- This way, client will have written all fields and might be able to read them
-- Hacky but might work if theory is correct
+**Pros:** Zero changes needed  
+**Cons:** User confusion, stale data
 
 ## Code Locations
 

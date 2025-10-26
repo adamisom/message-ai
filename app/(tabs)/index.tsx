@@ -120,7 +120,7 @@ export default function ConversationsList() {
       console.log('🔌 [ConversationsList] Cleaning up listener');
       unsubscribe();
     };
-  }, [user, setConversations]);
+  }, [user, setConversations, loading]); // Include loading in deps array
 
   // Phase 5: Listen to participant statuses
   useEffect(() => {

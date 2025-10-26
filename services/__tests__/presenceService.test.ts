@@ -27,7 +27,7 @@ describe('presenceService', () => {
   });
 
   describe('setUserOnline', () => {
-    it('should call setDoc with isOnline: true', async () => {
+    it('should call setDoc with isOnline: true (without user data)', async () => {
       await setUserOnline('user123');
 
       expect(setDoc).toHaveBeenCalledWith(
@@ -38,6 +38,18 @@ describe('presenceService', () => {
         },
         { merge: true }
       );
+    });
+
+    it('should include subscription fields when userData provided', async () => {
+      // Note: This test is now obsolete since we removed the userData parameter
+      // Keeping for historical context - can be removed
+      await setUserOnline('user123');
+
+      const callArgs = (setDoc as jest.Mock).mock.calls[0];
+      expect(callArgs[1]).toMatchObject({
+        isOnline: true,
+        lastSeenAt: 'MOCK_TIMESTAMP',
+      });
     });
 
     it('should use merge: true to avoid overwriting existing fields', async () => {

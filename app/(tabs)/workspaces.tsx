@@ -18,7 +18,6 @@ import {
 } from 'react-native';
 import { TrialWorkspaceModal } from '../../components/TrialWorkspaceModal';
 import { UpgradeToProModal } from '../../components/UpgradeToProModal';
-import { getUserProfile } from '../../services/authService';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { Workspace } from '../../types';
@@ -36,7 +35,7 @@ function isInTrial(user: any): boolean {
 
 export default function WorkspacesScreen() {
   const router = useRouter();
-  const { user, setUser } = useAuthStore();
+  const { user, refreshUserProfile } = useAuthStore();
   const {
     workspaces,
     loading: isLoading,
@@ -208,12 +207,9 @@ export default function WorkspacesScreen() {
           // Refresh user data from Firestore to get new Pro status
           if (user?.uid) {
             try {
-              const updatedUser = await getUserProfile(user.uid);
-              if (updatedUser) {
-                await setUser(updatedUser);
-                // Reload workspaces to reflect new Pro status
-                await loadWorkspaces(user.uid);
-              }
+              await refreshUserProfile();
+              // Reload workspaces to reflect new Pro status
+              await loadWorkspaces(user.uid);
             } catch (error) {
               console.error('Failed to refresh user data after upgrade:', error);
             }
@@ -224,12 +220,9 @@ export default function WorkspacesScreen() {
           // Refresh user data from Firestore to get trial status
           if (user?.uid) {
             try {
-              const updatedUser = await getUserProfile(user.uid);
-              if (updatedUser) {
-                await setUser(updatedUser);
-                // Reload workspaces to reflect new trial status
-                await loadWorkspaces(user.uid);
-              }
+              await refreshUserProfile();
+              // Reload workspaces to reflect new trial status
+              await loadWorkspaces(user.uid);
             } catch (error) {
               console.error('Failed to refresh user data after trial start:', error);
             }
@@ -246,12 +239,9 @@ export default function WorkspacesScreen() {
           // Refresh user data from Firestore to get new Pro status
           if (user?.uid) {
             try {
-              const updatedUser = await getUserProfile(user.uid);
-              if (updatedUser) {
-                await setUser(updatedUser);
-                // Reload workspaces to reflect new Pro status
-                await loadWorkspaces(user.uid);
-              }
+              await refreshUserProfile();
+              // Reload workspaces to reflect new Pro status
+              await loadWorkspaces(user.uid);
             } catch (error) {
               console.error('Failed to refresh user data after upgrade:', error);
             }

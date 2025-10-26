@@ -83,17 +83,32 @@ async function manageTrial() {
     console.log(`   Current Status: ${user.isPaidUser ? '💎 Pro' : '🔴 Free'}`);
     
     if (user.trialEndsAt) {
-      const now = Date.now();
-      const trialEndsAt = user.trialEndsAt.toMillis();
-      const daysRemaining = Math.ceil((trialEndsAt - now) / (1000 * 60 * 60 * 24));
-      
-      if (now < trialEndsAt) {
-        console.log(`   Trial: 🎉 Active (${daysRemaining} days left)`);
-      } else {
-        console.log(`   Trial: ⏰ Expired`);
+      try {
+        const now = Date.now();
+        let trialEndsAt;
+        
+        // Handle both Timestamp object and plain object with _seconds
+        if (typeof user.trialEndsAt.toMillis === 'function') {
+          trialEndsAt = user.trialEndsAt.toMillis();
+        } else if (user.trialEndsAt._seconds) {
+          trialEndsAt = user.trialEndsAt._seconds * 1000;
+        } else {
+          // Fallback for any other format
+          trialEndsAt = new Date(user.trialEndsAt).getTime();
+        }
+        
+        const daysRemaining = Math.ceil((trialEndsAt - now) / (1000 * 60 * 60 * 24));
+        
+        if (now < trialEndsAt) {
+          console.log(`   Trial: 🎉 Active (${daysRemaining} days left)`);
+        } else {
+          console.log(`   Trial: ⏰ Expired`);
+        }
+      } catch (err) {
+        console.log(`   Trial: ⚠️ Has trial data (format issue)`);
       }
     } else {
-      console.log(`   Trial: ❌ Never had trial`);
+      console.log(`   Trial: ❌ No trial data`);
     }
     console.log('');
 

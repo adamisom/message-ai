@@ -34,7 +34,6 @@ import TypingIndicator from '../../components/TypingIndicator';
 import { UpgradeToProModal } from '../../components/UpgradeToProModal';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
-import { getUserProfile } from '../../services/authService';
 import { FailedMessagesService } from '../../services/failedMessagesService';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
@@ -43,7 +42,7 @@ import { ErrorLogger } from '../../utils/errorLogger';
 
 export default function ChatScreen() {
   const { id: conversationId } = useLocalSearchParams();
-  const { user, setUser } = useAuthStore();
+  const { user, refreshUserProfile } = useAuthStore();
   const navigation = useNavigation();
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
@@ -1069,11 +1068,8 @@ export default function ChatScreen() {
           // Refresh user data from Firestore to get new Pro status
           if (user?.uid) {
             try {
-              const updatedUser = await getUserProfile(user.uid);
-              if (updatedUser) {
-                await setUser(updatedUser);
-                Alert.alert('Success!', 'Welcome to Pro! 🎉\n\nYou now have AI features everywhere.');
-              }
+              await refreshUserProfile();
+              Alert.alert('Success!', 'Welcome to Pro! 🎉\n\nYou now have AI features everywhere.');
             } catch (error) {
               console.error('Failed to refresh user data after upgrade:', error);
               Alert.alert('Success!', 'Upgrade successful! Please restart the app to see changes.');
@@ -1085,11 +1081,8 @@ export default function ChatScreen() {
           // Refresh user data from Firestore to get trial status
           if (user?.uid) {
             try {
-              const updatedUser = await getUserProfile(user.uid);
-              if (updatedUser) {
-                await setUser(updatedUser);
-                Alert.alert('Trial Started!', 'Enjoy 5 days of full Pro access! 🎉');
-              }
+              await refreshUserProfile();
+              Alert.alert('Trial Started!', 'Enjoy 5 days of full Pro access! 🎉');
             } catch (error) {
               console.error('Failed to refresh user data after trial start:', error);
               Alert.alert('Trial Started!', 'Please restart the app to see changes.');
