@@ -13,6 +13,7 @@ export const Colors = {
   background: '#fff',
   backgroundGray: '#f8f8f8',
   backgroundLight: '#f5f5f5',
+  surfaceLight: '#f5f5f7',  // Phase 5: Light surface for banners/cards
   
   // Borders
   border: '#e0e0e0',

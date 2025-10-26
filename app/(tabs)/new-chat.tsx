@@ -17,6 +17,8 @@ import {
     findUserByEmail
 } from '../../services/firestoreService';
 import { useAuthStore } from '../../store/authStore';
+import { useWorkspaceStore } from '../../store/workspaceStore';
+import { Colors } from '../../utils/colors';
 import { validateEmail } from '../../utils/validators';
 
 interface User {
@@ -33,9 +35,10 @@ export default function NewChat() {
   const [isGroupMode, setIsGroupMode] = useState(false);
 
   const { user } = useAuthStore();
+  const { currentWorkspace } = useWorkspaceStore();
   const router = useRouter();
 
-  console.log('📝 [NewChat] Rendering, mode:', isGroupMode ? 'group' : 'direct', 'users:', validUsers.length);
+  console.log('📝 [NewChat] Rendering, mode:', isGroupMode ? 'group' : 'direct', 'users:', validUsers.length, 'workspace:', currentWorkspace?.name || 'none');
 
   const handleAddUser = async () => {
     setError('');
@@ -104,12 +107,14 @@ export default function NewChat() {
     }
 
     setLoading(true);
-    console.log('💬 [NewChat] Creating direct chat');
+    console.log('💬 [NewChat] Creating direct chat', currentWorkspace ? `in workspace: ${currentWorkspace.name}` : '(no workspace)');
     
     try {
       const conversationId = await createOrOpenConversation(
         validUsers[0], 
-        user
+        user,
+        currentWorkspace?.id,
+        currentWorkspace?.name
       );
       console.log('✅ [NewChat] Direct chat created, navigating to:', conversationId);
       router.push(`/chat/${conversationId}` as any);
@@ -133,10 +138,15 @@ export default function NewChat() {
     }
 
     setLoading(true);
-    console.log('👥 [NewChat] Creating group chat with', validUsers.length, 'users');
+    console.log('👥 [NewChat] Creating group chat with', validUsers.length, 'users', currentWorkspace ? `in workspace: ${currentWorkspace.name}` : '(no workspace)');
     
     try {
-      const conversationId = await createGroupConversation(validUsers, user);
+      const conversationId = await createGroupConversation(
+        validUsers, 
+        user,
+        currentWorkspace?.id,
+        currentWorkspace?.name
+      );
       console.log('✅ [NewChat] Group chat created, navigating to:', conversationId);
       router.push(`/chat/${conversationId}` as any);
     } catch (err: any) {
@@ -181,6 +191,15 @@ export default function NewChat() {
   return (
     <ErrorBoundary level="screen">
       <View style={styles.container}>
+      {/* Phase 5: Workspace context banner */}
+      {currentWorkspace && (
+        <View style={styles.workspaceBanner}>
+          <Text style={styles.workspaceBannerText}>
+            Creating chat in: <Text style={styles.workspaceName}>{currentWorkspace.name}</Text>
+          </Text>
+        </View>
+      )}
+      
       {/* Mode toggle */}
       <View style={styles.modeToggle}>
         <Button
@@ -266,6 +285,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     padding: 16,
+  },
+  workspaceBanner: {
+    backgroundColor: Colors.surfaceLight,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.primary,
+  },
+  workspaceBannerText: {
+    fontSize: 14,
+    color: Colors.textMedium,
+  },
+  workspaceName: {
+    fontWeight: '600',
+    color: Colors.primary,
   },
   modeToggle: {
     marginBottom: 16,
