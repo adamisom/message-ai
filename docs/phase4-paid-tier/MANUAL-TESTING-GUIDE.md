@@ -10,7 +10,7 @@ Last Updated: October 26, 2025
 - ✅ Sub-Phases 1-2: Workspaces, Trial, Billing Foundation (Tests 1-14)
 - ✅ Sub-Phase 3: Admin Action Item Assignment (Tests 23-28)
 - ✅ Sub-Phase 4: Invitation Notifications (Tests 15-22)
-- 🚧 Sub-Phase 5: Workspace Chats (tests will be added after implementation)
+- ✅ Sub-Phase 5: Workspace Chats (Tests 29-36)
 - 🚧 Sub-Phase 6: AI Feature Gating (tests will be added after implementation)
 
 ---
@@ -835,7 +835,183 @@ _________________________________
 
 ## Sub-Phase 5: Workspace Chats Tests
 
-*Tests will be added after Sub-Phase 5 implementation is complete...*
+### ✅ Test 29: View Workspace Chat List When Workspace Selected (2 min)
+
+**Prerequisites:** User is a member of a workspace with at least one workspace chat
+
+**Steps:**
+1. From Workspaces tab, tap on a workspace card (not settings icon)
+2. Navigate to Chats tab
+3. Observe the chat list
+
+**Expected Results:**
+- ✓ Workspace banner appears at top showing workspace name
+- ✓ Banner shows "View All" button
+- ✓ Only workspace chats displayed (filtered by workspaceId)
+- ✓ Each workspace chat shows workspace badge (building icon)
+- ✓ Non-workspace chats are hidden
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
+
+---
+
+### ✅ Test 30: Clear Workspace Filter (1 min)
+
+**Steps:**
+1. With workspace selected (from Test 29)
+2. Tap "View All" button in workspace banner
+3. Observe chat list
+
+**Expected Results:**
+- ✓ Workspace banner disappears
+- ✓ All non-workspace chats appear
+- ✓ Workspace chats are hidden (filtered out)
+- ✓ Chat list returns to normal state
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
+
+---
+
+### ✅ Test 31: Create Direct Chat in Workspace (2 min)
+
+**Prerequisites:** Workspace selected, at least one other workspace member
+
+**Steps:**
+1. Select a workspace from Workspaces tab
+2. Navigate to New Chat tab
+3. Observe workspace banner
+4. Enter email of workspace member
+5. Tap "Find User"
+6. Tap "Create Chat"
+7. Navigate back to Chats tab
+
+**Expected Results:**
+- ✓ Workspace banner shows: "Creating chat in: [Workspace Name]"
+- ✓ Chat created successfully
+- ✓ New chat appears in workspace chat list (when workspace selected)
+- ✓ Chat has workspace badge (building icon)
+- ✓ Chat has workspaceId and workspaceName fields in Firestore
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
+
+---
+
+### ✅ Test 32: Create Group Chat in Workspace (3 min)
+
+**Prerequisites:** Workspace selected, at least 2 other workspace members
+
+**Steps:**
+1. Select a workspace from Workspaces tab
+2. Navigate to New Chat tab
+3. Tap "Switch to Group Chat"
+4. Add 2+ workspace members by email
+5. Tap "Create Group"
+6. Navigate back to Chats tab
+
+**Expected Results:**
+- ✓ Workspace banner visible during creation
+- ✓ Group chat created successfully
+- ✓ Group shows in workspace chat list
+- ✓ Group has both group icon (people) and workspace badge (building)
+- ✓ Group has workspaceId, workspaceName, and isWorkspaceChat=true in Firestore
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
+
+---
+
+### ✅ Test 33: Non-Workspace Chat Creation (1 min)
+
+**Steps:**
+1. Clear any selected workspace (tap "View All" if workspace selected)
+2. Navigate to New Chat tab
+3. Observe - no workspace banner
+4. Create a direct or group chat
+5. Check chat list
+
+**Expected Results:**
+- ✓ No workspace banner in New Chat screen
+- ✓ Chat created successfully
+- ✓ Chat appears in "View All" mode (no workspace filter)
+- ✓ Chat has NO workspace badge
+- ✓ Chat has workspaceId=undefined in Firestore
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
+
+---
+
+### ✅ Test 34: Workspace Badge Visual Indicator (1 min)
+
+**Steps:**
+1. Create both workspace and non-workspace chats
+2. Toggle between "View All" and workspace-filtered views
+3. Observe conversation items
+
+**Expected Results:**
+- ✓ Workspace chats show building icon badge next to name
+- ✓ Badge is light blue background with primary blue icon
+- ✓ Non-workspace chats have NO badge
+- ✓ Badge positioned correctly (after name, before status)
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
+
+---
+
+### ✅ Test 35: Workspace Context Persistence (2 min)
+
+**Steps:**
+1. Select a workspace
+2. Navigate to different tabs (Chats, New Chat, Workspaces)
+3. Return to Chats tab
+
+**Expected Results:**
+- ✓ Workspace selection persists across tab navigation
+- ✓ Workspace banner remains visible in Chats tab
+- ✓ New Chat screen continues showing workspace banner
+- ✓ Filter remains active until explicitly cleared
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
+
+---
+
+### ✅ Test 36: Empty States (1 min)
+
+**Steps:**
+1. Select a workspace with no chats yet
+2. Observe Chats tab empty state
+3. Clear workspace filter
+4. Observe "View All" empty state (if no non-workspace chats)
+
+**Expected Results:**
+- ✓ Workspace empty state: "No chats in [Workspace Name] yet"
+- ✓ Subtext: "Start a conversation with workspace members"
+- ✓ General empty state: "No conversations yet"
+- ✓ General subtext: "Tap 'New Chat' to start a conversation"
+
+**Status:** ⬜ Pass | ⬜ Fail
+
+**Notes:**
+_________________________________
 
 ---
 
@@ -939,10 +1115,18 @@ firebase deploy --only functions
 | 20 | Spam Reporting | ⬜ | |
 | 21 | Edge Cases | ⬜ | |
 | 22 | Navigation Flow | ⬜ | |
+| **Sub-Phase 5** | | | |
+| 29 | Workspace Chat List | ⬜ | |
+| 30 | Clear Workspace Filter | ⬜ | |
+| 31 | Direct Chat in Workspace | ⬜ | |
+| 32 | Group Chat in Workspace | ⬜ | |
+| 33 | Non-Workspace Chat | ⬜ | |
+| 34 | Workspace Badge | ⬜ | |
+| 35 | Context Persistence | ⬜ | |
+| 36 | Empty States | ⬜ | |
 
 **Future Tests (to be added after implementation):**
 
-- Sub-Phase 5 Tests: TBD
 - Sub-Phase 6 Tests: TBD
 
 **Overall Status:** ⬜ Pass | ⬜ Fail | ⬜ Partial
@@ -1006,7 +1190,7 @@ Before merging `PaidTier` branch to `main`:
 - [ ] All Sub-Phase 1-2 tests passing (Tests 1-14)
 - [ ] All Sub-Phase 3 tests passing (Tests 23-28)
 - [ ] All Sub-Phase 4 tests passing (Tests 15-22)
-- [ ] All Sub-Phase 5 tests passing (TBD)
+- [ ] All Sub-Phase 5 tests passing (Tests 29-36)
 - [ ] All Sub-Phase 6 tests passing (TBD)
 - [ ] No critical bugs found
 - [ ] Automated tests passing (25/25 unit, 8/8 manual)
