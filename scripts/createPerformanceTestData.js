@@ -236,9 +236,11 @@ async function createPerformanceTestData() {
     }
     
     // Update conversation metadata
+    const lastTimestamp = new Date(startTime + (MESSAGE_COUNT * timeIncrement));
     await db.collection('conversations').doc(conversationId).update({
       messageCount: MESSAGE_COUNT,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastMessageAt: admin.firestore.Timestamp.fromDate(lastTimestamp), // Required for conversations query
       lastMessage: generateMessage(),
     });
     
