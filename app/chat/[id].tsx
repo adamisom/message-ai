@@ -66,6 +66,7 @@ export default function ChatScreen() {
   const [showActionItemsModal, setShowActionItemsModal] = useState(false);
   const [showDecisionsModal, setShowDecisionsModal] = useState(false);
   const [showMeetingSchedulerModal, setShowMeetingSchedulerModal] = useState(false);
+  // const [showUpgradeModal, setShowUpgradeModal] = useState(false); // TODO: Phase 4
   
   // Jump to message functionality
   const messageListRef = useRef<MessageListRef>(null);
@@ -980,6 +981,11 @@ export default function ChatScreen() {
         onOpenDecisions={() => setShowDecisionsModal(true)}
         onOpenMeetingScheduler={() => setShowMeetingSchedulerModal(true)}
         isGroupChat={conversation.type === 'group'}
+        canAccessAI={true}
+        onUpgradeRequired={() => {
+          // TODO: Phase 4 - setShowUpgradeModal(true)
+          Alert.alert('Upgrade Required', 'Upgrade to Pro to access AI features');
+        }}
       />
 
       {/* AI Feature Modals */}

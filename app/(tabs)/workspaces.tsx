@@ -16,21 +16,21 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { authStore } from '../../store/authStore';
-import { workspaceStore } from '../../store/workspaceStore';
+import { useAuthStore } from '../../store/authStore';
+import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { Workspace } from '../../types';
 import { Colors } from '../../utils/colors';
 
 export default function WorkspacesScreen() {
   const router = useRouter();
-  const user = authStore((state) => state.user);
+  const user = useAuthStore((state: any) => state.user);
   const {
     workspaces,
-    isLoading,
+    loading: isLoading,
     loadWorkspaces,
     setCurrentWorkspace,
     currentWorkspace,
-  } = workspaceStore();
+  } = useWorkspaceStore();
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -62,11 +62,11 @@ export default function WorkspacesScreen() {
       return;
     }
 
-    router.push('/(tabs)/create-workspace');
+    router.push('/create-workspace' as any);
   };
 
-  const ownedWorkspaces = workspaces.filter((ws) => ws.adminUid === user?.uid);
-  const memberWorkspaces = workspaces.filter((ws) => ws.adminUid !== user?.uid);
+  const ownedWorkspaces = workspaces.filter((ws: Workspace) => ws.adminUid === user?.uid);
+  const memberWorkspaces = workspaces.filter((ws: Workspace) => ws.adminUid !== user?.uid);
 
   if (isLoading && workspaces.length === 0) {
     return (
@@ -101,7 +101,7 @@ export default function WorkspacesScreen() {
         <View style={styles.currentWorkspaceBox}>
           <Ionicons name="checkmark-circle" size={20} color="#34C759" />
           <Text style={styles.currentWorkspaceText}>
-            Current: {workspaces.find((ws) => ws.id === currentWorkspace)?.name}
+            Current: {workspaces.find((ws: Workspace) => ws.id === currentWorkspace?.id)?.name}
           </Text>
         </View>
       )}
@@ -127,14 +127,14 @@ export default function WorkspacesScreen() {
       {ownedWorkspaces.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Workspaces</Text>
-          {ownedWorkspaces.map((workspace) => (
+          {ownedWorkspaces.map((workspace: Workspace) => (
             <WorkspaceCard
               key={workspace.id}
               workspace={workspace}
               isOwner={true}
-              isCurrent={workspace.id === currentWorkspace}
+              isCurrent={workspace.id === currentWorkspace?.id}
               onPress={() => handleWorkspacePress(workspace)}
-              onSettings={() => router.push(`/workspace/${workspace.id}/settings`)}
+              onSettings={() => router.push(`/workspace/${workspace.id}/settings` as any)}
             />
           ))}
         </View>
@@ -144,14 +144,14 @@ export default function WorkspacesScreen() {
       {memberWorkspaces.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Member Of</Text>
-          {memberWorkspaces.map((workspace) => (
+          {memberWorkspaces.map((workspace: Workspace) => (
             <WorkspaceCard
               key={workspace.id}
               workspace={workspace}
               isOwner={false}
-              isCurrent={workspace.id === currentWorkspace}
+              isCurrent={workspace.id === currentWorkspace?.id}
               onPress={() => handleWorkspacePress(workspace)}
-              onSettings={() => router.push(`/workspace/${workspace.id}/settings`)}
+              onSettings={() => router.push(`/workspace/${workspace.id}/settings` as any)}
             />
           ))}
         </View>

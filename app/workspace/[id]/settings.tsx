@@ -18,14 +18,14 @@ import {
 } from 'react-native';
 import { functions } from '../../../firebase.config';
 import { getWorkspace } from '../../../services/workspaceService';
-import { authStore } from '../../../store/authStore';
+import { useAuthStore } from '../../../store/authStore';
 import type { Workspace } from '../../../types';
 import { Colors } from '../../../utils/colors';
 
 export default function WorkspaceSettingsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const user = authStore((state) => state.user);
+  const user = useAuthStore((state: any) => state.user);
   
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,7 +79,7 @@ export default function WorkspaceSettingsScreen() {
       await deleteWorkspaceFn({ workspaceId: workspace.id });
 
       Alert.alert('Deleted', 'Workspace deleted successfully', [
-        { text: 'OK', onPress: () => router.replace('/(tabs)/workspaces') },
+        { text: 'OK', onPress: () => router.replace('/workspaces' as any) },
       ]);
     } catch (error: any) {
       console.error('Delete workspace error:', error);
@@ -108,11 +108,11 @@ export default function WorkspaceSettingsScreen() {
   };
 
   const handleInviteMember = () => {
-    router.push(`/workspace/${id}/invite-member`);
+    router.push(`/workspace/${id}/invite-member` as any);
   };
 
   const handleManageMembers = () => {
-    router.push(`/workspace/${id}/members`);
+    router.push(`/workspace/${id}/members` as any);
   };
 
   if (isLoading) {

@@ -16,14 +16,14 @@ import {
   View,
 } from 'react-native';
 import { getWorkspace } from '../../../services/workspaceService';
-import { authStore } from '../../../store/authStore';
+import { useAuthStore } from '../../../store/authStore';
 import type { Workspace } from '../../../types';
 import { Colors } from '../../../utils/colors';
 
 export default function WorkspaceMembersScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const user = authStore((state) => state.user);
+  const user = useAuthStore((state: any) => state.user);
   
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -144,7 +144,7 @@ export default function WorkspaceMembersScreen() {
       {isAdmin && members.length < workspace.maxUsersThisMonth && (
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => router.push(`/workspace/${id}/invite-member`)}
+          onPress={() => router.push(`/workspace/${id}/invite-member` as any)}
         >
           <Ionicons name="person-add" size={20} color="#FFF" />
           <Text style={styles.addButtonText}>Invite Member</Text>

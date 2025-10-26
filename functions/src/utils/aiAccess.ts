@@ -6,8 +6,6 @@
 import * as admin from 'firebase-admin';
 import { checkUserAIAccess, checkWorkspaceAIAccess } from './aiAccessHelpers';
 
-const db = admin.firestore();
-
 /**
  * Check if user can access AI features
  * Access granted if:
@@ -20,6 +18,9 @@ export async function canAccessAIFeatures(
   conversationId?: string
 ): Promise<{ canAccess: boolean; reason?: string; trialDaysRemaining?: number }> {
   try {
+    // Get firestore instance inside function to avoid initialization issues in tests
+    const db = admin.firestore();
+    
     // Get user document
     const userDoc = await db.collection('users').doc(userId).get();
     
@@ -88,6 +89,7 @@ export async function getTrialStatus(userId: string): Promise<{
   trialEndsAt?: Date;
 }> {
   try {
+    const db = admin.firestore(); // Move inside function
     const userDoc = await db.collection('users').doc(userId).get();
     
     if (!userDoc.exists) {
