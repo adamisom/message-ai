@@ -209,7 +209,7 @@ export default function ProfileScreen() {
         <View style={styles.featureItem}>
           <Ionicons name="checkmark-circle" size={20} color="#34C759" />
           <Text style={styles.featureText}>
-            Assign action items to your team
+            Assign action items within the chat
           </Text>
         </View>
         <View style={styles.featureItem}>
