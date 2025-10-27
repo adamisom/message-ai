@@ -18,9 +18,10 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { HelpModal, UpgradeToProModal } from '../../components';
+import { HelpModal, SpamWarningBanner, UpgradeToProModal } from '../../components';
 import { logoutUser } from '../../services/authService';
 import { getUserGroupChatInvitations } from '../../services/groupChatService';
+import { getUserSpamStatus, SpamStatus } from '../../services/spamService';
 import { getUserWorkspaceInvitations } from '../../services/workspaceService';
 import { useAuthStore } from '../../store/authStore';
 import type { WorkspaceInvitation } from '../../types';
@@ -63,6 +64,8 @@ export default function ProfileScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isStartingTrial, setIsStartingTrial] = useState(false);
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
+  const [spamStatus, setSpamStatus] = useState<SpamStatus | null>(null);
+  const [showSpamWarning, setShowSpamWarning] = useState(true);
   
   // Load pending invitations (workspace + group chat)
   const loadInvitations = useCallback(async () => {
@@ -79,6 +82,16 @@ export default function ProfileScreen() {
     }
   }, [user?.uid]);
   
+  // Load spam status
+  const loadSpamStatus = useCallback(async () => {
+    try {
+      const status = await getUserSpamStatus();
+      setSpamStatus(status);
+    } catch (error) {
+      console.error('Failed to load spam status:', error);
+    }
+  }, []);
+  
   // Refresh user data when screen is focused
   useFocusEffect(
     useCallback(() => {
@@ -88,6 +101,7 @@ export default function ProfileScreen() {
           try {
             await refreshUserProfile();
             await loadInvitations();
+            await loadSpamStatus();
           } catch (error) {
             console.error('Failed to refresh user data:', error);
           } finally {
@@ -97,7 +111,7 @@ export default function ProfileScreen() {
       };
       
       refreshUser();
-    }, [user?.uid, refreshUserProfile, loadInvitations])
+    }, [user?.uid, refreshUserProfile, loadInvitations, loadSpamStatus])
   );
   
   // Manual refresh handler
@@ -285,6 +299,17 @@ export default function ProfileScreen() {
           <Ionicons name="log-out-outline" size={18} color="#B91C1C" />
         </TouchableOpacity>
       </View>
+
+      {/* Sub-Phase 8: Spam Warning Banner */}
+      {spamStatus && showSpamWarning && spamStatus.status !== 'good' && (
+        <SpamWarningBanner
+          status={spamStatus.status}
+          message={spamStatus.message}
+          strikeCount={spamStatus.strikeCount}
+          banEndsAt={spamStatus.banEndsAt}
+          onDismiss={() => setShowSpamWarning(false)}
+        />
+      )}
 
       {/* Notifications Section - Only show if invitations exist */}
       {invitations.length > 0 && (

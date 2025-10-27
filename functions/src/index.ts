@@ -47,4 +47,7 @@ export { expandWorkspaceCapacity } from './workspaces/capacityExpansion';
 export { pinMessage, unpinMessage } from './workspaces/pinnedMessages';
 export { markMessageUrgent, unmarkMessageUrgent } from './workspaces/urgencyMarkers';
 
+// Sub-Phase 8: Enhanced Spam Reporting
+export { getUserSpamStatus } from './spam/getUserSpamStatus';
+
 

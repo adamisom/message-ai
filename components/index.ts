@@ -16,6 +16,9 @@ export { default as MessageToolbar } from './MessageToolbar';
 export { default as PinnedMessagesModal } from './PinnedMessagesModal';
 export { default as ReadOnlyWorkspaceBanner } from './ReadOnlyWorkspaceBanner';
 
+// Sub-Phase 8: Spam Prevention UI
+export { default as SpamWarningBanner } from './SpamWarningBanner';
+
 // Phase 4: Paid Tier Components
 export { HelpModal } from './HelpModal';
 export { ProfileButton } from './ProfileButton';
