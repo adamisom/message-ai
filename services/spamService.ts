@@ -7,10 +7,10 @@ export interface SpamStatus {
   status: 'good' | 'warning' | 'danger' | 'temp_banned' | 'permanently_banned';
   message: string;
   banEndsAt: number | null;
-  activeReports: Array<{
+  activeReports: {
     reason: string;
     reportedAt: number;
-  }>;
+  }[];
 }
 
 /**

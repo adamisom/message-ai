@@ -18,16 +18,20 @@ import {
     updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { ActionSheetIOS, ActivityIndicator, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
+import CapacityExpansionModal from '../../components/CapacityExpansionModal';
 import { DecisionsModal } from '../../components/DecisionsModal';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
 import { MeetingSchedulerModal } from '../../components/MeetingSchedulerModal';
 import MessageInput from '../../components/MessageInput';
 import MessageList, { MessageListRef } from '../../components/MessageList';
+import MessageToolbar from '../../components/MessageToolbar';
 import OfflineBanner from '../../components/OfflineBanner';
+import PinnedMessagesModal from '../../components/PinnedMessagesModal';
+import ReadOnlyWorkspaceBanner from '../../components/ReadOnlyWorkspaceBanner';
 import { SearchModal } from '../../components/SearchModal';
 import { SummaryModal } from '../../components/SummaryModal';
 import TypingIndicator from '../../components/TypingIndicator';
@@ -36,6 +40,13 @@ import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
 import { FailedMessagesService } from '../../services/failedMessagesService';
 import { reportDirectMessageSpam } from '../../services/groupChatService';
+import {
+  expandWorkspaceCapacity,
+  markMessageUrgent,
+  pinMessage,
+  unmarkMessageUrgent,
+  unpinMessage,
+} from '../../services/workspaceAdminService';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
 import { Workspace } from '../../types/workspace';
@@ -903,107 +914,6 @@ export default function ChatScreen() {
     );
   };
 
-  // Handle message long-press for spam reporting (Phase C)
-  const handleMessageLongPress = async (message: Message) => {
-    console.log('👆 [ChatScreen] Message long-press:', message.id);
-    
-    // Only show spam reporting for direct messages from other users
-    if (conversation?.type !== 'direct' || message.senderId === user?.uid) {
-      return;
-    }
-    
-    const options = ['Report Spam', 'Cancel'];
-    const destructiveButtonIndex = 0;
-    const cancelButtonIndex = 1;
-    
-    const showActionSheet = () => {
-      if (Platform.OS === 'ios') {
-        ActionSheetIOS.showActionSheetWithOptions(
-          {
-            options,
-            destructiveButtonIndex,
-            cancelButtonIndex,
-            title: 'Message Options',
-          },
-          async (buttonIndex) => {
-            if (buttonIndex === 0) {
-              // Report Spam
-              await handleReportSpam(message);
-            }
-          }
-        );
-      } else {
-        // Android fallback using Alert
-        Alert.alert(
-          'Message Options',
-          'What would you like to do?',
-          [
-            {
-              text: 'Report Spam',
-              onPress: () => handleReportSpam(message),
-              style: 'destructive',
-            },
-            {
-              text: 'Cancel',
-              style: 'cancel',
-            },
-          ]
-        );
-      }
-    };
-    
-    showActionSheet();
-  };
-  
-  const handleReportSpam = async (message: Message) => {
-    try {
-      console.log('🚨 [ChatScreen] Reporting spam:', message.id);
-      
-      if (!user?.uid || !conversationId || typeof conversationId !== 'string') {
-        throw new Error('Invalid conversation or user');
-      }
-      
-      await reportDirectMessageSpam(conversationId, message.senderId);
-      
-      Alert.alert(
-        'Spam Reported',
-        'This message has been reported. The sender has been blocked, and this conversation has been hidden from your list.',
-        [{ text: 'OK' }]
-      );
-      
-      // Navigate back to conversation list
-      navigation.goBack();
-      
-    } catch (error: any) {
-      console.error('❌ [ChatScreen] Error reporting spam:', error);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to report spam. Please try again.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
-
-  // Jump to message from search results
-  const handleJumpToMessage = (messageId: string) => {
-    console.log('🎯 [ChatScreen] Jumping to message:', messageId);
-    
-    const index = messages.findIndex(m => m.id === messageId);
-    if (index !== -1) {
-      messageListRef.current?.scrollToIndex({
-        index,
-        animated: true,
-        viewPosition: 0.5, // Center the message in viewport
-      });
-      
-      // Highlight the message for 2 seconds
-      setHighlightedMessageId(messageId);
-      setTimeout(() => setHighlightedMessageId(null), 2000);
-    } else {
-      console.warn('⚠️ [ChatScreen] Message not found in current messages list');
-    }
-  };
-
   // Phase 5: Typing indicator handlers
   const handleTyping = async () => {
     if (!conversationId || typeof conversationId !== 'string' || !user) return;
@@ -1138,6 +1048,114 @@ export default function ChatScreen() {
     });
 
     return { readBy, unreadBy };
+  };
+
+  // Sub-Phase 7: Workspace Admin Handlers
+  const handleMessageLongPress = (message: Message) => {
+    if (!conversation?.workspaceId) return; // Only for workspace chats
+    setSelectedMessage(message);
+    setShowMessageToolbar(true);
+  };
+
+  const handleMarkUrgent = async () => {
+    if (!selectedMessage || !conversation?.workspaceId) return;
+    
+    try {
+      await markMessageUrgent(conversationId as string, selectedMessage.id);
+      Alert.alert('Success', 'Message marked as urgent');
+      setShowMessageToolbar(false);
+      setSelectedMessage(null);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to mark message as urgent');
+    }
+  };
+
+  const handleUnmarkUrgent = async () => {
+    if (!selectedMessage || !conversation?.workspaceId) return;
+    
+    try {
+      await unmarkMessageUrgent(conversationId as string, selectedMessage.id);
+      Alert.alert('Success', 'Urgency marker removed');
+      setShowMessageToolbar(false);
+      setSelectedMessage(null);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to remove urgency marker');
+    }
+  };
+
+  const handlePinMessage = async () => {
+    if (!selectedMessage || !conversation?.workspaceId) return;
+    
+    try {
+      await pinMessage(conversationId as string, selectedMessage.id);
+      Alert.alert('Success', 'Message pinned');
+      setShowMessageToolbar(false);
+      setSelectedMessage(null);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to pin message');
+    }
+  };
+
+  const handleUnpinMessage = async (messageId: string) => {
+    if (!conversation?.workspaceId) return;
+    
+    try {
+      await unpinMessage(conversationId as string, messageId);
+      Alert.alert('Success', 'Message unpinned');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to unpin message');
+    }
+  };
+
+  const handleJumpToMessage = (messageId: string) => {
+    // Close pinned modal
+    setShowPinnedModal(false);
+    
+    // Find message index and scroll
+    const index = messages.findIndex(m => m.id === messageId);
+    if (index !== -1) {
+      messageListRef.current?.scrollToIndex({
+        index,
+        animated: true,
+        viewPosition: 0.5, // Center in viewport
+      });
+      
+      // Highlight message
+      setHighlightedMessageId(messageId);
+      setTimeout(() => setHighlightedMessageId(null), 2000);
+    }
+  };
+
+  const handleExpandCapacity = async (newCapacity: number) => {
+    if (!workspace) return;
+    
+    try {
+      await expandWorkspaceCapacity(workspace.id, newCapacity);
+      Alert.alert('Success', 'Workspace capacity expanded successfully');
+      setShowCapacityModal(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to expand capacity');
+    }
+  };
+
+  const handleReportSpam = async () => {
+    if (!selectedMessage || conversation?.type !== 'direct') return;
+    
+    const otherUserId = conversation.participants.find(id => id !== user?.uid);
+    if (!otherUserId) return;
+
+    try {
+      await reportDirectMessageSpam(conversationId as string, otherUserId);
+      Alert.alert(
+        'Spam Reported',
+        'User reported for spam and blocked. This conversation will be hidden.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+      setShowMessageToolbar(false);
+      setSelectedMessage(null);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to report spam');
+    }
   };
 
   // Cleanup all timeouts on unmount
@@ -1316,6 +1334,55 @@ export default function ChatScreen() {
           }
         }}
       />
+
+      {/* Sub-Phase 7: Workspace Admin Modals */}
+      {conversation?.workspaceId && (
+        <>
+          {/* Read-Only Banner (shows if workspace inactive) */}
+          {workspace && !workspace.isActive && (
+            <ReadOnlyWorkspaceBanner
+              visible={true}
+              reason="inactive"
+            />
+          )}
+
+          <MessageToolbar
+            visible={showMessageToolbar}
+            message={selectedMessage}
+            isWorkspaceChat={true}
+            isAdmin={isAdmin}
+            isOwnMessage={selectedMessage?.senderId === user?.uid}
+            onClose={() => {
+              setShowMessageToolbar(false);
+              setSelectedMessage(null);
+            }}
+            onMarkUrgent={handleMarkUrgent}
+            onUnmarkUrgent={handleUnmarkUrgent}
+            onPin={handlePinMessage}
+            onReportSpam={handleReportSpam}
+          />
+
+          <PinnedMessagesModal
+            visible={showPinnedModal}
+            pinnedMessages={pinnedMessages}
+            conversation={conversation}
+            isAdmin={isAdmin}
+            onClose={() => setShowPinnedModal(false)}
+            onUnpin={handleUnpinMessage}
+            onJumpToMessage={handleJumpToMessage}
+          />
+
+          {isAdmin && workspace && (
+            <CapacityExpansionModal
+              visible={showCapacityModal}
+              workspace={workspace}
+              newMemberCount={conversation.participants.length + 1}
+              onClose={() => setShowCapacityModal(false)}
+              onExpand={handleExpandCapacity}
+            />
+          )}
+        </>
+      )}
     </View>
     </ErrorBoundary>
   );
