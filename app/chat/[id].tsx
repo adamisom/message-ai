@@ -38,7 +38,6 @@ import TypingIndicator from '../../components/TypingIndicator';
 import { UpgradeToProModal } from '../../components/UpgradeToProModal';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
-import { useModalManager } from '../../hooks/useModalManager';
 import { FailedMessagesService } from '../../services/failedMessagesService';
 import { reportDirectMessageSpam } from '../../services/groupChatService';
 import { editMessage as editMessageService, deleteMessage as deleteMessageService } from '../../services/messageEditService';
@@ -61,9 +60,6 @@ export default function ChatScreen() {
   const { id: conversationId } = useLocalSearchParams();
   const { user, refreshUserProfile } = useAuthStore();
   const navigation = useNavigation();
-  
-  // Modal management - consolidated from 11 separate useState calls
-  const modals = useModalManager();
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
