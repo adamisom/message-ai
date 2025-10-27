@@ -12,7 +12,9 @@ export { default as EditSummaryModal } from './EditSummaryModal';
 
 // Sub-Phase 7: Workspace Admin Components
 export { default as CapacityExpansionModal } from './CapacityExpansionModal';
+export { default as MessageToolbar } from './MessageToolbar';
 export { default as PinnedMessagesModal } from './PinnedMessagesModal';
+export { default as ReadOnlyWorkspaceBanner } from './ReadOnlyWorkspaceBanner';
 
 // Phase 4: Paid Tier Components
 export { HelpModal } from './HelpModal';
