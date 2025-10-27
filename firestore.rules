@@ -87,6 +87,25 @@ service cloud.firestore {
                        isUser(resource.data.invitedByUid);
     }
     
+    // Group chat invitations (Sub-Phase 6.5)
+    match /group_chat_invitations/{invitationId} {
+      // Invitee and inviter can read
+      allow read: if isAuthenticated() && 
+                     (isUser(resource.data.invitedUserUid) || 
+                      isUser(resource.data.invitedByUid));
+      
+      // Authenticated users (non-banned) can create invitations
+      allow create: if isAuthenticated() &&
+                       !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.spamBanned;
+      
+      // Invitee can update (accept/decline/spam)
+      allow update: if isUser(resource.data.invitedUserUid);
+      
+      // Invitee or inviter can delete
+      allow delete: if isUser(resource.data.invitedUserUid) || 
+                       isUser(resource.data.invitedByUid);
+    }
+    
     // ===== USERS COLLECTION =====
     
     // WIDE OPEN FOR DEBUGGING - TODO: Restrict properly

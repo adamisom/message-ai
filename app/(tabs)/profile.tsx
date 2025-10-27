@@ -21,6 +21,7 @@ import {
 import { HelpModal, UpgradeToProModal } from '../../components';
 import { logoutUser } from '../../services/authService';
 import { getUserWorkspaceInvitations } from '../../services/workspaceService';
+import { getUserGroupChatInvitations } from '../../services/groupChatService';
 import { useAuthStore } from '../../store/authStore';
 import type { WorkspaceInvitation } from '../../types';
 import { Colors } from '../../utils/colors';
@@ -63,12 +64,16 @@ export default function ProfileScreen() {
   const [isStartingTrial, setIsStartingTrial] = useState(false);
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
   
-  // Load pending invitations
+  // Load pending invitations (workspace + group chat)
   const loadInvitations = useCallback(async () => {
     if (!user?.uid) return;
     try {
-      const invites = await getUserWorkspaceInvitations(user.uid);
-      setInvitations(invites);
+      const [workspaceInvites, groupChatInvites] = await Promise.all([
+        getUserWorkspaceInvitations(user.uid),
+        getUserGroupChatInvitations(user.uid),
+      ]);
+      // Combine both types for display
+      setInvitations([...workspaceInvites, ...groupChatInvites]);
     } catch (error) {
       console.error('Failed to load invitations:', error);
     }

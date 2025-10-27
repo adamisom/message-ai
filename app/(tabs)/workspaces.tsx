@@ -19,6 +19,7 @@ import {
 import { TrialWorkspaceModal } from '../../components/TrialWorkspaceModal';
 import { UpgradeToProModal } from '../../components/UpgradeToProModal';
 import { getUserWorkspaceInvitations } from '../../services/workspaceService';
+import { getUserGroupChatInvitations } from '../../services/groupChatService';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { Workspace } from '../../types';
@@ -61,8 +62,12 @@ export default function WorkspacesScreen() {
   const loadInvitationCount = async () => {
     if (!user?.uid) return;
     try {
-      const invitations = await getUserWorkspaceInvitations(user.uid);
-      setInvitationCount(invitations.length);
+      const [workspaceInvites, groupChatInvites] = await Promise.all([
+        getUserWorkspaceInvitations(user.uid),
+        getUserGroupChatInvitations(user.uid),
+      ]);
+      // Combined count of both invitation types
+      setInvitationCount(workspaceInvites.length + groupChatInvites.length);
     } catch (error) {
       console.error('Error loading invitation count:', error);
     }
