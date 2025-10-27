@@ -52,7 +52,6 @@ export const expandWorkspaceCapacity = functions.https.onCall(async (data, conte
     );
   }
 
-  const billingCycleStart = workspace.billingCycleStart?.toDate() || new Date();
   const today = new Date();
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   const daysRemaining = daysInMonth - today.getDate() + 1;

@@ -135,7 +135,7 @@ export const exportWorkspace = functions
 
     // 5. Build members list
     const members: WorkspaceExport['members'] = [];
-    for (const [uid, details] of Object.entries(workspace.memberDetails as any)) {
+    for (const [, details] of Object.entries(workspace.memberDetails as any)) {
       const memberDetails = details as any;
       members.push({
         email: memberDetails.email,

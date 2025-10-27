@@ -2,7 +2,6 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import {
   calculateActiveStrikes,
-  shouldSendBanNotification,
 } from '../utils/spamHelpers';
 
 const db = admin.firestore();
@@ -107,9 +106,6 @@ export const reportDirectMessageSpam = functions.https.onCall(
       timestamp: now,
       conversationId,
     };
-
-    // 8. Calculate strikes BEFORE adding new report
-    const wasAlreadyBanned = reportedUser.spamBanned || false;
 
     // 9. Run transaction to update reported user
     await db.runTransaction(async (transaction) => {
