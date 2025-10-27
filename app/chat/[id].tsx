@@ -18,7 +18,7 @@ import {
   updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
 import CapacityExpansionModal from '../../components/CapacityExpansionModal';
