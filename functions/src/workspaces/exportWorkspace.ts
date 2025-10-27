@@ -33,26 +33,26 @@ interface ExportedConversation {
     generatedAt: string;
     editedByAdmin?: boolean;
   };
-  decisions?: Array<{
+  decisions?: {
     decision: string;
     context: string;
     confidence: number;
     decidedAt: string;
     editedByAdmin?: boolean;
-  }>;
-  actionItems?: Array<{
+  }[];
+  actionItems?: {
     text: string;
     assignee: string | null;
     dueDate: string | null;
     priority: string;
     status: string;
     editedByAdmin?: boolean;
-  }>;
-  pinnedMessages?: Array<{
+  }[];
+  pinnedMessages?: {
     messageId: string;
     pinnedBy: string;
     pinnedAt: string;
-  }>;
+  }[];
 }
 
 interface WorkspaceExport {
@@ -61,12 +61,12 @@ interface WorkspaceExport {
   exportedAt: string;
   exportedBy: string;
   
-  members: Array<{
+  members: {
     email: string;
     displayName: string;
     role: 'admin' | 'member';
     joinedAt: string;
-  }>;
+  }[];
   
   conversations: ExportedConversation[];
   

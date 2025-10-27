@@ -285,6 +285,7 @@ export const reportDirectMessageInvitationSpam = functions.https.onCall(async (d
   });
 
   // 5. Add spam report to inviter (reuse existing spam helper logic)
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { calculateActiveStrikes } = require('../utils/spamHelpers');
   
   const inviterRef = db.collection('users').doc(invitation.inviterId);

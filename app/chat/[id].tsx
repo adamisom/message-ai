@@ -38,6 +38,7 @@ import TypingIndicator from '../../components/TypingIndicator';
 import { UpgradeToProModal } from '../../components/UpgradeToProModal';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
+import { useModalManager } from '../../hooks/useModalManager';
 import { FailedMessagesService } from '../../services/failedMessagesService';
 import { reportDirectMessageSpam } from '../../services/groupChatService';
 import { deleteMessage as deleteMessageService, editMessage as editMessageService } from '../../services/messageEditService';
@@ -67,18 +68,8 @@ export default function ChatScreen() {
   const [isOnline, setIsOnline] = useState(true);
   const [canAccessAI, setCanAccessAI] = useState(false); // AI access control
   
-  // Modal state
-  const [showAIMenu, setShowAIMenu] = useState(false);
-  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
-  const [showSearchModal, setShowSearchModal] = useState(false);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [showActionItemsModal, setShowActionItemsModal] = useState(false);
-  const [showDecisionsModal, setShowDecisionsModal] = useState(false);
-  const [showMeetingSchedulerModal, setShowMeetingSchedulerModal] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showPinnedModal, setShowPinnedModal] = useState(false);
-  const [showCapacityModal, setShowCapacityModal] = useState(false);
+  // Modal state - consolidated with useModalManager
+  const modals = useModalManager();
   
   // Pagination state
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -288,10 +279,10 @@ export default function ChatScreen() {
                   showText={true}
                 />
               )}
-              <TouchableOpacity onPress={() => setShowAIMenu(true)}>
+              <TouchableOpacity onPress={() => modals.open('aiMenu')}>
                 <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowParticipantsModal(true)}>
+              <TouchableOpacity onPress={() => modals.open('participants')}>
                 <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
               </TouchableOpacity>
             </View>
@@ -306,11 +297,11 @@ export default function ChatScreen() {
         const pinnedCount = conversation.pinnedMessages?.length || 0;
         headerRight = () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, gap: 12 }}>
-            <TouchableOpacity onPress={() => setShowAIMenu(true)}>
+            <TouchableOpacity onPress={() => modals.open('aiMenu')}>
               <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
             </TouchableOpacity>
             {conversation.workspaceId && pinnedCount > 0 && (
-              <TouchableOpacity onPress={() => setShowPinnedModal(true)}>
+              <TouchableOpacity onPress={() => modals.open('pinned')}>
                 <View style={{ position: 'relative' }}>
                   <Ionicons name="pin" size={24} color="#007AFF" />
                   <View style={{
@@ -329,7 +320,7 @@ export default function ChatScreen() {
                 </View>
               </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={() => setShowParticipantsModal(true)}>
+            <TouchableOpacity onPress={() => modals.open('participants')}>
               <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
             </TouchableOpacity>
           </View>
@@ -339,7 +330,7 @@ export default function ChatScreen() {
       console.log('📝 [ChatScreen] Setting header title:', title);
       navigation.setOptions({ title, headerRight });
     }
-  }, [conversation, user, userStatuses, navigation]);
+  }, [conversation, user, userStatuses, navigation, modals]);
 
   // Listen to network status
   useEffect(() => {
@@ -1070,7 +1061,7 @@ export default function ChatScreen() {
         onPress: () => {
           if (option === 'Edit Message') {
             setMessageToEdit(message);
-            setShowEditModal(true);
+            modals.open('edit');
           } else if (option === 'Delete Message') {
             handleDeleteMessage(message);
           } else if (option === 'Mark Urgent') {
@@ -1142,7 +1133,7 @@ export default function ChatScreen() {
 
   const handleJumpToMessage = (messageId: string) => {
     // Close pinned modal
-    setShowPinnedModal(false);
+    modals.close();
     
     // Find message index and scroll
     const index = messages.findIndex(m => m.id === messageId);
@@ -1165,7 +1156,7 @@ export default function ChatScreen() {
     try {
       await expandWorkspaceCapacity(workspace.id, newCapacity);
       Alerts.success('Workspace capacity expanded successfully');
-      setShowCapacityModal(false);
+      modals.close();
     } catch (error: any) {
       Alerts.error(error.message || 'Failed to expand capacity');
     }
@@ -1195,7 +1186,7 @@ export default function ChatScreen() {
     try {
       await editMessageService(conversationId as string, messageToEdit.id, newText);
       // Success - message will update via real-time listener
-      setShowEditModal(false);
+      modals.close();
       setMessageToEdit(null);
     } catch (error: any) {
       throw error; // Let EditMessageModal handle the error display
@@ -1294,7 +1285,7 @@ export default function ChatScreen() {
       
       {/* Participants Modal (for both direct and group chats) */}
       <GroupParticipantsModal
-        visible={showParticipantsModal}
+        visible={modals.isOpen('participants')}
         participants={Object.entries(conversation.participantDetails).map(([uid, details]) => ({
           uid,
           displayName: details.displayName,
@@ -1304,7 +1295,7 @@ export default function ChatScreen() {
         conversationId={conversationId as string}
         conversationType={conversation.type}
         isWorkspaceChat={!!conversation.workspaceId}
-        onClose={() => setShowParticipantsModal(false)}
+        onClose={() => modals.close()}
         onMemberAdded={async () => {
           // Refresh conversation to update participant list
           const conversationRef = doc(db, 'conversations', conversationId as string);
@@ -1317,38 +1308,38 @@ export default function ChatScreen() {
 
       {/* AI Features Menu */}
       <AIFeaturesMenu
-        visible={showAIMenu}
-        onClose={() => setShowAIMenu(false)}
-        onOpenSearch={() => setShowSearchModal(true)}
-        onOpenSummary={() => setShowSummaryModal(true)}
-        onOpenActionItems={() => setShowActionItemsModal(true)}
-        onOpenDecisions={() => setShowDecisionsModal(true)}
-        onOpenMeetingScheduler={() => setShowMeetingSchedulerModal(true)}
+        visible={modals.isOpen('aiMenu')}
+        onClose={() => modals.close()}
+        onOpenSearch={() => modals.open('search')}
+        onOpenSummary={() => modals.open('summary')}
+        onOpenActionItems={() => modals.open('actionItems')}
+        onOpenDecisions={() => modals.open('decisions')}
+        onOpenMeetingScheduler={() => modals.open('meetingScheduler')}
         isGroupChat={conversation.type === 'group'}
         canAccessAI={canAccessAI}
-        onUpgradeRequired={() => setShowUpgradeModal(true)}
+        onUpgradeRequired={() => modals.open('upgrade')}
       />
 
       {/* AI Feature Modals */}
       <SearchModal
-        visible={showSearchModal}
+        visible={modals.isOpen('search')}
         conversationId={conversationId as string}
-        onClose={() => setShowSearchModal(false)}
+        onClose={() => modals.close()}
         onSelectMessage={handleJumpToMessage}
       />
 
       <SummaryModal
-        visible={showSummaryModal}
+        visible={modals.isOpen('summary')}
         conversationId={conversationId as string}
         isWorkspaceChat={conversation?.isWorkspaceChat || false}
         isAdmin={isAdmin}
-        onClose={() => setShowSummaryModal(false)}
+        onClose={() => modals.close()}
       />
 
       <EditMessageModal
-        visible={showEditModal}
+        visible={modals.isOpen('edit')}
         onClose={() => {
-          setShowEditModal(false);
+          modals.close();
           setMessageToEdit(null);
         }}
         originalText={messageToEdit?.text || ''}
@@ -1356,29 +1347,29 @@ export default function ChatScreen() {
       />
 
       <ActionItemsModal
-        visible={showActionItemsModal}
+        visible={modals.isOpen('actionItems')}
         conversationId={conversationId as string}
-        onClose={() => setShowActionItemsModal(false)}
+        onClose={() => modals.close()}
       />
 
       <DecisionsModal
-        visible={showDecisionsModal}
+        visible={modals.isOpen('decisions')}
         conversationId={conversationId as string}
-        onClose={() => setShowDecisionsModal(false)}
+        onClose={() => modals.close()}
       />
 
       <MeetingSchedulerModal
-        visible={showMeetingSchedulerModal}
+        visible={modals.isOpen('meetingScheduler')}
         conversationId={conversationId as string}
-        onClose={() => setShowMeetingSchedulerModal(false)}
+        onClose={() => modals.close()}
       />
 
       {/* Upgrade to Pro Modal */}
       <UpgradeToProModal
-        visible={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
+        visible={modals.isOpen('upgrade')}
+        onClose={() => modals.close()}
         onUpgradeSuccess={async () => {
-          setShowUpgradeModal(false);
+          modals.close();
           // Refresh user data from Firestore to get new Pro status
           if (user?.uid) {
             try {
@@ -1391,7 +1382,7 @@ export default function ChatScreen() {
           }
         }}
         onTrialStart={async () => {
-          setShowUpgradeModal(false);
+          modals.close();
           // Refresh user data from Firestore to get trial status
           if (user?.uid) {
             try {
@@ -1417,21 +1408,21 @@ export default function ChatScreen() {
           )}
 
           <PinnedMessagesModal
-            visible={showPinnedModal}
+            visible={modals.isOpen('pinned')}
             pinnedMessages={pinnedMessages}
             conversation={conversation}
             isAdmin={isAdmin}
-            onClose={() => setShowPinnedModal(false)}
+            onClose={() => modals.close()}
             onUnpin={handleUnpinMessage}
             onJumpToMessage={handleJumpToMessage}
           />
 
           {isAdmin && workspace && (
             <CapacityExpansionModal
-              visible={showCapacityModal}
+              visible={modals.isOpen('capacity')}
               workspace={workspace}
               newMemberCount={conversation.participants.length + 1}
-              onClose={() => setShowCapacityModal(false)}
+              onClose={() => modals.close()}
               onExpand={handleExpandCapacity}
             />
           )}

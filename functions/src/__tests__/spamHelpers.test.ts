@@ -10,7 +10,6 @@ describe('spamHelpers', () => {
     const now = Date.now();
     const ONE_HOUR = 60 * 60 * 1000;
     const ONE_DAY = 24 * ONE_HOUR;
-    const ONE_WEEK = 7 * ONE_DAY;
 
     it('should return 0 strikes for empty array', () => {
       const result = calculateActiveStrikes([]);
