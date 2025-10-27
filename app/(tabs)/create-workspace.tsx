@@ -5,7 +5,6 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { httpsCallable } from 'firebase/functions';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
@@ -18,7 +17,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { functions } from '../../firebase.config';
+import { callCloudFunction } from '../../services/cloudFunctions';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Alerts } from '../../utils/alerts';
@@ -58,15 +57,17 @@ export default function CreateWorkspaceScreen() {
     setIsCreating(true);
 
     try {
-      const createWorkspace = httpsCallable(functions, 'createWorkspace');
-      const result = await createWorkspace({
-        name: workspaceName.trim(),
-        maxUsers: parseInt(maxUsers),
-        initialMemberEmails: [], // Could add email input later
-      });
+      const result = await callCloudFunction<{ workspace: any }>(
+        'createWorkspace',
+        {
+          name: workspaceName.trim(),
+          maxUsers: parseInt(maxUsers),
+          initialMemberEmails: [], // Could add email input later
+        }
+      );
 
       // Add workspace to local store immediately
-      const workspaceData = (result.data as any).workspace;
+      const workspaceData = result.workspace;
       if (workspaceData) {
         addWorkspace(workspaceData);
       }

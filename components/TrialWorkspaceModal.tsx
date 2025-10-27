@@ -4,7 +4,6 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { httpsCallable } from 'firebase/functions';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { functions } from '../firebase.config';
+import { callCloudFunction } from '../services/cloudFunctions';
 import { Alerts } from '../utils/alerts';
 import { Colors } from '../utils/colors';
 
@@ -40,8 +39,7 @@ export function TrialWorkspaceModal({
       async () => {
         setIsUpgrading(true);
         try {
-          const upgradeToPro = httpsCallable(functions, 'upgradeToPro');
-          const result = await upgradeToPro({});
+          await callCloudFunction('upgradeToPro', {});
           
           Alerts.success(
             'You\'ve been upgraded to Pro! 🎉',

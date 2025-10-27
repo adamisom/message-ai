@@ -1,6 +1,6 @@
-import { httpsCallable } from 'firebase/functions';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { db, functions } from '../firebase.config';
+import { db } from '../firebase.config';
+import { callCloudFunction } from './cloudFunctions';
 
 /**
  * Send invitation to join a group chat
@@ -10,14 +10,15 @@ export async function addMemberToGroupChat(
   conversationId: string,
   memberEmail: string
 ): Promise<{ success: boolean; displayName: string; uid: string; invitationId: string }> {
-  const addMember = httpsCallable(functions, 'addMemberToGroupChat');
-  
-  const result = await addMember({
-    conversationId,
-    memberEmail: memberEmail.toLowerCase().trim()
-  });
+  const result = await callCloudFunction<{ success: boolean; displayName: string; uid: string; invitationId: string }>(
+    'addMemberToGroupChat',
+    {
+      conversationId,
+      memberEmail: memberEmail.toLowerCase().trim()
+    }
+  );
 
-  return result.data as { success: boolean; displayName: string; uid: string; invitationId: string };
+  return result;
 }
 
 /**
@@ -45,9 +46,11 @@ export async function getUserGroupChatInvitations(uid: string): Promise<any[]> {
 export async function acceptGroupChatInvitation(
   invitationId: string
 ): Promise<{ success: boolean; alreadyMember?: boolean }> {
-  const accept = httpsCallable(functions, 'acceptGroupChatInvitation');
-  const result = await accept({ invitationId });
-  return result.data as { success: boolean; alreadyMember?: boolean };
+  const result = await callCloudFunction<{ success: boolean; alreadyMember?: boolean }>(
+    'acceptGroupChatInvitation',
+    { invitationId }
+  );
+  return result;
 }
 
 /**
@@ -56,9 +59,11 @@ export async function acceptGroupChatInvitation(
 export async function declineGroupChatInvitation(
   invitationId: string
 ): Promise<{ success: boolean }> {
-  const decline = httpsCallable(functions, 'declineGroupChatInvitation');
-  const result = await decline({ invitationId });
-  return result.data as { success: boolean };
+  const result = await callCloudFunction<{ success: boolean }>(
+    'declineGroupChatInvitation',
+    { invitationId }
+  );
+  return result;
 }
 
 /**
@@ -67,9 +72,11 @@ export async function declineGroupChatInvitation(
 export async function reportGroupChatInvitationSpam(
   invitationId: string
 ): Promise<{ success: boolean }> {
-  const report = httpsCallable(functions, 'reportGroupChatInvitationSpam');
-  const result = await report({ invitationId });
-  return result.data as { success: boolean };
+  const result = await callCloudFunction<{ success: boolean }>(
+    'reportGroupChatInvitationSpam',
+    { invitationId }
+  );
+  return result;
 }
 
 /**
@@ -80,8 +87,10 @@ export async function reportDirectMessageSpam(
   conversationId: string,
   reportedUserUid: string
 ): Promise<{ success: boolean }> {
-  const report = httpsCallable(functions, 'reportDirectMessageSpam');
-  const result = await report({ conversationId, reportedUserUid });
-  return result.data as { success: boolean };
+  const result = await callCloudFunction<{ success: boolean }>(
+    'reportDirectMessageSpam',
+    { conversationId, reportedUserUid }
+  );
+  return result;
 }
 

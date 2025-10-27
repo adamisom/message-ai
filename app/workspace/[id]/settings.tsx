@@ -5,7 +5,6 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { httpsCallable } from 'firebase/functions';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -15,7 +14,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { functions } from '../../../firebase.config';
+import { callCloudFunction } from '../../../services/cloudFunctions';
 import { exportWorkspaceData } from '../../../services/workspaceExportService';
 import { getWorkspace } from '../../../services/workspaceService';
 import { useAuthStore } from '../../../store/authStore';
@@ -71,8 +70,7 @@ export default function WorkspaceSettingsScreen() {
 
     setIsDeleting(true);
     try {
-      const deleteWorkspaceFn = httpsCallable(functions, 'deleteWorkspace');
-      await deleteWorkspaceFn({ workspaceId: workspace.id });
+      await callCloudFunction('deleteWorkspace', { workspaceId: workspace.id });
 
       Alerts.success('Workspace deleted successfully', () => router.replace('/workspaces' as any));
     } catch (error: any) {

@@ -145,8 +145,10 @@ export default function InvitationsScreen() {
           'Success!',
           `You can now message ${invitation.name}`,
           () => router.push(`/chat/${result.conversationId}` as any),
-          { confirmText: 'Open Chat', cancelText: 'Later', onCancel: () => loadInvitations() }
+          { confirmText: 'Open Chat', cancelText: 'Later' }
         );
+        // Reload after either action
+        await loadInvitations();
       }
     } catch (error: any) {
       console.error('Accept invitation error:', error);

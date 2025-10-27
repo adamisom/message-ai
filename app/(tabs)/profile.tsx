@@ -45,20 +45,6 @@ function getInitials(displayName: string): string {
 }
 
 /**
- * Format date for subscription expiry
- */
-function formatDate(timestamp: any): string {
-  if (!timestamp) return '';
-  
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-/**
  * Format phone number for display
  * Input: "1234567890" -> Output: "(123) 456-7890"
  */

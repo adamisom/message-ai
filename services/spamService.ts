@@ -1,5 +1,4 @@
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase.config';
+import { callCloudFunction } from './cloudFunctions';
 
 export interface SpamStatus {
   strikeCount: number;
@@ -18,9 +17,8 @@ export interface SpamStatus {
  */
 export async function getUserSpamStatus(): Promise<SpamStatus> {
   try {
-    const getStatus = httpsCallable(functions, 'getUserSpamStatus');
-    const result = await getStatus();
-    return result.data as SpamStatus;
+    const result = await callCloudFunction<SpamStatus>('getUserSpamStatus', {});
+    return result;
   } catch (error: any) {
     console.error('[spamService] getUserSpamStatus error:', error);
     throw new Error(error.message || 'Failed to get spam status');

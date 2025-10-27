@@ -3,8 +3,7 @@
  * Sub-Phase 11 (Polish): Pro-only feature
  */
 
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase.config';
+import { callCloudFunction } from './cloudFunctions';
 
 /**
  * Edit a message (Pro-only)
@@ -15,8 +14,7 @@ export async function editMessage(
   newText: string
 ): Promise<void> {
   try {
-    const editFn = httpsCallable(functions, 'editMessage');
-    await editFn({ conversationId, messageId, newText });
+    await callCloudFunction('editMessage', { conversationId, messageId, newText });
   } catch (error: any) {
     console.error('[editMessage] Error:', error);
     throw new Error(error.message || 'Failed to edit message');
@@ -31,8 +29,7 @@ export async function deleteMessage(
   messageId: string
 ): Promise<void> {
   try {
-    const deleteFn = httpsCallable(functions, 'deleteMessage');
-    await deleteFn({ conversationId, messageId });
+    await callCloudFunction('deleteMessage', { conversationId, messageId });
   } catch (error: any) {
     console.error('[deleteMessage] Error:', error);
     throw new Error(error.message || 'Failed to delete message');

@@ -1,5 +1,4 @@
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase.config';
+import { callCloudFunction } from './cloudFunctions';
 
 /**
  * Mark Message as Urgent - Sub-Phase 7
@@ -10,9 +9,11 @@ export async function markMessageUrgent(
   messageId: string
 ): Promise<{ success: boolean; urgentCount: number }> {
   try {
-    const markUrgent = httpsCallable(functions, 'markMessageUrgent');
-    const result = await markUrgent({ conversationId, messageId });
-    return result.data as { success: boolean; urgentCount: number };
+    const result = await callCloudFunction<{ success: boolean; urgentCount: number }>(
+      'markMessageUrgent',
+      { conversationId, messageId }
+    );
+    return result;
   } catch (error: any) {
     console.error('[workspaceAdminService] markMessageUrgent error:', error);
     
@@ -33,9 +34,11 @@ export async function unmarkMessageUrgent(
   messageId: string
 ): Promise<{ success: boolean }> {
   try {
-    const unmarkUrgent = httpsCallable(functions, 'unmarkMessageUrgent');
-    const result = await unmarkUrgent({ conversationId, messageId });
-    return result.data as { success: boolean };
+    const result = await callCloudFunction<{ success: boolean }>(
+      'unmarkMessageUrgent',
+      { conversationId, messageId }
+    );
+    return result;
   } catch (error: any) {
     console.error('[workspaceAdminService] unmarkMessageUrgent error:', error);
     throw new Error(error.message || 'Failed to unmark message urgent');
@@ -52,9 +55,11 @@ export async function pinMessage(
   replaceMessageId?: string
 ): Promise<{ success: boolean; pinnedCount: number }> {
   try {
-    const pin = httpsCallable(functions, 'pinMessage');
-    const result = await pin({ conversationId, messageId, replaceMessageId });
-    return result.data as { success: boolean; pinnedCount: number };
+    const result = await callCloudFunction<{ success: boolean; pinnedCount: number }>(
+      'pinMessage',
+      { conversationId, messageId, replaceMessageId }
+    );
+    return result;
   } catch (error: any) {
     console.error('[workspaceAdminService] pinMessage error:', error);
     
@@ -75,9 +80,11 @@ export async function unpinMessage(
   messageId: string
 ): Promise<{ success: boolean; pinnedCount: number }> {
   try {
-    const unpin = httpsCallable(functions, 'unpinMessage');
-    const result = await unpin({ conversationId, messageId });
-    return result.data as { success: boolean; pinnedCount: number };
+    const result = await callCloudFunction<{ success: boolean; pinnedCount: number }>(
+      'unpinMessage',
+      { conversationId, messageId }
+    );
+    return result;
   } catch (error: any) {
     console.error('[workspaceAdminService] unpinMessage error:', error);
     throw new Error(error.message || 'Failed to unpin message');
@@ -93,9 +100,11 @@ export async function expandWorkspaceCapacity(
   newMaxUsers: number
 ): Promise<{ success: boolean; newCapacity: number; chargeAmount: number }> {
   try {
-    const expand = httpsCallable(functions, 'expandWorkspaceCapacity');
-    const result = await expand({ workspaceId, newMaxUsers });
-    return result.data as { success: boolean; newCapacity: number; chargeAmount: number };
+    const result = await callCloudFunction<{ success: boolean; newCapacity: number; chargeAmount: number }>(
+      'expandWorkspaceCapacity',
+      { workspaceId, newMaxUsers }
+    );
+    return result;
   } catch (error: any) {
     console.error('[workspaceAdminService] expandWorkspaceCapacity error:', error);
     

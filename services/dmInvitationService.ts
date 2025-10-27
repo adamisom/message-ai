@@ -3,10 +3,10 @@
  * Sub-Phase 11 (Polish): DM Privacy System
  */
 
-import { httpsCallable } from 'firebase/functions';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db, functions } from '../firebase.config';
+import { db } from '../firebase.config';
 import type { DirectMessageInvitation } from '../types/workspace';
+import { callCloudFunction } from './cloudFunctions';
 
 /**
  * Create a direct message invitation
@@ -17,9 +17,11 @@ export async function createDirectMessageInvitation(recipientId: string): Promis
   recipientName: string;
 }> {
   try {
-    const createInvitationFn = httpsCallable(functions, 'createDirectMessageInvitation');
-    const result = await createInvitationFn({ recipientId });
-    return result.data as { invitationId: string; recipientName: string };
+    const result = await callCloudFunction<{ invitationId: string; recipientName: string }>(
+      'createDirectMessageInvitation',
+      { recipientId }
+    );
+    return result;
   } catch (error: any) {
     console.error('[createDirectMessageInvitation] Error:', error);
     throw new Error(error.message || 'Failed to create invitation');
@@ -34,9 +36,11 @@ export async function acceptDirectMessageInvitation(invitationId: string): Promi
   conversationId: string;
 }> {
   try {
-    const acceptFn = httpsCallable(functions, 'acceptDirectMessageInvitation');
-    const result = await acceptFn({ invitationId });
-    return result.data as { conversationId: string };
+    const result = await callCloudFunction<{ conversationId: string }>(
+      'acceptDirectMessageInvitation',
+      { invitationId }
+    );
+    return result;
   } catch (error: any) {
     console.error('[acceptDirectMessageInvitation] Error:', error);
     throw new Error(error.message || 'Failed to accept invitation');
@@ -48,8 +52,7 @@ export async function acceptDirectMessageInvitation(invitationId: string): Promi
  */
 export async function declineDirectMessageInvitation(invitationId: string): Promise<void> {
   try {
-    const declineFn = httpsCallable(functions, 'declineDirectMessageInvitation');
-    await declineFn({ invitationId });
+    await callCloudFunction('declineDirectMessageInvitation', { invitationId });
   } catch (error: any) {
     console.error('[declineDirectMessageInvitation] Error:', error);
     throw new Error(error.message || 'Failed to decline invitation');
@@ -61,8 +64,7 @@ export async function declineDirectMessageInvitation(invitationId: string): Prom
  */
 export async function reportDirectMessageInvitationSpam(invitationId: string): Promise<void> {
   try {
-    const reportFn = httpsCallable(functions, 'reportDirectMessageInvitationSpam');
-    await reportFn({ invitationId });
+    await callCloudFunction('reportDirectMessageInvitationSpam', { invitationId });
   } catch (error: any) {
     console.error('[reportDirectMessageInvitationSpam] Error:', error);
     throw new Error(error.message || 'Failed to report spam');

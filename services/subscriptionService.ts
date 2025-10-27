@@ -9,8 +9,7 @@
  */
 
 import { Alert } from 'react-native';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase.config';
+import { callCloudFunction } from './cloudFunctions';
 
 /**
  * Upgrade user to Pro (MVP: instant, no real payment)
@@ -27,8 +26,7 @@ export async function upgradeUserToPro(): Promise<void> {
           text: 'Upgrade Now',
           onPress: async () => {
             try {
-              const upgradeToPro = httpsCallable(functions, 'upgradeToPro');
-              await upgradeToPro({});
+              await callCloudFunction('upgradeToPro', {});
               resolve();
             } catch (error: any) {
               reject(error);
@@ -45,8 +43,7 @@ export async function upgradeUserToPro(): Promise<void> {
  */
 export async function startFreeTrial(): Promise<void> {
   try {
-    const startTrialFn = httpsCallable(functions, 'startFreeTrial');
-    await startTrialFn({});
+    await callCloudFunction('startFreeTrial', {});
   } catch (error: any) {
     console.error('[subscriptionService] startFreeTrial error:', error);
     throw new Error(error.message || 'Failed to start trial');
