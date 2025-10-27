@@ -1,25 +1,25 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import {
+    Alert,
     Modal,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
-    Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useAIFeature } from '../hooks/useAIFeature';
 import { generateSummary, saveEditedSummary } from '../services/aiService';
+import { useAuthStore } from '../store/authStore';
 import { commonModalStyles } from '../styles/commonModalStyles';
+import { Summary } from '../types';
 import { Colors } from '../utils/colors';
+import EditSummaryModal from './EditSummaryModal';
 import { EmptyState } from './modals/EmptyState';
 import { ErrorState } from './modals/ErrorState';
 import { LoadingState } from './modals/LoadingState';
 import { ModalHeader } from './modals/ModalHeader';
-import EditSummaryModal from './EditSummaryModal';
-import { useAuthStore } from '../store/authStore';
-import { Summary } from '../types';
 
 interface SummaryModalProps {
   visible: boolean;

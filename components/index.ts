@@ -10,6 +10,10 @@ export { default as EditActionItemsModal } from './EditActionItemsModal';
 export { default as EditDecisionModal } from './EditDecisionModal';
 export { default as EditSummaryModal } from './EditSummaryModal';
 
+// Sub-Phase 7: Workspace Admin Components
+export { default as CapacityExpansionModal } from './CapacityExpansionModal';
+export { default as PinnedMessagesModal } from './PinnedMessagesModal';
+
 // Phase 4: Paid Tier Components
 export { HelpModal } from './HelpModal';
 export { ProfileButton } from './ProfileButton';

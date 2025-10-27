@@ -43,8 +43,8 @@ export { reportDirectMessageSpam } from './groupChats/reportDirectMessageSpam';
 export { reportGroupChatInvitationSpam } from './groupChats/reportGroupChatInvitationSpam';
 
 // Sub-Phase 7: Workspace Admin Features
-export { markMessageUrgent, unmarkMessageUrgent } from './workspaces/urgencyMarkers';
-export { pinMessage, unpinMessage } from './workspaces/pinnedMessages';
 export { expandWorkspaceCapacity } from './workspaces/capacityExpansion';
+export { pinMessage, unpinMessage } from './workspaces/pinnedMessages';
+export { markMessageUrgent, unmarkMessageUrgent } from './workspaces/urgencyMarkers';
 
 

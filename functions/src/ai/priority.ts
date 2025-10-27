@@ -60,6 +60,16 @@ export const batchAnalyzePriority = functions.pubsub
     for (const messageDoc of needsAnalysis.docs) {
       const message = messageDoc.data();
 
+      // Sub-Phase 7: Skip AI analysis if admin manually marked urgent
+      if (message.manuallyMarkedUrgent === true) {
+        await messageDoc.ref.update({
+          priorityNeedsAnalysis: false,
+          priorityAnalyzedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log(`Skipping AI analysis for admin-marked message: ${messageDoc.id}`);
+        continue; // Don't overwrite admin's decision
+      }
+
       try {
         const aiPriority = await analyzeMessagePriorityWithAI(message.text);
 
