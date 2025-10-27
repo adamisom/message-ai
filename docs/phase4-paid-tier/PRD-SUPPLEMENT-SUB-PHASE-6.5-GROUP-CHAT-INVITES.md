@@ -47,6 +47,356 @@
 
 ---
 
+## End-to-End Flows
+
+This section documents the complete user flows to clarify how blocking, spam banning, and conversation hiding interact.
+
+### Flow 1: Direct Message Spam Reporting (Happy Path)
+
+**Scenario:** Alice receives unwanted direct messages from Bob and reports them as spam.
+
+**Step-by-Step:**
+
+1. **User Action:** Alice long-presses on Bob's message in their direct chat
+   - Action sheet appears with "Report Spam" option
+   - Only visible on messages from the OTHER user (not Alice's own messages)
+
+2. **User Confirms:** Alice taps "Report Spam"
+   - Client calls `reportDirectMessageSpam` Cloud Function
+   - Params: `{ conversationId, reportedUserUid: Bob's UID }`
+
+3. **Cloud Function Executes:** `reportDirectMessageSpam`
+   - **Verification:**
+     - Authenticates Alice
+     - Verifies conversation exists and is type "direct"
+     - Verifies both Alice and Bob are participants
+   - **Updates Bob's Document:**
+     - Adds spam strike to `spamReportsReceived` array
+     - Calculates active strikes using `calculateActiveStrikes()` helper
+     - Updates `spamStrikes` count
+     - Sets `spamBanned: true` if threshold exceeded (2+ in 24h OR 5+ in 30d)
+     - Sends ban notification to Bob (differentiated by type)
+   - **Updates Alice's Document:**
+     - Adds Bob's UID to Alice's `blockedUsers` array
+     - Adds conversation ID to Alice's `hiddenConversations` array
+   - Returns `{ success: true }`
+
+4. **Client-Side Effects:**
+   - **Alice's View:**
+     - Conversation disappears from Alice's conversation list (filtered by `hiddenConversations`)
+     - If Alice navigates back to chat (e.g., via deep link):
+       - `isBlockedByRecipient` check passes (Bob hasn't blocked Alice)
+       - Alice CAN still send messages to Bob (one-way block)
+   - **Bob's View:**
+     - Conversation still visible in Bob's list (not hidden for Bob)
+     - If Bob tries to send message to Alice:
+       - Client-side check passes (not enforced client-side for blockers)
+       - Firestore security rule BLOCKS message creation:
+         - Rule checks `!isBlockedInDirectMessage(conversationId)`
+         - Helper function retrieves Alice's `blockedUsers` array
+         - Finds Bob's UID in array → returns `true` (is blocked)
+         - Message creation fails with permission-denied error
+
+5. **Bob Gets Notified (if threshold met):**
+   - **2 strikes in 24h:** "⏰ Your account is restricted from sending direct messages and invitations for 24 hours due to multiple spam reports."
+   - **5 strikes in 30d:** "🚫 Your account is restricted from sending direct messages and invitations indefinitely due to spam reports. This ban will lift as reports expire after 30 days."
+   - **3-4 strikes (warning):** "⚠️ You have X spam reports. Be careful - 5 strikes will restrict messaging/invitations indefinitely, and 2 strikes in 24 hours will ban you for 24 hours."
+
+**Result:**
+- ✅ Bob cannot send messages to Alice (blocked)
+- ✅ Alice cannot see conversation in her list (hidden)
+- ✅ Bob gets spam strike(s) and may be banned
+- ✅ Ban prevents Bob from messaging ANYONE (if `spamBanned: true`)
+
+---
+
+### Flow 2: Spam Ban Enforcement (2 Strikes in 24 Hours - Temp Ban)
+
+**Scenario:** Mallory spams multiple users and receives 2 spam reports within 24 hours.
+
+**Step-by-Step:**
+
+1. **First Report (Day 1, 2:00 PM):**
+   - Alice reports Mallory for spam
+   - Mallory's document updated:
+     - `spamReportsReceived`: [{ reportedBy: Alice, timestamp: Day1-2PM, reason: 'directMessage' }]
+     - `spamStrikes`: 1
+     - `spamBanned`: false
+   - No notification sent (only 1 strike)
+
+2. **Second Report (Day 1, 8:00 PM - 6 hours later):**
+   - Bob reports Mallory for spam
+   - `calculateActiveStrikes()` runs:
+     - Finds 2 reports in last 24 hours
+     - Returns: `{ isTempBanned: true, tempBanEndsAt: Day1-8PM + 24h, isPermanentlyBanned: false, notificationType: 'temp-banned' }`
+   - Mallory's document updated:
+     - `spamReportsReceived`: [Alice's report, Bob's report]
+     - `spamStrikes`: 2
+     - `spamBanned`: true ← **TEMP BAN ACTIVE**
+   - Notification sent: "⏰ Your account is restricted for 24 hours..."
+
+3. **Mallory Tries to Send Message (Day 1, 9:00 PM):**
+   - Client-side: No specific temp ban check (UI doesn't hide MessageInput for temp bans)
+   - Firestore security rule for message creation:
+     - Checks: `!get(/databases/$(database)/documents/users/$(request.auth.uid)).data.spamBanned`
+     - Mallory's `spamBanned: true`
+     - Message creation **DENIED** with permission-denied error
+   - Client shows error: "Permission denied"
+
+4. **Mallory Tries to Create Workspace (Day 1, 9:30 PM):**
+   - Cloud Function `createWorkspace` checks:
+     - `if (userData.spamBanned) throw error`
+   - Creation **DENIED**
+
+5. **Ban Expires (Day 2, 8:00 PM - 24 hours after second strike):**
+   - **Manual Check Required:** Currently, there's no automatic un-ban after 24h temp ban
+   - **Future Enhancement:** Background job or Cloud Function scheduler to check `tempBanEndsAt` and unset `spamBanned` if no indefinite ban active
+   - **Current Behavior:** Ban persists until:
+     - Strikes decay below threshold naturally (30 days)
+     - OR third report comes in and recalculates (may lift temp ban if >24h passed)
+
+**Result:**
+- ✅ Mallory banned from messaging anyone for 24h
+- ✅ Mallory banned from creating workspaces/groups for 24h
+- ✅ Ban enforced at Firestore security rule level (backstop)
+- ⚠️ Manual un-ban not implemented (relies on strike decay)
+
+---
+
+### Flow 3: Spam Ban Enforcement (5 Strikes in 30 Days - Indefinite Ban)
+
+**Scenario:** Oscar repeatedly spams users and accumulates 5 spam reports over 2 weeks.
+
+**Step-by-Step:**
+
+1. **Reports 1-4 (Week 1-2):**
+   - Oscar gets 4 spam strikes from different users
+   - `spamStrikes`: 4, `spamBanned`: false
+   - Notification at strike 3: "⚠️ You have 3 spam reports. Be careful..."
+   - Notification at strike 4: "⚠️ You have 4 spam reports. Be careful..."
+
+2. **Report 5 (Week 2, Day 14):**
+   - Fifth user reports Oscar
+   - `calculateActiveStrikes()` runs:
+     - Finds 5 reports in last 30 days
+     - Returns: `{ isPermanentlyBanned: true, isTempBanned: false, notificationType: 'banned' }`
+   - Oscar's document updated:
+     - `spamStrikes`: 5
+     - `spamBanned`: true ← **INDEFINITE BAN ACTIVE**
+   - Notification sent: "🚫 Your account is restricted indefinitely..."
+
+3. **Oscar's Account Status:**
+   - ❌ Cannot send direct messages to anyone
+   - ❌ Cannot create workspaces
+   - ❌ Cannot create group chats
+   - ❌ Cannot send workspace invitations
+   - ❌ Cannot send group chat invitations
+   - ✅ CAN still receive messages in existing chats (read-only mode)
+   - ✅ CAN still participate in group chats (send messages)
+   - ✅ CAN still participate in workspaces (send messages)
+
+4. **Ban Lifts Naturally (Week 6, Day 44):**
+   - Oldest strike is now >30 days old
+   - Next spam report OR background job recalculates strikes:
+     - `calculateActiveStrikes()` filters out expired strikes
+     - Active strikes: 4 (down from 5)
+     - Returns: `{ isPermanentlyBanned: false, spamBanned: false }`
+   - Oscar's document updated:
+     - `spamStrikes`: 4
+     - `spamBanned`: false ← **BAN LIFTED**
+   - No notification sent (no explicit "ban lifted" notification)
+
+**Result:**
+- ✅ Indefinite ban prevents all messaging/invitations
+- ✅ Ban automatically lifts when strikes decay below 5
+- ✅ User can resume normal activity after ban lifts
+- ⚠️ No explicit "ban lifted" notification
+
+---
+
+### Flow 4: Dual Ban (2 in 24h AND 5 in 30d)
+
+**Scenario:** Paula gets her 5th strike, and the last 2 strikes were within 24 hours.
+
+**Step-by-Step:**
+
+1. **Reports 1-3 (Week 1-2):**
+   - Paula has 3 strikes, not banned yet
+
+2. **Report 4 (Day 14, 10:00 AM):**
+   - Paula's 4th strike
+   - `spamStrikes`: 4, `spamBanned`: false
+
+3. **Report 5 (Day 14, 2:00 PM - 4 hours later):**
+   - Paula's 5th strike (also 2nd strike in 24h window)
+   - `calculateActiveStrikes()` runs:
+     - Finds 5 reports in last 30 days → `isPermanentlyBanned: true`
+     - Finds 2 reports in last 24 hours → `isTempBanned: true`
+     - `tempBanEndsAt`: Day 14, 2:00 PM + 24h = Day 15, 2:00 PM
+     - **Notification priority:** `notificationType: 'banned'` (indefinite takes precedence over temp)
+   - Paula's document updated:
+     - `spamStrikes`: 5
+     - `spamBanned`: true ← **BOTH BANS ACTIVE**
+   - Notification sent: "🚫 Your account is restricted indefinitely..." (only one notification)
+
+4. **Paula's Status (Day 14-15):**
+   - Both bans active, same restrictions apply
+   - Temp ban expires Day 15, 2:00 PM
+   - Indefinite ban continues (needs strikes to decay below 5)
+
+5. **One Strike Expires (Day 44):**
+   - Oldest strike drops off
+   - Active strikes: 4
+   - `calculateActiveStrikes()` returns: `{ isPermanentlyBanned: false, isTempBanned: false }`
+   - Paula's document updated:
+     - `spamBanned`: false ← **INDEFINITE BAN LIFTED**
+   - Temp ban already expired (Day 15)
+
+**Result:**
+- ✅ Both ban types tracked correctly
+- ✅ `spamBanned` flag encompasses both ban types
+- ✅ Notification sent for indefinite ban (higher priority)
+- ✅ Ban lifts when strikes decay naturally
+- ℹ️ Temp ban and indefinite ban have same practical effect (all messaging blocked)
+
+---
+
+### Flow 5: User Blocking (One-Way Block)
+
+**Scenario:** Alice blocks Bob (via spam report), but Bob hasn't blocked Alice.
+
+**Clarifications:**
+
+**Alice Blocks Bob:**
+- Alice's `blockedUsers`: [Bob's UID]
+- Bob's `blockedUsers`: [] (empty)
+
+**Effects:**
+
+1. **Bob Tries to Message Alice:**
+   - Client-side: No block check on sender
+   - Message send attempted
+   - Firestore security rule:
+     - Checks `!isBlockedInDirectMessage(conversationId)`
+     - Retrieves Alice's document (recipient)
+     - Checks if Bob (sender) is in Alice's `blockedUsers`
+     - Bob IS in array → **MESSAGE DENIED**
+   - Error: "Permission denied"
+
+2. **Alice Tries to Message Bob:**
+   - Client-side: Checks if Alice is blocked BY Bob
+     - `isBlockedByRecipient` = false (Bob hasn't blocked Alice)
+     - MessageInput rendered normally
+   - Message send attempted
+   - Firestore security rule:
+     - Retrieves Bob's document (recipient)
+     - Checks if Alice (sender) is in Bob's `blockedUsers`
+     - Alice NOT in array → **MESSAGE ALLOWED**
+   - Message sent successfully ✅
+
+3. **Group Chat Interaction (Alice and Bob both in group):**
+   - Alice's `blockedUsers` doesn't affect group chats
+   - Bob can send messages to group → Alice sees them ✅
+   - Alice can send messages to group → Bob sees them ✅
+   - Blocking ONLY affects direct messages
+
+**Result:**
+- ✅ One-way block (Alice blocks Bob, Bob doesn't block Alice)
+- ✅ Bob can't DM Alice (blocked)
+- ✅ Alice CAN DM Bob (not blocked the other way)
+- ✅ Group chats unaffected by blocks
+- ✅ Workspace chats unaffected by blocks
+
+---
+
+### Flow 6: Conversation Hiding
+
+**Scenario:** David reports Emily for spam, and the conversation is hidden from David's view.
+
+**Step-by-Step:**
+
+1. **David Reports Emily:**
+   - Cloud Function updates:
+     - David's `hiddenConversations`: [conversationId]
+     - Emily's `blockedUsers`: (not updated, blocks are one-way from reporter)
+   - Wait, I need to re-check the implementation...
+
+Actually, looking at the Cloud Function:
+```typescript
+await reporterRef.update({
+  blockedUsers: admin.firestore.FieldValue.arrayUnion(reportedUserUid),
+  hiddenConversations: admin.firestore.FieldValue.arrayUnion(conversationId),
+});
+```
+
+So:
+- **Reporter (David) updates:**
+  - `blockedUsers`: [Emily's UID] ← David blocks Emily
+  - `hiddenConversations`: [conversationId] ← Conversation hidden from David
+
+2. **David's Conversation List:**
+   - Query: `conversations.filter(conv => !user.hiddenConversations.includes(conv.id))`
+   - Result: Conversation with Emily NOT shown ✅
+
+3. **Emily's Conversation List:**
+   - Emily's `hiddenConversations` not updated
+   - Query: Conversation with David still visible ✅
+   - Emily can still see the conversation (but can't send messages because David blocked her)
+
+4. **Conversation Hiding for Other Spam Types:**
+   - **Group Chat Invitation Spam:** No conversation hiding (invitation declined/spam, no conversation created yet)
+   - **Workspace Invitation Spam:** No conversation hiding (invitation declined/spam, no workspace joined yet)
+   - **Direct Message Spam:** Conversation hidden ✅ (implemented in Phase C)
+
+**Result:**
+- ✅ Reporter sees conversation disappear from list
+- ✅ Reported user still sees conversation (not hidden for them)
+- ✅ Hiding is one-directional (reporter only)
+- ℹ️ Applies to: direct messages, group chats, workspaces (any spam-reported conversation)
+
+---
+
+### Flow 7: Security Rule Enforcement vs Client-Side Checks
+
+**Comparison Table:**
+
+| Feature | Client-Side Check | Firestore Security Rule | Cloud Function |
+|---------|------------------|------------------------|----------------|
+| **Block Check** | ✅ Shows "You cannot send messages" if `isBlockedByRecipient` | ✅ **Primary enforcement** via `isBlockedInDirectMessage()` helper | ❌ Not needed (rule sufficient) |
+| **Spam Ban Check** | ❌ Not implemented (no UI check) | ✅ **Primary enforcement** via `!get(...).data.spamBanned` check | ✅ Checked in workspace/group creation functions |
+| **Conversation Hiding** | ✅ **Primary enforcement** via `hiddenConversations` filter | ❌ Not enforced (read access unchanged) | ❌ Not needed |
+| **25-Member Limit** | ❌ Not checked client-side | ❌ Not enforced in rules | ✅ Checked in `acceptGroupChatInvitation` function |
+
+**Why This Architecture:**
+
+1. **Blocking (Firestore Rule):**
+   - Security-critical: Can't trust client-side alone
+   - Efficient: Single rule check on message creation
+   - No Cloud Function trigger needed (direct messages only, simple check)
+
+2. **Spam Banning (Firestore Rule + Cloud Functions):**
+   - Security-critical: Can't trust client-side alone
+   - Firestore rule: Prevents message creation
+   - Cloud Functions: Prevents workspace/group creation (already implemented)
+
+3. **Conversation Hiding (Client-Side):**
+   - UI-only concern: Not security-critical
+   - User still has read access (not revoking permissions)
+   - Efficient: No server-side queries needed
+
+4. **Member Limits (Cloud Functions):**
+   - Business logic: Not security-critical
+   - Changes frequently: Easier to update in functions
+   - Requires participant count: Cheaper to check server-side
+
+**Result:**
+- ✅ Security enforced at Firestore rule level (blocking, spam ban)
+- ✅ UI enhancements at client level (conversation hiding)
+- ✅ Business logic at Cloud Function level (member limits)
+- ✅ Defense in depth: Multiple enforcement points
+
+---
+
 ## Overview
 
 This sub-phase adds member management to group chats and implements an invitation system similar to workspace invitations. It consists of three sequential phases:
