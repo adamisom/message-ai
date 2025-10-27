@@ -99,7 +99,7 @@ if (conversation?.workspaceId && isAdmin) {
 
 ### ✅ Helper Usage Audit Complete
 
-**All helpers verified - NO DEAD CODE found:**
+**All helpers verified - Dead code found and removed:**
 
 1. **subscriptionService.ts** ✅
    - Used in: `app/(tabs)/profile.tsx`, `components/UpgradeToProModal.tsx`
@@ -111,9 +111,10 @@ if (conversation?.workspaceId && isAdmin) {
    - Functions used: `getUserPermissions`, `canAccessAIInContext`
    - **Status:** Both functions actively used
 
-3. **useModalManager.ts** ❌ → ✅ FIXED
-   - Was imported in `app/chat/[id].tsx` but not used (dead code)
-   - **Fixed:** Removed unused import and instantiation
+3. **useModalManager.ts** ⚠️ DEAD CODE FOUND → ✅ FIXED
+   - **Issue Found:** Imported in `app/chat/[id].tsx` but never used
+   - **Dead Code:** `import { useModalManager }` and `const modals = useModalManager()` were present but `modals` was never referenced
+   - **Fixed:** Removed unused import and instantiation (commit 35a66af)
    - **Status:** Ready for future use when chat screen modal refactor happens
 
 4. **cloudFunctions.ts** ✅

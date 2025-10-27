@@ -54,7 +54,7 @@ import { Workspace } from '../../types/workspace';
 import { Alerts } from '../../utils/alerts';
 import { MESSAGE_LIMIT, MESSAGE_TIMEOUT_MS, TYPING_DEBOUNCE_MS } from '../../utils/constants';
 import { ErrorLogger } from '../../utils/errorLogger';
-import { canAccessAIInContext, getUserPermissions } from '../../utils/userPermissions';
+import { canAccessAIInContext } from '../../utils/userPermissions';
 
 export default function ChatScreen() {
   const { id: conversationId } = useLocalSearchParams();
@@ -66,6 +66,19 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
   const [canAccessAI, setCanAccessAI] = useState(false); // AI access control
+  
+  // Modal state
+  const [showAIMenu, setShowAIMenu] = useState(false);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [showActionItemsModal, setShowActionItemsModal] = useState(false);
+  const [showDecisionsModal, setShowDecisionsModal] = useState(false);
+  const [showMeetingSchedulerModal, setShowMeetingSchedulerModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showPinnedModal, setShowPinnedModal] = useState(false);
+  const [showCapacityModal, setShowCapacityModal] = useState(false);
   
   // Pagination state
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -863,23 +876,17 @@ export default function ChatScreen() {
   const handleDeleteFailedMessage = (messageId: string) => {
     console.log('🗑️ [ChatScreen] Deleting failed message:', messageId);
     
-    Alert.alert(
+    Alerts.confirm(
       'Delete Message',
       'Are you sure you want to delete this failed message?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            // Remove from AsyncStorage
-            await FailedMessagesService.removeFailedMessage(messageId);
-            
-            // Remove from UI
-            setMessages(prev => prev.filter(m => m.id !== messageId));
-          },
-        },
-      ]
+      async () => {
+        // Remove from AsyncStorage
+        await FailedMessagesService.removeFailedMessage(messageId);
+        
+        // Remove from UI
+        setMessages(prev => prev.filter(m => m.id !== messageId));
+      },
+      { confirmText: 'Delete', isDestructive: true }
     );
   };
 
@@ -1076,8 +1083,7 @@ export default function ChatScreen() {
             setSelectedMessage(message);
             handlePinMessage();
           } else if (option === 'Unpin Message') {
-            setSelectedMessage(message);
-            handleUnpinMessage();
+            handleUnpinMessage(message.id);
           } else if (option === 'Report Spam') {
             setSelectedMessage(message);
             handleReportSpam(message);
@@ -1092,10 +1098,10 @@ export default function ChatScreen() {
     
     try {
       await markMessageUrgent(conversationId as string, selectedMessage.id);
-      Alert.alert('Success', 'Message marked as urgent');
+      Alerts.success('Message marked as urgent');
       setSelectedMessage(null);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to mark message as urgent');
+      Alerts.error(error.message || 'Failed to mark message as urgent');
     }
   };
 
@@ -1104,10 +1110,10 @@ export default function ChatScreen() {
     
     try {
       await unmarkMessageUrgent(conversationId as string, selectedMessage.id);
-      Alert.alert('Success', 'Urgency marker removed');
+      Alerts.success('Urgency marker removed');
       setSelectedMessage(null);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to remove urgency marker');
+      Alerts.error(error.message || 'Failed to remove urgency marker');
     }
   };
 
@@ -1116,10 +1122,10 @@ export default function ChatScreen() {
     
     try {
       await pinMessage(conversationId as string, selectedMessage.id);
-      Alert.alert('Success', 'Message pinned');
+      Alerts.success('Message pinned');
       setSelectedMessage(null);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to pin message');
+      Alerts.error(error.message || 'Failed to pin message');
     }
   };
 
@@ -1128,9 +1134,9 @@ export default function ChatScreen() {
     
     try {
       await unpinMessage(conversationId as string, messageId);
-      Alert.alert('Success', 'Message unpinned');
+      Alerts.success('Message unpinned');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to unpin message');
+      Alerts.error(error.message || 'Failed to unpin message');
     }
   };
 
@@ -1158,10 +1164,10 @@ export default function ChatScreen() {
     
     try {
       await expandWorkspaceCapacity(workspace.id, newCapacity);
-      Alert.alert('Success', 'Workspace capacity expanded successfully');
+      Alerts.success('Workspace capacity expanded successfully');
       setShowCapacityModal(false);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to expand capacity');
+      Alerts.error(error.message || 'Failed to expand capacity');
     }
   };
 
@@ -1173,13 +1179,12 @@ export default function ChatScreen() {
 
     try {
       await reportDirectMessageSpam(conversationId as string, otherUserId);
-      Alert.alert(
-        'Spam Reported',
+      Alerts.success(
         'User reported for spam and blocked. This conversation will be hidden.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
+        () => navigation.goBack()
       );
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to report spam');
+      Alerts.error(error.message || 'Failed to report spam');
     }
   };
 
@@ -1198,24 +1203,18 @@ export default function ChatScreen() {
   };
 
   const handleDeleteMessage = (message: Message) => {
-    Alert.alert(
+    Alerts.confirm(
       'Delete Message?',
       'This message will be deleted for everyone. This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteMessageService(conversationId as string, message.id);
-              // Success - message will update via real-time listener
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to delete message');
-            }
-          },
-        },
-      ]
+      async () => {
+        try {
+          await deleteMessageService(conversationId as string, message.id);
+          // Success - message will update via real-time listener
+        } catch (error: any) {
+          Alerts.error(error.message || 'Failed to delete message');
+        }
+      },
+      { confirmText: 'Delete', isDestructive: true }
     );
   };
 
@@ -1384,10 +1383,10 @@ export default function ChatScreen() {
           if (user?.uid) {
             try {
               await refreshUserProfile();
-              Alert.alert('Success!', 'Welcome to Pro! 🎉\n\nYou now have AI features everywhere.');
+              Alerts.success('Welcome to Pro! 🎉\n\nYou now have AI features everywhere.');
             } catch (error) {
               console.error('Failed to refresh user data after upgrade:', error);
-              Alert.alert('Success!', 'Upgrade successful! Please restart the app to see changes.');
+              Alerts.success('Upgrade successful! Please restart the app to see changes.');
             }
           }
         }}
@@ -1397,10 +1396,10 @@ export default function ChatScreen() {
           if (user?.uid) {
             try {
               await refreshUserProfile();
-              Alert.alert('Trial Started!', 'Enjoy 5 days of full Pro access! 🎉');
+              Alerts.success('Enjoy 5 days of full Pro access! 🎉');
             } catch (error) {
               console.error('Failed to refresh user data after trial start:', error);
-              Alert.alert('Trial Started!', 'Please restart the app to see changes.');
+              Alerts.success('Please restart the app to see changes.');
             }
           }
         }}
