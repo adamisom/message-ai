@@ -133,13 +133,15 @@ service cloud.firestore {
     
     // Messages - only conversation participants can read/write
     // Blocked users cannot send direct messages
+    // Spam-banned users cannot send any messages
     match /conversations/{conversationId}/messages/{messageId} {
       allow read: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
       
       allow create: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
-        !isBlockedInDirectMessage(conversationId);
+        !isBlockedInDirectMessage(conversationId) &&
+        !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.spamBanned;
       
       allow update, delete: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
