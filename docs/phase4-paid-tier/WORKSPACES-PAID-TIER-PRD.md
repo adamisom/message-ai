@@ -189,7 +189,13 @@
 - ❌ Analytics tracking
 - ❌ Performance testing
 - ❌ E2E test suite
-- ❌ Improve 'New Chat' UX (auto-detect direct/group based on user count)
+- ✅ Improve 'New Chat' UX (auto-detect direct/group based on user count)
+
+**Implementation Complete (Oct 27, 2025):**
+- Removed confusing Direct/Group toggle
+- Auto-detects: 1 user = direct, 2+ = group (max 25)
+- Dynamic button text shows recipient name or member count
+- 20 new unit tests for validation logic (367 total tests passing)
 
 **Sub-Phase 12: Billing & Admin**
 
