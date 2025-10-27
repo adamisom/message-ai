@@ -1,9 +1,25 @@
+/**
+ * Sparkle Menu (✨)
+ * 
+ * Modal menu for accessing AI-powered features including:
+ * - Thread Summarization
+ * - Action Items Extraction
+ * - Smart Semantic Search
+ * - Decision Tracking
+ * - Proactive Meeting Scheduler
+ * 
+ * Access control:
+ * - Pro users: Full access everywhere
+ * - Free users in workspaces: Full access
+ * - Free users outside workspaces: Upgrade prompt
+ */
+
 import {
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { Colors } from '../utils/colors';
 
@@ -14,9 +30,11 @@ interface AIFeaturesMenuProps {
   onOpenSummary: () => void;
   onOpenActionItems: () => void;
   onOpenDecisions: () => void;
+  onOpenMeetingScheduler: () => void;
   isGroupChat: boolean;
 }
 
+// Sparkle Menu Component
 export function AIFeaturesMenu({
   visible,
   onClose,
@@ -24,6 +42,7 @@ export function AIFeaturesMenu({
   onOpenSummary,
   onOpenActionItems,
   onOpenDecisions,
+  onOpenMeetingScheduler,
   isGroupChat,
 }: AIFeaturesMenuProps) {
   const handleFeature = (callback: () => void) => {
@@ -100,6 +119,19 @@ export function AIFeaturesMenu({
               </View>
             </TouchableOpacity>
           )}
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => handleFeature(onOpenMeetingScheduler)}
+          >
+            <Text style={styles.menuIcon}>📅</Text>
+            <View style={styles.menuTextContainer}>
+              <Text style={styles.menuTitle}>Suggest Meeting Times</Text>
+              <Text style={styles.menuDescription}>
+                AI-powered scheduling assistant
+              </Text>
+            </View>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.menuItem, styles.cancelButton]}

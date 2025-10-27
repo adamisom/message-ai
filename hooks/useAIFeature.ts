@@ -1,4 +1,12 @@
+/**
+ * useAIFeature Hook
+ * Centralized error handling and loading states for all AI features
+ * Auto-fetches on mount when modal becomes visible
+ */
+
 import { useEffect, useRef, useState } from 'react';
+import { UserFriendlyError, translateError } from '../utils/errorTranslator';
+import { ErrorLogger } from '../utils/errorLogger';
 
 interface UseAIFeatureOptions<T> {
   visible: boolean;
@@ -11,13 +19,14 @@ interface UseAIFeatureResult<T> {
   data: T | null;
   loading: boolean;
   loadingSlowly: boolean; // True after 5 seconds of loading
-  error: string;
+  error: UserFriendlyError | null;
   reload: () => Promise<void>;
 }
 
 /**
  * Custom hook for AI feature modals with standard loading/error/data pattern
  * Includes progressive loading state for better UX on slow operations
+ * Now with user-friendly error messages and developer logging
  */
 export function useAIFeature<T>({
   visible,
@@ -28,13 +37,13 @@ export function useAIFeature<T>({
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingSlowly, setLoadingSlowly] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<UserFriendlyError | null>(null);
   const slowLoadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = async () => {
     setLoading(true);
     setLoadingSlowly(false);
-    setError('');
+    setError(null);
 
     // Set "loading slowly" state after 5 seconds
     slowLoadingTimerRef.current = setTimeout(() => {
@@ -45,8 +54,19 @@ export function useAIFeature<T>({
       const result = await fetchFunction(conversationId, ...dependencies);
       setData(result as T);
     } catch (err: any) {
-      console.error('AI feature error:', err);
-      setError(err.message || 'An error occurred');
+      console.error('[useAIFeature] Error:', err);
+      
+      // Translate to user-friendly error
+      const friendlyError = translateError(err);
+      setError(friendlyError);
+      
+      // Log for developers
+      ErrorLogger.log(err, {
+        conversationId,
+        feature: 'ai_feature_hook',
+        action: 'fetch',
+        metadata: { dependencies },
+      });
     } finally {
       // Clear the slow loading timer
       if (slowLoadingTimerRef.current) {
@@ -58,29 +78,29 @@ export function useAIFeature<T>({
     }
   };
 
+  // Auto-fetch when modal becomes visible
   useEffect(() => {
     if (visible) {
       load();
-    } else {
-      // Clean up timer when modal closes
-      if (slowLoadingTimerRef.current) {
-        clearTimeout(slowLoadingTimerRef.current);
-        slowLoadingTimerRef.current = null;
-      }
-      setLoadingSlowly(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, conversationId, ...dependencies]);
 
-  // Cleanup on unmount
-  useEffect(() => {
+    // Cleanup timer on unmount
     return () => {
       if (slowLoadingTimerRef.current) {
         clearTimeout(slowLoadingTimerRef.current);
       }
     };
-  }, []);
+  }, [visible, conversationId, ...dependencies]);
 
-  return { data, loading, loadingSlowly, error, reload: load };
+  const reload = async () => {
+    await load();
+  };
+
+  return {
+    data,
+    loading,
+    loadingSlowly,
+    error,
+    reload,
+  };
 }
-

@@ -2,24 +2,29 @@ import { Ionicons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    limit,
-    onSnapshot,
-    orderBy,
-    query,
-    serverTimestamp,
-    setDoc,
-    updateDoc
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  startAfter,
+  updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
 import { DecisionsModal } from '../../components/DecisionsModal';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
+import { MeetingSchedulerModal } from '../../components/MeetingSchedulerModal';
 import MessageInput from '../../components/MessageInput';
 import MessageList, { MessageListRef } from '../../components/MessageList';
 import OfflineBanner from '../../components/OfflineBanner';
@@ -28,9 +33,11 @@ import { SummaryModal } from '../../components/SummaryModal';
 import TypingIndicator from '../../components/TypingIndicator';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
+import { FailedMessagesService } from '../../services/failedMessagesService';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
 import { MESSAGE_LIMIT, MESSAGE_TIMEOUT_MS, TYPING_DEBOUNCE_MS } from '../../utils/constants';
+import { ErrorLogger } from '../../utils/errorLogger';
 
 export default function ChatScreen() {
   const { id: conversationId } = useLocalSearchParams();
@@ -43,12 +50,22 @@ export default function ChatScreen() {
   const [isOnline, setIsOnline] = useState(true);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   
+  // Pagination state
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const oldestMessageRef = useRef<any>(null); // Track oldest message for pagination
+  const paginationLockRef = useRef(false); // Prevent concurrent pagination calls
+  const unsubscribeRef = useRef<(() => void) | null>(null); // Store listener unsubscribe function
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false); // Show jump to bottom button
+  const [isPaginationMode, setIsPaginationMode] = useState(false); // Track if we're in pagination mode
+  
   // AI Features Modals
   const [showAIMenu, setShowAIMenu] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [showActionItemsModal, setShowActionItemsModal] = useState(false);
   const [showDecisionsModal, setShowDecisionsModal] = useState(false);
+  const [showMeetingSchedulerModal, setShowMeetingSchedulerModal] = useState(false);
   
   // Jump to message functionality
   const messageListRef = useRef<MessageListRef>(null);
@@ -68,6 +85,19 @@ export default function ChatScreen() {
   const timeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   console.log('💬 [ChatScreen] Rendering, conversationId:', conversationId, 'messagesCount:', messages.length);
+
+  // Helper: Deduplicate messages by ID (safety net for race conditions)
+  const deduplicateMessages = (msgs: Message[]): Message[] => {
+    const seen = new Set<string>();
+    return msgs.filter(msg => {
+      if (seen.has(msg.id)) {
+        console.warn('⚠️ [deduplicateMessages] Removed duplicate:', msg.id);
+        return false;
+      }
+      seen.add(msg.id);
+      return true;
+    });
+  };
 
   // Phase 5: Listen to participant statuses
   useEffect(() => {
@@ -197,19 +227,32 @@ export default function ChatScreen() {
     };
   }, [conversationId]);
 
-  // Listen to messages (last 100) - Phase 6: Added notification triggering
+  // Listen to messages (with pagination support)
   useEffect(() => {
     if (!conversationId || typeof conversationId !== 'string' || !user) return;
+    
+    // Skip if we're in pagination mode (listener already stopped)
+    if (isPaginationMode) {
+      console.log('⏭️ [ChatScreen] In pagination mode, skipping listener setup');
+      return;
+    }
 
-    console.log('👂 [ChatScreen] Setting up messages listener');
+    console.log('👂 [ChatScreen] Setting up messages listener (last 100 messages)');
 
+    // Query for the LAST 100 messages (most recent)
     const q = query(
       collection(db, 'conversations', conversationId, 'messages'),
-      orderBy('createdAt', 'asc'),
+      orderBy('createdAt', 'desc'), // Descending order to get most recent first
       limit(MESSAGE_LIMIT)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      // CRITICAL: If pagination mode was enabled while this callback was pending, ignore it
+      if (isPaginationMode) {
+        console.log('⚠️ [ChatScreen] Pagination mode active, ignoring listener update');
+        return;
+      }
+      
       console.log('📬 [ChatScreen] Received', snapshot.docs.length, 'messages from Firestore');
       
       const msgs = snapshot.docs.map(doc => ({
@@ -217,35 +260,38 @@ export default function ChatScreen() {
         ...doc.data(),
       })) as Message[];
 
-      // DEBUG: Log all message IDs to see if we have temp messages
-      console.log('🔍 [ChatScreen] Message IDs:', msgs.map(m => `${m.id.substring(0, 20)}... (${m.text?.substring(0, 10)}...)`));
-      
-      // Check for temp messages that should have been removed
-      const tempMessages = msgs.filter(m => m.id.startsWith('temp_'));
-      if (tempMessages.length > 0) {
-        console.warn('⚠️ [ChatScreen] Found', tempMessages.length, 'temp messages still in state!');
-        tempMessages.forEach(tm => console.warn('  - Temp:', tm.id, 'text:', tm.text));
+      // For inverted FlatList: keep DESC order (newest first)
+      // FlatList will render them inverted so newest appears at bottom of screen
+
+      // Deduplicate messages (safety net for race conditions)
+      const uniqueMsgs = deduplicateMessages(msgs);
+
+      // Track the oldest message for pagination
+      if (snapshot.docs.length > 0) {
+        oldestMessageRef.current = snapshot.docs[snapshot.docs.length - 1]; // Last doc in desc order = oldest message
       }
 
-      // Phase 6: No notification logic here - notifications happen in conversation list
-      // when a message arrives for a chat that's NOT currently open
+      // If we got fewer messages than the limit, there are no more older messages
+      setHasMoreMessages(snapshot.docs.length === MESSAGE_LIMIT);
 
-      setMessages(msgs);
+      setMessages(uniqueMsgs);
       setLoading(false);
     }, (error) => {
       console.error('❌ [ChatScreen] Messages listener error:', error);
-      // If index is required, error will contain a link to create it
       if (error.message && error.message.includes('index')) {
         console.error('⚠️ FIRESTORE INDEX REQUIRED - See error above for a link to create it.');
       }
       setLoading(false);
     });
 
+    // Store unsubscribe function for later use
+    unsubscribeRef.current = unsubscribe;
+
     return () => {
       console.log('🔌 [ChatScreen] Cleaning up messages listener');
       unsubscribe();
     };
-  }, [conversationId, user]);
+  }, [conversationId, user, isPaginationMode]);
 
   // Phase 5: Listen to typing indicators
   useEffect(() => {
@@ -255,17 +301,67 @@ export default function ChatScreen() {
 
     const typingRef = collection(db, 'conversations', conversationId, 'typingUsers');
     
+    // Track typing users with their last update time
+    const typingUsersMap = new Map<string, { user: TypingUser; lastUpdate: number; timer: ReturnType<typeof setTimeout> }>();
+    
     const unsubscribe = onSnapshot(typingRef, (snapshot) => {
-      const typing = snapshot.docs
-        .map(doc => ({ uid: doc.id, ...doc.data() }))
-        .filter(t => t.uid !== user.uid) as TypingUser[];
+      const now = Date.now();
       
-      console.log('⌨️ [ChatScreen] Typing users:', typing.length);
-      setTypingUsers(typing);
+      // Process current typing users from Firestore
+      snapshot.docs.forEach(doc => {
+        const typingUser = { uid: doc.id, ...doc.data() } as TypingUser;
+        if (typingUser.uid === user.uid) return; // Skip own typing
+        
+        // Clear existing timer if any
+        const existing = typingUsersMap.get(typingUser.uid);
+        if (existing?.timer) {
+          clearTimeout(existing.timer);
+        }
+        
+        // Set new timer to remove after 2 seconds
+        const timer = setTimeout(() => {
+          console.log('⌨️ [ChatScreen] Removing stale typing indicator:', typingUser.displayName);
+          typingUsersMap.delete(typingUser.uid);
+          updateTypingState();
+        }, 2000);
+        
+        typingUsersMap.set(typingUser.uid, {
+          user: typingUser,
+          lastUpdate: now,
+          timer
+        });
+      });
+      
+      // Check for users who were removed from Firestore but should still show for a bit
+      // (This handles the case where sender stopped typing and deleted their doc)
+      typingUsersMap.forEach((data, uid) => {
+        const existsInSnapshot = snapshot.docs.some(doc => doc.id === uid);
+        if (!existsInSnapshot && now - data.lastUpdate < 2000) {
+          // User was removed from Firestore but was recently typing - keep showing for full 2 seconds
+          console.log('⌨️ [ChatScreen] Keeping recently removed typing indicator:', data.user.displayName);
+        } else if (!existsInSnapshot && now - data.lastUpdate >= 2000) {
+          // It's been 2 seconds, safe to remove
+          if (data.timer) clearTimeout(data.timer);
+          typingUsersMap.delete(uid);
+        }
+      });
+      
+      updateTypingState();
     });
+    
+    const updateTypingState = () => {
+      const currentlyTyping = Array.from(typingUsersMap.values()).map(data => data.user);
+      console.log('⌨️ [ChatScreen] Typing users:', currentlyTyping.length);
+      setTypingUsers(currentlyTyping);
+    };
 
     return () => {
       console.log('🔌 [ChatScreen] Cleaning up typing indicators listener');
+      // Clear all timers
+      typingUsersMap.forEach(data => {
+        if (data.timer) clearTimeout(data.timer);
+      });
+      typingUsersMap.clear();
       unsubscribe();
     };
   }, [conversationId, user]);
@@ -293,6 +389,201 @@ export default function ChatScreen() {
     }
   }, [messages, user, conversationId]);
 
+  // Scroll away from bottom handler - show button
+  const handleScrollAwayFromBottom = () => {
+    console.log('⬆️ [handleScrollAwayFromBottom] User scrolled away, showing button');
+    setShowScrollToBottom(true);
+  };
+
+  // Scroll to bottom and re-enable real-time listener
+  const handleScrollToBottom = async () => {
+    console.log('⬇️ [handleScrollToBottom] User at bottom');
+    
+    // Hide the scroll-to-bottom button
+    setShowScrollToBottom(false);
+    
+    // Only re-enable listener if we're in pagination mode
+    if (!isPaginationMode) return;
+    
+    console.log('   Fetching latest messages and switching to append-only mode');
+    
+    if (!conversationId || !user) return;
+    
+    try {
+      // Step 1: Fetch the current latest 100 messages to catch up
+      console.log('📥 [handleScrollToBottom] Fetching latest 100 messages to catch up...');
+      const latestQuery = query(
+        collection(db, 'conversations', conversationId as string, 'messages'),
+        orderBy('createdAt', 'desc'),
+        limit(MESSAGE_LIMIT)
+      );
+      
+      const latestSnapshot = await getDocs(latestQuery);
+      const latestMessages = latestSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Message[];
+      
+      // For inverted list: keep DESC order (NO reverse)
+      console.log(`📬 [handleScrollToBottom] Fetched ${latestMessages.length} latest messages (DESC order)`);
+      
+      // Step 2: Merge with existing paginated messages (prepend newer to inverted list)
+      const existingIds = new Set(messages.map(m => m.id));
+      const newMessages = latestMessages.filter(msg => !existingIds.has(msg.id));
+      
+      if (newMessages.length > 0) {
+        console.log(`➕ [handleScrollToBottom] Prepending ${newMessages.length} new messages to existing ${messages.length}`);
+        // PREPEND for inverted list (newer messages go at beginning of array)
+        setMessages(prev => [...newMessages, ...prev]);
+      } else {
+        console.log('✅ [handleScrollToBottom] No new messages, already caught up');
+      }
+      
+      // Step 3: Set up append-only listener for future messages
+      console.log('🔊 [handleScrollToBottom] Setting up append-only listener for new messages');
+      
+      // Get the most recent message after merge (first element in inverted list)
+      const currentMessages = newMessages.length > 0 
+        ? [...newMessages, ...messages]
+        : messages;
+      
+      if (currentMessages.length === 0) {
+        console.warn('⚠️ [handleScrollToBottom] No messages to set up listener');
+        return;
+      }
+      
+      // Most recent message is at index 0 in inverted list
+      const mostRecentMsg = currentMessages[0];
+      
+      // Fetch the document to use as cursor
+      const mostRecentDocRef = doc(db, 'conversations', conversationId as string, 'messages', mostRecentMsg.id);
+      const mostRecentDocSnap = await getDoc(mostRecentDocRef);
+      
+      if (!mostRecentDocSnap.exists()) {
+        console.error('❌ [handleScrollToBottom] Could not fetch most recent message document');
+        return;
+      }
+      
+      // Query for messages AFTER the most recent one
+      const appendOnlyQuery = query(
+        collection(db, 'conversations', conversationId as string, 'messages'),
+        orderBy('createdAt', 'asc'),
+        startAfter(mostRecentDocSnap)
+      );
+      
+      const unsubscribe = onSnapshot(appendOnlyQuery, (snapshot) => {
+        if (snapshot.docs.length === 0) return;
+        
+        console.log('📬 [handleScrollToBottom] Append-only listener received', snapshot.docs.length, 'new messages');
+        
+        const newMsgs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Message[];
+        
+        // PREPEND to inverted list (new messages go at beginning)
+        setMessages(prev => [...newMsgs, ...prev]);
+      });
+      
+      unsubscribeRef.current = unsubscribe;
+      setIsPaginationMode(false);
+      setShowScrollToBottom(false);
+      
+      console.log('✅ [handleScrollToBottom] Successfully switched to append-only mode');
+      
+    } catch (error) {
+      console.error('❌ [handleScrollToBottom] Error:', error);
+    }
+  };
+
+  // Manual scroll to bottom button
+  const scrollToBottom = () => {
+    console.log('🔘 [scrollToBottom] Button clicked, jumping to bottom');
+    
+    // First, scroll the list to bottom
+    messageListRef.current?.scrollToEnd({ animated: true });
+    
+    // Then trigger the listener re-enable after a short delay
+    setTimeout(() => {
+      handleScrollToBottom();
+    }, 500); // Give scroll animation time to complete
+  };
+
+  // Load more messages (pagination)
+  const loadMoreMessages = async () => {
+    if (!conversationId || typeof conversationId !== 'string' || !user) return;
+    if (isLoadingMore || !hasMoreMessages || !oldestMessageRef.current) return;
+
+    // Prevent concurrent pagination calls (race condition guard)
+    if (paginationLockRef.current) {
+      console.log('⚠️ [loadMoreMessages] Pagination already in progress, skipping...');
+      return;
+    }
+
+    // CRITICAL: Stop real-time listener to prevent it from resetting state
+    if (unsubscribeRef.current) {
+      console.log('🔇 [loadMoreMessages] Unsubscribing from real-time listener (pagination mode)');
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+      setIsPaginationMode(true); // Enable pagination mode (shows jump to bottom button)
+    }
+
+    paginationLockRef.current = true;
+    console.log('📜 [ChatScreen] Loading more messages...');
+    console.log('   Current message count:', messages.length);
+    setIsLoadingMore(true);
+
+    try {
+      // Query for messages BEFORE the oldest message we have
+      // CRITICAL: With DESC order, use startAfter() not endBefore()
+      // DESC order means newest-first, so startAfter() goes to older messages
+      const q = query(
+        collection(db, 'conversations', conversationId, 'messages'),
+        orderBy('createdAt', 'desc'),
+        startAfter(oldestMessageRef.current), // <-- FIXED: was endBefore, should be startAfter for DESC
+        limit(MESSAGE_LIMIT)
+      );
+
+      const snapshot = await getDocs(q);
+      console.log('📬 [ChatScreen] Loaded', snapshot.docs.length, 'older messages');
+
+      if (snapshot.docs.length === 0) {
+        setHasMoreMessages(false);
+        setIsLoadingMore(false);
+        paginationLockRef.current = false;
+        return;
+      }
+
+      const olderMsgs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Message[];
+
+      // For inverted FlatList: keep DESC order (NO reverse)
+      // Update oldest message ref
+      oldestMessageRef.current = snapshot.docs[snapshot.docs.length - 1];
+
+      // APPEND older messages to existing messages for inverted list
+      // Current array: [newest...oldest]
+      // Paginated array: [slightlyOlder...evenOlder]
+      // Result: [newest...oldest, slightlyOlder...evenOlder]
+      setMessages(prev => {
+        const combined = [...prev, ...olderMsgs];
+        const deduped = deduplicateMessages(combined);
+        console.log('   After combining: total', deduped.length, 'messages');
+        return deduped;
+      });
+
+      // Check if there are more messages to load
+      setHasMoreMessages(snapshot.docs.length === MESSAGE_LIMIT);
+    } catch (error) {
+      console.error('❌ [ChatScreen] Error loading more messages:', error);
+    } finally {
+      setIsLoadingMore(false);
+      paginationLockRef.current = false;
+    }
+  };
+
   const sendMessage = async (text: string) => {
     if (!conversation || !user || typeof conversationId !== 'string') {
       console.log('⚠️ [ChatScreen] Cannot send message - missing conversation or user');
@@ -316,7 +607,8 @@ export default function ChatScreen() {
     };
 
     // Optimistic update: Add temp message immediately
-    setMessages(prev => [...prev, tempMessage]);
+    // PREPEND for inverted list (new messages at index 0)
+    setMessages(prev => [tempMessage, ...prev]);
 
     // Set timeout for failure detection (10 seconds)
     const timeout = setTimeout(() => {
@@ -371,6 +663,13 @@ export default function ChatScreen() {
     } catch (error) {
       console.error('❌ [ChatScreen] Send message error:', error);
       
+      // Log error with context
+      ErrorLogger.log(error as Error, {
+        userId: user.uid,
+        conversationId: conversationId as string,
+        action: 'send_message',
+      });
+      
       // Clear timeout
       const existingTimeout = timeoutRefs.current.get(tempId);
       if (existingTimeout) {
@@ -380,6 +679,9 @@ export default function ChatScreen() {
 
       // Mark as failed
       updateMessageStatus(tempId, 'failed');
+      
+      // Save to AsyncStorage for persistence
+      FailedMessagesService.saveFailedMessage(tempMessage, conversationId as string);
     }
   };
 
@@ -387,6 +689,51 @@ export default function ChatScreen() {
     console.log('🔄 [ChatScreen] Updating message status:', messageId, '→', status);
     setMessages(prev => 
       prev.map(m => m.id === messageId ? { ...m, status } : m)
+    );
+  };
+
+  // Retry a failed message
+  const handleRetryMessage = async (messageId: string) => {
+    console.log('🔄 [ChatScreen] Retrying failed message:', messageId);
+    
+    // Find the failed message
+    const failedMessage = messages.find(m => m.id === messageId);
+    if (!failedMessage) {
+      console.warn('⚠️ [ChatScreen] Failed message not found');
+      return;
+    }
+    
+    // Remove from AsyncStorage
+    await FailedMessagesService.removeFailedMessage(messageId);
+    
+    // Remove from UI
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    
+    // Resend
+    await sendMessage(failedMessage.text);
+  };
+
+  // Delete a failed message
+  const handleDeleteMessage = (messageId: string) => {
+    console.log('🗑️ [ChatScreen] Deleting failed message:', messageId);
+    
+    Alert.alert(
+      'Delete Message',
+      'Are you sure you want to delete this failed message?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            // Remove from AsyncStorage
+            await FailedMessagesService.removeFailedMessage(messageId);
+            
+            // Remove from UI
+            setMessages(prev => prev.filter(m => m.id !== messageId));
+          },
+        },
+      ]
     );
   };
 
@@ -502,6 +849,50 @@ export default function ChatScreen() {
     }
   };
 
+  // Phase 3: Read details for group chats (shows WHO has read)
+  interface ReadDetails {
+    readBy: { uid: string; displayName: string }[];
+    unreadBy: { uid: string; displayName: string }[];
+  }
+
+  const getReadDetails = (message: Message): ReadDetails | null => {
+    // Only for group chats and own messages
+    if (!conversation || conversation.type !== 'group' || message.senderId !== user?.uid) {
+      return null;
+    }
+
+    const otherParticipants = conversation.participants.filter(id => id !== user.uid);
+    const readBy: { uid: string; displayName: string }[] = [];
+    const unreadBy: { uid: string; displayName: string }[] = [];
+
+    otherParticipants.forEach(participantId => {
+      const participantDetails = conversation.participantDetails[participantId];
+      const displayName = participantDetails?.displayName || 'Unknown';
+
+      const lastRead = conversation.lastRead?.[participantId];
+      
+      if (lastRead) {
+        const lastReadMsg = messages.find(m => m.id === lastRead);
+        if (lastReadMsg) {
+          const messageTime = getMessageTime(message);
+          const lastReadTime = getMessageTime(lastReadMsg);
+
+          if (messageTime && lastReadTime && messageTime <= lastReadTime) {
+            readBy.push({ uid: participantId, displayName });
+          } else {
+            unreadBy.push({ uid: participantId, displayName });
+          }
+        } else {
+          unreadBy.push({ uid: participantId, displayName });
+        }
+      } else {
+        unreadBy.push({ uid: participantId, displayName });
+      }
+    });
+
+    return { readBy, unreadBy };
+  };
+
   // Cleanup all timeouts on unmount
   useEffect(() => {
     const timeouts = timeoutRefs.current;
@@ -530,7 +921,8 @@ export default function ChatScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ErrorBoundary level="screen">
+      <View style={styles.container}>
       <OfflineBanner />
       <MessageList
         ref={messageListRef}
@@ -538,7 +930,15 @@ export default function ChatScreen() {
         currentUserId={user?.uid || ''}
         conversationType={conversation.type}
         getReadStatus={getReadStatus}
+        getReadDetails={getReadDetails}
         highlightedMessageId={highlightedMessageId}
+        onLoadMore={loadMoreMessages}
+        onRetryMessage={handleRetryMessage}
+        onDeleteMessage={handleDeleteMessage}
+        isLoadingMore={isLoadingMore}
+        hasMoreMessages={hasMoreMessages}
+        onScrollToBottom={handleScrollToBottom}
+        onScrollAwayFromBottom={handleScrollAwayFromBottom}
       />
       <TypingIndicator typingUsers={typingUsers} />
       <MessageInput
@@ -547,6 +947,16 @@ export default function ChatScreen() {
         onStopTyping={handleStopTyping}
         disabled={false} // Can send even when offline (will queue)
       />
+      
+      {/* Jump to Bottom Button (shows when user has scrolled away from bottom) */}
+      {showScrollToBottom && (
+        <TouchableOpacity
+          style={styles.scrollToBottomButton}
+          onPress={scrollToBottom}
+        >
+          <Ionicons name="arrow-down" size={24} color="#FFF" />
+        </TouchableOpacity>
+      )}
       
       {/* Participants Modal (for both direct and group chats) */}
       <GroupParticipantsModal
@@ -568,6 +978,7 @@ export default function ChatScreen() {
         onOpenSummary={() => setShowSummaryModal(true)}
         onOpenActionItems={() => setShowActionItemsModal(true)}
         onOpenDecisions={() => setShowDecisionsModal(true)}
+        onOpenMeetingScheduler={() => setShowMeetingSchedulerModal(true)}
         isGroupChat={conversation.type === 'group'}
       />
 
@@ -596,7 +1007,14 @@ export default function ChatScreen() {
         conversationId={conversationId as string}
         onClose={() => setShowDecisionsModal(false)}
       />
+
+      <MeetingSchedulerModal
+        visible={showMeetingSchedulerModal}
+        conversationId={conversationId as string}
+        onClose={() => setShowMeetingSchedulerModal(false)}
+      />
     </View>
+    </ErrorBoundary>
   );
 }
 
@@ -604,6 +1022,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  scrollToBottomButton: {
+    position: 'absolute',
+    right: 20,
+    bottom: 100, // Above the message input
+    backgroundColor: '#007AFF',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   loadingContainer: {
     flex: 1,

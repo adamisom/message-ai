@@ -44,20 +44,65 @@ export const formatTimestamp = (date: Date): string => {
 };
 
 /**
- * Format time for message bubble (e.g., "2:30 PM")
+ * Format time for message bubble with smart date display
+ * - Today: "2:30 PM"
+ * - Yesterday: "Yesterday, 2:30 PM"
+ * - 2-6 days ago: "Wednesday, 2:30 PM"
+ * - 7+ days ago: "Oct 26, 2:30 PM"
  * @param date - Date object to format
- * @returns Formatted time string
+ * @returns Formatted time string with appropriate date context
  */
 export const formatMessageTime = (date: Date): string => {
   if (!date || !(date instanceof Date)) {
     return '';
   }
 
-  return date.toLocaleTimeString('en-US', {
+  const now = new Date();
+  const timeString = date.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
   });
+
+  // Check if today
+  const isToday = 
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  if (isToday) {
+    return timeString;
+  }
+
+  // Check if yesterday
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = 
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  if (isYesterday) {
+    return `Yesterday, ${timeString}`;
+  }
+
+  // Check if within 2-6 days ago - show day name
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays >= 2 && diffDays < 7) {
+    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+    return `${dayName}, ${timeString}`;
+  }
+
+  // 7+ days ago - show full date
+  const dateString = date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+  });
+
+  return `${dateString}, ${timeString}`;
 };
 
 /**

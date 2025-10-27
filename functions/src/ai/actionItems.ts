@@ -132,20 +132,28 @@ Priority rules:
       })
     );
 
-    // 11. Store in Firestore
+    // 11. Store in Firestore and capture IDs
     const db = getDb();
     const batch = db.batch();
+    const itemsWithIds: any[] = [];
+    
     resolvedItems.forEach((item) => {
       const itemRef = db
         .collection(`conversations/${data.conversationId}/ai_action_items`)
         .doc();
       batch.set(itemRef, item);
+      
+      // Store the item with its auto-generated ID
+      itemsWithIds.push({
+        ...item,
+        id: itemRef.id, // Include the Firestore document ID
+      });
     });
     await batch.commit();
 
     // 12. Store in cache (convert serverTimestamp to actual timestamp for array storage)
     const now = admin.firestore.Timestamp.now();
-    const itemsForCache = resolvedItems.map((item) => ({
+    const itemsForCache = itemsWithIds.map((item) => ({
       ...item,
       extractedAt: now,
     }));

@@ -42,18 +42,15 @@ service cloud.firestore {
       allow write: if false;
     }
     
-    // AI Action Items - participants can read and update status
+    // AI Action Items - participants can read, only Cloud Functions can write
     match /conversations/{conversationId}/ai_action_items/{itemId} {
       allow read: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
       
-      // Users can mark action items as complete (status, completedAt only)
-      allow update: if request.auth != null && 
-        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedAt']);
-      
-      // Only Cloud Functions can create/delete
-      allow create, delete: if false;
+      // Phase 3: Read-only for users
+      // Phase 4: Workspace admins will be able to assign/edit action items
+      // Only Cloud Functions can create/update/delete
+      allow write: if false;
     }
     
     // AI Decisions - only conversation participants can read
@@ -64,22 +61,14 @@ service cloud.firestore {
       allow write: if false;
     }
     
-    // AI Cache Documents - only conversation participants can read
-    match /conversations/{conversationId}/ai_summaries_cache {
+    // AI Cache Documents (subcollection: /conversations/{id}/ai_cache/{docId})
+    // Phase 3: Read-only for users
+    // Phase 4: Workspace admins can invalidate cache when editing AI content
+    match /conversations/{conversationId}/ai_cache/{cacheDocId} {
       allow read: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
-      allow write: if false;
-    }
-    
-    match /conversations/{conversationId}/ai_action_items_cache {
-      allow read: if request.auth != null && 
-        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
-      allow write: if false;
-    }
-    
-    match /conversations/{conversationId}/ai_decisions_cache {
-      allow read: if request.auth != null && 
-        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+      
+      // Only Cloud Functions can write
       allow write: if false;
     }
   }

@@ -13,8 +13,10 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:functions": "cd functions && npm test",
     "test:integration": "cd functions && npm run test:integration",
-    "validate": "npm run lint && npm run type-check && npm test"
+    "validate": "npm run lint && npm run type-check && npm test",
+    "validate:all": "npm run lint && npm run type-check && npm test && npm run test:functions"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -24,6 +26,7 @@
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
     "expo": "~54.0.17",
+    "expo-clipboard": "^8.0.7",
     "expo-constants": "~18.0.9",
     "expo-font": "~14.0.9",
     "expo-haptics": "~15.0.7",

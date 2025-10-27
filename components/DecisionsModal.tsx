@@ -27,7 +27,7 @@ export function DecisionsModal({
   conversationId,
   onClose,
 }: DecisionsModalProps) {
-  const { data, loading, loadingSlowly, error, reload } = useAIFeature({
+  const { data, loading, loadingSlowly, error, reload } = useAIFeature<any>({
     visible,
     conversationId,
     fetchFunction: (convId) => trackDecisions(convId),
@@ -59,7 +59,7 @@ export function DecisionsModal({
 
         {/* Error State */}
         {error && !loading && (
-          <ErrorState message={error} onRetry={reload} />
+          <ErrorState error={error} onRetry={reload} />
         )}
 
         {/* Decisions List */}

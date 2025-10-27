@@ -223,3 +223,80 @@ Consider the language, tone, and content to determine priority.`,
   },
 };
 
+/**
+ * Tool for suggesting meeting times based on conversation analysis
+ * (Advanced AI Capability)
+ */
+export const suggestMeetingTimesTool: Tool = {
+  name: 'suggest_meeting_times',
+  description: `Analyze a conversation to suggest optimal meeting times for team members.
+  
+You are a scheduling assistant analyzing a team conversation to identify:
+- Scheduling-related discussions ("let's meet", "when can we sync", "need to discuss")
+- Mentioned availability and constraints
+- Time preferences and patterns
+- Potential conflicts or blockers
+
+Your task is to suggest 3 specific meeting times that:
+- Respect mentioned availability and constraints
+- Fall within typical business hours (9 AM - 6 PM)
+- Are specific dates/times, not vague ("Tuesday 2 PM ET" not "next week")
+- Account for time zones if mentioned
+- Are ordered by confidence (best suggestion first)
+
+If no specific availability is mentioned, suggest reasonable times based on:
+- Typical meeting patterns (Tuesday-Thursday afternoons are often good)
+- Avoiding early mornings or late afternoons
+- Suggesting times 3-10 days in the future`,
+  input_schema: {
+    type: 'object',
+    properties: {
+      suggestedTimes: {
+        type: 'array',
+        description: '3 suggested meeting times ordered by confidence',
+        items: {
+          type: 'object',
+          properties: {
+            dateTime: {
+              type: 'string',
+              description: 'Specific date and time (e.g., "Tuesday, October 29, 2025 at 2:00 PM ET")',
+            },
+            reasoning: {
+              type: 'string',
+              description: 'Clear explanation why this time is optimal (1-2 sentences)',
+            },
+            confidence: {
+              type: 'number',
+              description: 'Confidence score 0-1 based on how well it matches mentioned constraints',
+              minimum: 0,
+              maximum: 1,
+            },
+          },
+          required: ['dateTime', 'reasoning', 'confidence'],
+        },
+        minItems: 3,
+        maxItems: 3,
+      },
+      participants: {
+        type: 'array',
+        description: 'User IDs of participants who should attend the meeting (all conversation participants by default)',
+        items: {
+          type: 'string',
+        },
+      },
+      context: {
+        type: 'string',
+        description: '1-2 sentence summary of what needs to be scheduled and why',
+      },
+      conflicts: {
+        type: 'array',
+        description: 'List of any scheduling conflicts or constraints mentioned (e.g., "Alice unavailable Monday mornings")',
+        items: {
+          type: 'string',
+        },
+      },
+    },
+    required: ['suggestedTimes', 'participants', 'context'],
+  },
+};
+

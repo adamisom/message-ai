@@ -155,6 +155,27 @@ export async function trackDecisions(conversationId: string) {
 }
 
 /**
+ * Meeting Scheduler (Advanced AI Capability) - Suggest optimal meeting times
+ * @param conversationId - Conversation to analyze
+ * @param messageCount - Number of recent messages to analyze (default: 50)
+ * @throws Error with user-friendly message
+ */
+export async function suggestMeetingTimes(
+  conversationId: string,
+  messageCount: number = 50
+) {
+  try {
+    return await callAIFeatureWithTimeout(
+      'analyzeMeetingScheduling',
+      {conversationId, messageCount},
+      30000 // 30 second timeout (matching other AI features, allows for cold start)
+    );
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+/**
  * Action Item Status Toggle - Mark action item as completed or pending
  * @param conversationId - Conversation containing the action item
  * @param itemId - Action item ID
@@ -176,11 +197,44 @@ export async function toggleActionItemStatus(
     );
     await updateDoc(itemRef, {
       status: newStatus,
-      completedAt: newStatus === 'completed' ? serverTimestamp() : null,
+      updatedAt: serverTimestamp(),
     });
   } catch (error: any) {
     console.error('[aiService] toggleActionItemStatus error:', error);
-    throw new Error(getErrorMessage(error));
+    throw new Error(error.message || 'Failed to update action item status');
+  }
+}
+
+/**
+ * Assign Action Item - Manually assign an action item to a participant
+ * @param conversationId - Conversation containing the action item
+ * @param itemId - Action item ID
+ * @param assigneeUid - UID of the user to assign
+ * @param assigneeDisplayName - Display name of the user to assign
+ * @throws Error with user-friendly message
+ */
+export async function assignActionItem(
+  conversationId: string,
+  itemId: string,
+  assigneeUid: string,
+  assigneeDisplayName: string
+) {
+  try {
+    const {doc, updateDoc, serverTimestamp} = await import('firebase/firestore');
+    const {db} = await import('../firebase.config');
+
+    const itemRef = doc(
+      db,
+      `conversations/${conversationId}/ai_action_items/${itemId}`
+    );
+    await updateDoc(itemRef, {
+      assigneeUid,
+      assigneeDisplayName,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error: any) {
+    console.error('[aiService] assignActionItem error:', error);
+    throw new Error(error.message || 'Failed to assign action item');
   }
 }
 

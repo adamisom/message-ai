@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Message } from '../types';
 import { FEATURE_FLAGS } from '../utils/featureFlags';
 import { formatMessageTime } from '../utils/timeFormat';
@@ -8,7 +8,13 @@ interface MessageBubbleProps {
   isOwnMessage: boolean;
   showSenderName?: boolean; // For group chats
   readStatus?: '✓' | '✓✓' | null; // For read receipts (Phase 5)
+  readDetails?: { // Phase 3: Detailed read receipts for group chats
+    readBy: Array<{ uid: string; displayName: string }>;
+    unreadBy: Array<{ uid: string; displayName: string }>;
+  } | null;
   isHighlighted?: boolean; // For search result highlighting
+  onRetry?: (messageId: string) => void; // Retry failed message
+  onDelete?: (messageId: string) => void; // Delete failed message
 }
 
 export default function MessageBubble({ 
@@ -16,7 +22,10 @@ export default function MessageBubble({
   isOwnMessage, 
   showSenderName = false,
   readStatus,
-  isHighlighted = false
+  readDetails,
+  isHighlighted = false,
+  onRetry,
+  onDelete
 }: MessageBubbleProps) {
   const getTimestamp = () => {
     if (!message.createdAt) return 'Sending...';
@@ -96,6 +105,40 @@ export default function MessageBubble({
           )}
         </View>
       </View>
+      
+      {/* Phase 3: Detailed read receipts for group chats */}
+      {isOwnMessage && readDetails && readDetails.readBy.length > 0 && (
+        <View style={styles.readDetailsContainer}>
+          <Text style={styles.readDetailsText}>
+            Read by {readDetails.readBy.map(r => r.displayName).join(', ')}
+          </Text>
+        </View>
+      )}
+      
+      {/* Failed message actions */}
+      {isOwnMessage && message.status === 'failed' && (
+        <View style={styles.failedActionsContainer}>
+          <Text style={styles.failedText}>Failed to send</Text>
+          <View style={styles.failedButtons}>
+            {onRetry && (
+              <TouchableOpacity 
+                onPress={() => onRetry(message.id)} 
+                style={styles.retryButton}
+              >
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            )}
+            {onDelete && (
+              <TouchableOpacity 
+                onPress={() => onDelete(message.id)} 
+                style={styles.deleteButton}
+              >
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -178,6 +221,51 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.7)',
     marginLeft: 4,
+  },
+  readDetailsContainer: {
+    marginTop: 4,
+    marginRight: 12,
+  },
+  readDetailsText: {
+    fontSize: 11,
+    color: '#8E8E93',
+    fontStyle: 'italic',
+  },
+  // Failed message styles
+  failedActionsContainer: {
+    marginTop: 4,
+    marginRight: 8,
+  },
+  failedText: {
+    fontSize: 11,
+    color: '#FF3B30',
+    marginBottom: 4,
+  },
+  failedButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 
