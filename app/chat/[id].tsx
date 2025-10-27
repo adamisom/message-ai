@@ -21,17 +21,13 @@ import { useEffect, useRef, useState } from 'react';
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
-import CapacityExpansionModal from '../../components/CapacityExpansionModal';
 import { DecisionsModal } from '../../components/DecisionsModal';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
 import { MeetingSchedulerModal } from '../../components/MeetingSchedulerModal';
 import MessageInput from '../../components/MessageInput';
 import MessageList, { MessageListRef } from '../../components/MessageList';
-import MessageToolbar from '../../components/MessageToolbar';
 import OfflineBanner from '../../components/OfflineBanner';
-import PinnedMessagesModal from '../../components/PinnedMessagesModal';
-import ReadOnlyWorkspaceBanner from '../../components/ReadOnlyWorkspaceBanner';
 import { SearchModal } from '../../components/SearchModal';
 import { SummaryModal } from '../../components/SummaryModal';
 import TypingIndicator from '../../components/TypingIndicator';
@@ -40,13 +36,6 @@ import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
 import { FailedMessagesService } from '../../services/failedMessagesService';
 import { reportDirectMessageSpam } from '../../services/groupChatService';
-import {
-  expandWorkspaceCapacity,
-  markMessageUrgent,
-  pinMessage,
-  unmarkMessageUrgent,
-  unpinMessage,
-} from '../../services/workspaceAdminService';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
 import { Workspace } from '../../types/workspace';
@@ -1273,6 +1262,8 @@ export default function ChatScreen() {
       <SummaryModal
         visible={showSummaryModal}
         conversationId={conversationId as string}
+        isWorkspaceChat={conversation?.isWorkspaceChat || false}
+        isAdmin={isAdmin}
         onClose={() => setShowSummaryModal(false)}
       />
 

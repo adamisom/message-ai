@@ -159,6 +159,7 @@
 **Note:** Core spam prevention (workspace invitations, group chat invitations, direct message spam reporting with dual ban logic) is fully implemented in Sub-Phases 4 and 6.5. See `PRD-SUPPLEMENT-SUB-PHASE-6.5-GROUP-CHAT-INVITES.md` for detailed discussion of the dual ban system (24h temp ban for 2 strikes in 24h, indefinite ban for 5 strikes in 30d), blocking functionality, conversation hiding, and spam reporting decisions (no abuse prevention, no appeal mechanism).
 
 **Sub-Phase 8 Implementation:**
+
 - `getUserSpamStatus` Cloud Function returns current spam strike count and status
 - `SpamWarningBanner` component displays color-coded warnings (warning/danger/temp_banned/permanently_banned)
 - Integrated into profile screen with auto-refresh on focus
