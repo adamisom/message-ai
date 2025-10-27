@@ -40,7 +40,7 @@ import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
 import { FailedMessagesService } from '../../services/failedMessagesService';
 import { reportDirectMessageSpam } from '../../services/groupChatService';
-import { editMessage as editMessageService, deleteMessage as deleteMessageService } from '../../services/messageEditService';
+import { deleteMessage as deleteMessageService, editMessage as editMessageService } from '../../services/messageEditService';
 import {
   expandWorkspaceCapacity,
   markMessageUrgent,

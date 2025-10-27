@@ -7,7 +7,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Alerts } from '../utils/alerts';
 import { Colors } from '../utils/colors';
 
 interface UserSettingsModalProps {
@@ -43,10 +43,10 @@ export function UserSettingsModal({
     setIsSaving(true);
     try {
       await onSave(dmSetting);
-      Alert.alert('Settings Saved', 'Your privacy settings have been updated');
+      Alerts.success('Your privacy settings have been updated');
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save settings');
+      Alerts.error(error.message || 'Failed to save settings');
     } finally {
       setIsSaving(false);
     }

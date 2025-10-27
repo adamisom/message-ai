@@ -7,7 +7,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   StyleSheet,
   Text,
@@ -15,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Alerts } from '../utils/alerts';
 import { Colors } from '../utils/colors';
 
 interface EditMessageModalProps {
@@ -37,17 +37,17 @@ export function EditMessageModal({
     const trimmedText = text.trim();
     
     if (trimmedText.length === 0) {
-      Alert.alert('Error', 'Message cannot be empty');
+      Alerts.error('Message cannot be empty');
       return;
     }
 
     if (trimmedText === originalText.trim()) {
-      Alert.alert('No Changes', 'You haven&apos;t made any changes');
+      Alerts.error('You haven\'t made any changes');
       return;
     }
 
     if (trimmedText.length > 10000) {
-      Alert.alert('Error', 'Message cannot exceed 10,000 characters');
+      Alerts.error('Message cannot exceed 10,000 characters');
       return;
     }
 
@@ -56,7 +56,7 @@ export function EditMessageModal({
       await onSave(trimmedText);
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to edit message');
+      Alerts.error(error.message || 'Failed to edit message');
     } finally {
       setIsSaving(false);
     }

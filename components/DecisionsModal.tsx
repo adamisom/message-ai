@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
     FlatList,
     Modal,
     StyleSheet,
@@ -16,6 +15,7 @@ import { saveEditedDecision, trackDecisions } from '../services/aiService';
 import { useAuthStore } from '../store/authStore';
 import { commonModalStyles } from '../styles/commonModalStyles';
 import { Decision } from '../types';
+import { Alerts } from '../utils/alerts';
 import { getConfidenceColor } from '../utils/colorHelpers';
 import { Colors } from '../utils/colors';
 import { formatDateDetailed } from '../utils/dateFormat';
@@ -103,7 +103,7 @@ export function DecisionsModal({
         editedDecision,
         editedContext
       );
-      Alert.alert('Success', 'Decision saved successfully');
+      Alerts.success('Decision saved successfully');
       setShowEditModal(false);
       setEditingDecision(null);
       reload(); // Reload to show saved version
