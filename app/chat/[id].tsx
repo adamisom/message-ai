@@ -18,7 +18,7 @@ import {
   updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
 import CapacityExpansionModal from '../../components/CapacityExpansionModal';
@@ -38,6 +38,7 @@ import TypingIndicator from '../../components/TypingIndicator';
 import { UpgradeToProModal } from '../../components/UpgradeToProModal';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
+import { useModalManager } from '../../hooks/useModalManager';
 import { FailedMessagesService } from '../../services/failedMessagesService';
 import { reportDirectMessageSpam } from '../../services/groupChatService';
 import { editMessage as editMessageService, deleteMessage as deleteMessageService } from '../../services/messageEditService';
@@ -51,19 +52,23 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
 import { Workspace } from '../../types/workspace';
+import { Alerts } from '../../utils/alerts';
 import { MESSAGE_LIMIT, MESSAGE_TIMEOUT_MS, TYPING_DEBOUNCE_MS } from '../../utils/constants';
 import { ErrorLogger } from '../../utils/errorLogger';
+import { canAccessAIInContext, getUserPermissions } from '../../utils/userPermissions';
 
 export default function ChatScreen() {
   const { id: conversationId } = useLocalSearchParams();
   const { user, refreshUserProfile } = useAuthStore();
   const navigation = useNavigation();
+  
+  // Modal management - consolidated from 11 separate useState calls
+  const modals = useModalManager();
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
-  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [canAccessAI, setCanAccessAI] = useState(false); // AI access control
   
   // Pagination state
@@ -74,15 +79,6 @@ export default function ChatScreen() {
   const unsubscribeRef = useRef<(() => void) | null>(null); // Store listener unsubscribe function
   const [showScrollToBottom, setShowScrollToBottom] = useState(false); // Show jump to bottom button
   const [isPaginationMode, setIsPaginationMode] = useState(false); // Track if we're in pagination mode
-  
-  // AI Features Modals
-  const [showAIMenu, setShowAIMenu] = useState(false);
-  const [showSearchModal, setShowSearchModal] = useState(false);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [showActionItemsModal, setShowActionItemsModal] = useState(false);
-  const [showDecisionsModal, setShowDecisionsModal] = useState(false);
-  const [showMeetingSchedulerModal, setShowMeetingSchedulerModal] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   
   // Jump to message functionality
   const messageListRef = useRef<MessageListRef>(null);
@@ -103,14 +99,11 @@ export default function ChatScreen() {
 
   // Sub-Phase 7: Workspace admin features
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
-  const [showPinnedModal, setShowPinnedModal] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [showCapacityModal, setShowCapacityModal] = useState(false);
 
   // Sub-Phase 11: Message editing/deletion (Pro feature)
-  const [showEditModal, setShowEditModal] = useState(false);
   const [messageToEdit, setMessageToEdit] = useState<Message | null>(null);
 
   // Track pending message timeouts
@@ -126,33 +119,9 @@ export default function ChatScreen() {
     }
 
     const checkAIAccess = () => {
-      // Pro users always have access
-      if (user.isPaidUser === true) {
-        setCanAccessAI(true);
-        return;
-      }
-
-      // Check if user is in active trial
-      if (user.trialEndsAt) {
-        const now = Date.now();
-        const trialEndsAt = typeof user.trialEndsAt === 'number' 
-          ? user.trialEndsAt 
-          : user.trialEndsAt.toMillis?.() || 0;
-        
-        if (now < trialEndsAt) {
-          setCanAccessAI(true);
-          return;
-        }
-      }
-
-      // Free users (after trial) can only access AI in workspace chats
-      if (conversation.workspaceId) {
-        setCanAccessAI(true);
-        return;
-      }
-
-      // No access: not Pro, trial expired, and not in workspace
-      setCanAccessAI(false);
+      // Use centralized helper for AI access check
+      const hasAccess = canAccessAIInContext(user, !!conversation.workspaceId);
+      setCanAccessAI(hasAccess);
     };
 
     checkAIAccess();
