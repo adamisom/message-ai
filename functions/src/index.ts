@@ -50,4 +50,7 @@ export { markMessageUrgent, unmarkMessageUrgent } from './workspaces/urgencyMark
 // Sub-Phase 8: Enhanced Spam Reporting
 export { getUserSpamStatus } from './spam/getUserSpamStatus';
 
+// Sub-Phase 10: Export Workspace
+export { exportWorkspace } from './workspaces/exportWorkspace';
+
 

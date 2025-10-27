@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { functions } from '../../../firebase.config';
 import { getWorkspace } from '../../../services/workspaceService';
+import { exportWorkspaceData } from '../../../services/workspaceExportService';
 import { useAuthStore } from '../../../store/authStore';
 import type { Workspace } from '../../../types';
 import { Colors } from '../../../utils/colors';
@@ -30,6 +31,7 @@ export default function WorkspaceSettingsScreen() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     loadWorkspace();
@@ -86,6 +88,33 @@ export default function WorkspaceSettingsScreen() {
       Alert.alert('Error', error.message || 'Failed to delete workspace');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleExportWorkspace = async () => {
+    if (!workspace || !id) return;
+
+    setIsExporting(true);
+    try {
+      const result = await exportWorkspaceData(id);
+      
+      if (result.success && result.data) {
+        const { metadata } = result.data;
+        let message = `Exported ${metadata.totalConversations} conversations with ${metadata.totalMessages} messages.`;
+        
+        if (metadata.timeoutWarning) {
+          message += `\n\n⚠️ ${metadata.timeoutWarning}`;
+        }
+        
+        Alert.alert('Export Complete', message);
+      } else {
+        Alert.alert('Export Failed', result.error || 'Unknown error');
+      }
+    } catch (error: any) {
+      console.error('Export workspace error:', error);
+      Alert.alert('Error', error.message || 'Failed to export workspace');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -235,6 +264,36 @@ export default function WorkspaceSettingsScreen() {
             <Text style={styles.menuText}>Change Capacity</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.textMedium} />
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Export Section (Admin Only) */}
+      {isAdmin && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Data</Text>
+          
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleExportWorkspace}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <>
+                <ActivityIndicator color={Colors.primary} />
+                <Text style={[styles.menuText, { marginLeft: 16 }]}>Exporting...</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="download-outline" size={24} color={Colors.primary} />
+                <Text style={styles.menuText}>Export Workspace (JSON)</Text>
+                <Ionicons name="chevron-forward" size={20} color={Colors.textMedium} />
+              </>
+            )}
+          </TouchableOpacity>
+          
+          <Text style={styles.helperText}>
+            Download all workspace data including messages, members, and AI analysis
+          </Text>
         </View>
       )}
 
@@ -413,6 +472,13 @@ const styles = StyleSheet.create({
     color: Colors.textDark,
     flex: 1,
     marginLeft: 12,
+  },
+  helperText: {
+    fontSize: 13,
+    color: Colors.textMedium,
+    marginTop: 8,
+    marginLeft: 40, // Align with menu text
+    lineHeight: 18,
   },
   menuSubtext: {
     fontSize: 13,
