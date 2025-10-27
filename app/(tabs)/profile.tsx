@@ -465,6 +465,10 @@ export default function ProfileScreen() {
             Meeting Scheduler & Auto-Detection of Urgent Messages
           </Text>
         </View>
+        <View style={styles.featureItem}>
+          <Ionicons name="checkmark-circle" size={20} color="#34C759" />
+          <Text style={styles.featureText}>Edit & Delete Messages</Text>
+        </View>
         
         {/* Workspace Features */}
         <Text style={[styles.subheader, styles.workspaceSubheader]}>Workspace Features:</Text>

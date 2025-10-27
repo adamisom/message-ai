@@ -64,4 +64,7 @@ export {
   reportDirectMessageInvitationSpam,
 } from './dm/directMessageInvitations';
 
+// Sub-Phase 11: Message Editing/Deletion (Pro feature)
+export { editMessage, deleteMessage } from './messages/editDeleteMessages';
+
 

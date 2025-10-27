@@ -23,12 +23,12 @@ import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
 import CapacityExpansionModal from '../../components/CapacityExpansionModal';
 import { DecisionsModal } from '../../components/DecisionsModal';
+import { EditMessageModal } from '../../components/EditMessageModal';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
 import { MeetingSchedulerModal } from '../../components/MeetingSchedulerModal';
 import MessageInput from '../../components/MessageInput';
 import MessageList, { MessageListRef } from '../../components/MessageList';
-import MessageToolbar from '../../components/MessageToolbar';
 import OfflineBanner from '../../components/OfflineBanner';
 import PinnedMessagesModal from '../../components/PinnedMessagesModal';
 import ReadOnlyWorkspaceBanner from '../../components/ReadOnlyWorkspaceBanner';
@@ -40,6 +40,7 @@ import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
 import { FailedMessagesService } from '../../services/failedMessagesService';
 import { reportDirectMessageSpam } from '../../services/groupChatService';
+import { editMessage as editMessageService, deleteMessage as deleteMessageService } from '../../services/messageEditService';
 import {
   expandWorkspaceCapacity,
   markMessageUrgent,
@@ -101,13 +102,16 @@ export default function ChatScreen() {
   const [isBlockedByRecipient, setIsBlockedByRecipient] = useState(false);
 
   // Sub-Phase 7: Workspace admin features
-  const [showMessageToolbar, setShowMessageToolbar] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showPinnedModal, setShowPinnedModal] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showCapacityModal, setShowCapacityModal] = useState(false);
+
+  // Sub-Phase 11: Message editing/deletion (Pro feature)
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [messageToEdit, setMessageToEdit] = useState<Message | null>(null);
 
   // Track pending message timeouts
   const timeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -891,7 +895,7 @@ export default function ChatScreen() {
   };
 
   // Delete a failed message
-  const handleDeleteMessage = (messageId: string) => {
+  const handleDeleteFailedMessage = (messageId: string) => {
     console.log('🗑️ [ChatScreen] Deleting failed message:', messageId);
     
     Alert.alert(
@@ -1052,9 +1056,74 @@ export default function ChatScreen() {
 
   // Sub-Phase 7: Workspace Admin Handlers
   const handleMessageLongPress = (message: Message) => {
-    if (!conversation?.workspaceId) return; // Only for workspace chats
-    setSelectedMessage(message);
-    setShowMessageToolbar(true);
+    // Skip deleted messages
+    if (message.isDeleted) return;
+    
+    const isOwnMessage = message.senderId === user?.uid;
+    const isPro = user?.isPaidUser || (user?.trialEndsAt && Date.now() < (typeof user.trialEndsAt === 'number' ? user.trialEndsAt : user.trialEndsAt.toMillis?.() || 0));
+    const isWorkspaceChat = !!conversation?.workspaceId;
+    
+    // Build action sheet options
+    const options: string[] = [];
+    
+    // Pro users can edit/delete their own messages
+    if (isOwnMessage && isPro) {
+      options.push('Edit Message');
+      options.push('Delete Message');
+    }
+    
+    // Workspace admins can mark urgent, pin, report spam
+    if (isWorkspaceChat && isAdmin) {
+      const isUrgent = message.manuallyMarkedUrgent || message.priority === 'high';
+      options.push(isUrgent ? 'Unmark Urgent' : 'Mark Urgent');
+      
+      const isPinned = (conversation.pinnedMessages || []).some(pm => pm.messageId === message.id);
+      options.push(isPinned ? 'Unpin Message' : 'Pin Message');
+      
+      if (!isOwnMessage) {
+        options.push('Report Spam');
+      }
+    }
+    
+    // Direct messages: report spam
+    if (conversation?.type === 'direct' && !isOwnMessage) {
+      options.push('Report Spam');
+    }
+    
+    // No options available
+    if (options.length === 0) return;
+    
+    options.push('Cancel');
+    
+    Alert.alert('Message Actions', 'Choose an action', [
+      ...options.map((option) => ({
+        text: option,
+        style: (option === 'Cancel' ? 'cancel' : option.includes('Delete') || option.includes('Spam') ? 'destructive' : 'default') as 'default' | 'cancel' | 'destructive',
+        onPress: () => {
+          if (option === 'Edit Message') {
+            setMessageToEdit(message);
+            setShowEditModal(true);
+          } else if (option === 'Delete Message') {
+            handleDeleteMessage(message);
+          } else if (option === 'Mark Urgent') {
+            setSelectedMessage(message);
+            handleMarkUrgent();
+          } else if (option === 'Unmark Urgent') {
+            setSelectedMessage(message);
+            handleUnmarkUrgent();
+          } else if (option === 'Pin Message') {
+            setSelectedMessage(message);
+            handlePinMessage();
+          } else if (option === 'Unpin Message') {
+            setSelectedMessage(message);
+            handleUnpinMessage();
+          } else if (option === 'Report Spam') {
+            setSelectedMessage(message);
+            handleReportSpam(message);
+          }
+        },
+      })),
+    ]);
   };
 
   const handleMarkUrgent = async () => {
@@ -1063,7 +1132,6 @@ export default function ChatScreen() {
     try {
       await markMessageUrgent(conversationId as string, selectedMessage.id);
       Alert.alert('Success', 'Message marked as urgent');
-      setShowMessageToolbar(false);
       setSelectedMessage(null);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to mark message as urgent');
@@ -1076,7 +1144,6 @@ export default function ChatScreen() {
     try {
       await unmarkMessageUrgent(conversationId as string, selectedMessage.id);
       Alert.alert('Success', 'Urgency marker removed');
-      setShowMessageToolbar(false);
       setSelectedMessage(null);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to remove urgency marker');
@@ -1089,7 +1156,6 @@ export default function ChatScreen() {
     try {
       await pinMessage(conversationId as string, selectedMessage.id);
       Alert.alert('Success', 'Message pinned');
-      setShowMessageToolbar(false);
       setSelectedMessage(null);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to pin message');
@@ -1138,8 +1204,8 @@ export default function ChatScreen() {
     }
   };
 
-  const handleReportSpam = async () => {
-    if (!selectedMessage || conversation?.type !== 'direct') return;
+  const handleReportSpam = async (message: Message) => {
+    if (conversation?.type !== 'direct') return;
     
     const otherUserId = conversation.participants.find(id => id !== user?.uid);
     if (!otherUserId) return;
@@ -1151,11 +1217,45 @@ export default function ChatScreen() {
         'User reported for spam and blocked. This conversation will be hidden.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
-      setShowMessageToolbar(false);
-      setSelectedMessage(null);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to report spam');
     }
+  };
+
+  // Sub-Phase 11: Message Edit/Delete Handlers
+  const handleEditMessage = async (newText: string) => {
+    if (!messageToEdit) return;
+    
+    try {
+      await editMessageService(conversationId as string, messageToEdit.id, newText);
+      // Success - message will update via real-time listener
+      setShowEditModal(false);
+      setMessageToEdit(null);
+    } catch (error: any) {
+      throw error; // Let EditMessageModal handle the error display
+    }
+  };
+
+  const handleDeleteMessage = (message: Message) => {
+    Alert.alert(
+      'Delete Message?',
+      'This message will be deleted for everyone. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteMessageService(conversationId as string, message.id);
+              // Success - message will update via real-time listener
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete message');
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Cleanup all timeouts on unmount
@@ -1199,7 +1299,7 @@ export default function ChatScreen() {
         highlightedMessageId={highlightedMessageId}
         onLoadMore={loadMoreMessages}
         onRetryMessage={handleRetryMessage}
-        onDeleteMessage={handleDeleteMessage}
+        onDeleteMessage={handleDeleteFailedMessage}
         onMessageLongPress={handleMessageLongPress}
         isLoadingMore={isLoadingMore}
         hasMoreMessages={hasMoreMessages}
@@ -1285,6 +1385,16 @@ export default function ChatScreen() {
         onClose={() => setShowSummaryModal(false)}
       />
 
+      <EditMessageModal
+        visible={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setMessageToEdit(null);
+        }}
+        originalText={messageToEdit?.text || ''}
+        onSave={handleEditMessage}
+      />
+
       <ActionItemsModal
         visible={showActionItemsModal}
         conversationId={conversationId as string}
@@ -1345,22 +1455,6 @@ export default function ChatScreen() {
               reason="inactive"
             />
           )}
-
-          <MessageToolbar
-            visible={showMessageToolbar}
-            message={selectedMessage}
-            isWorkspaceChat={true}
-            isAdmin={isAdmin}
-            isOwnMessage={selectedMessage?.senderId === user?.uid}
-            onClose={() => {
-              setShowMessageToolbar(false);
-              setSelectedMessage(null);
-            }}
-            onMarkUrgent={handleMarkUrgent}
-            onUnmarkUrgent={handleUnmarkUrgent}
-            onPin={handlePinMessage}
-            onReportSpam={handleReportSpam}
-          />
 
           <PinnedMessagesModal
             visible={showPinnedModal}

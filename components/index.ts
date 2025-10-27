@@ -22,6 +22,9 @@ export { default as SpamWarningBanner } from './SpamWarningBanner';
 // Sub-Phase 11: User Settings
 export { UserSettingsModal } from './UserSettingsModal';
 
+// Sub-Phase 11: Message Edit/Delete (Pro feature)
+export { EditMessageModal } from './EditMessageModal';
+
 // Phase 4: Paid Tier Components
 export { HelpModal } from './HelpModal';
 export { ProfileButton } from './ProfileButton';

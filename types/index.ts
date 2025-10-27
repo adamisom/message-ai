@@ -20,6 +20,13 @@ export interface Message {
   priorityQuick?: 'high' | 'low' | 'unknown';
   priorityAnalyzedAt?: any;
   priorityNeedsAnalysis?: boolean;
+
+  // Sub-Phase 11: Message editing/deletion (Pro feature)
+  isEdited?: boolean;
+  editedAt?: any;
+  isDeleted?: boolean;
+  deletedAt?: any;
+  deletedBy?: string; // UID of user who deleted it
   
   // Sub-Phase 7: Manual urgency markers
   manuallyMarkedUrgent?: boolean;     // Admin override

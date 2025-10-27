@@ -129,6 +129,7 @@ export const UpgradeToProModal: React.FC<UpgradeToProModalProps> = ({
     { icon: 'checkbox-outline', text: 'Track Action Items & Decisions' },
     { icon: 'sparkles', text: 'AI Summaries & Semantic Search' },
     { icon: 'calendar-outline', text: 'Meeting Scheduler & Auto-Detection of Urgent Messages' },
+    { icon: 'create-outline', text: 'Edit & Delete Messages' },
   ];
 
   return (

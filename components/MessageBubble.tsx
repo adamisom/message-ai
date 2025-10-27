@@ -61,8 +61,12 @@ export default function MessageBubble({
   const priorityBadge = getPriorityBadge();
   
   // Determine if long-press should be enabled
-  // Only for OTHER user's messages in direct chats
-  const shouldEnableLongPress = !isOwnMessage && conversationType === 'direct' && onLongPress;
+  const shouldEnableLongPress = onLongPress;
+  
+  // Format message text (handle deleted messages)
+  const displayText = message.isDeleted 
+    ? '[Message deleted]'
+    : message.text;
   
   const bubbleContent = (
     <View style={[
@@ -82,9 +86,10 @@ export default function MessageBubble({
       ]}>
         <Text style={[
           styles.text,
-          isOwnMessage ? styles.ownText : styles.otherText
+          isOwnMessage ? styles.ownText : styles.otherText,
+          message.isDeleted && styles.deletedText
         ]}>
-          {message.text}
+          {displayText}
         </Text>
         {priorityBadge && (
           <Text style={styles.priorityBadge}>{priorityBadge}</Text>
@@ -95,7 +100,7 @@ export default function MessageBubble({
             styles.time,
             isOwnMessage ? styles.ownTime : styles.otherTime
           ]}>
-            {getTimestamp()}
+            {getTimestamp()}{message.isEdited && ' (edited)'}
           </Text>
           
           {/* Show status for own messages */}
@@ -211,6 +216,10 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 16,
     lineHeight: 20,
+  },
+  deletedText: {
+    fontStyle: 'italic',
+    opacity: 0.6,
   },
   priorityBadge: {
     fontSize: 16,

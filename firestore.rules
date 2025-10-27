@@ -162,8 +162,12 @@ service cloud.firestore {
         !isBlockedInDirectMessage(conversationId) &&
         !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.spamBanned;
       
-      allow update, delete: if request.auth != null && 
-        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+      // Sub-Phase 11: Only message sender can edit/delete (Pro feature enforced in Cloud Function)
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.senderId;
+      
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.senderId;
     }
     
     // Helper function to check if sender is blocked by recipient (direct messages only)
