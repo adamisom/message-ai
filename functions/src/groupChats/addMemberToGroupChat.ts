@@ -4,8 +4,8 @@ import * as admin from 'firebase-admin';
 const db = admin.firestore();
 
 /**
- * Add a member to a group chat by email
- * Phase A: Instant add (no invitation required)
+ * Send invitation to join a group chat
+ * Phase B: Invitation system (replaces Phase A instant add)
  * 
  * Validation:
  * - User must be authenticated
@@ -15,6 +15,7 @@ const db = admin.firestore();
  * - Conversation must be group type (not direct)
  * - Conversation must NOT be workspace chat
  * - Must not exceed 25 member limit
+ * - No duplicate pending invitations
  */
 export const addMemberToGroupChat = functions.https.onCall(
   async (
@@ -30,7 +31,7 @@ export const addMemberToGroupChat = functions.https.onCall(
     }
 
     const { conversationId, memberEmail } = data;
-    const addedByUid = context.auth.uid;
+    const invitedByUid = context.auth.uid;
 
     // 2. Get conversation
     const conversationRef = db.collection('conversations').doc(conversationId);
@@ -62,10 +63,10 @@ export const addMemberToGroupChat = functions.https.onCall(
     }
 
     // 5. Verify caller is member
-    if (!conversation.participants.includes(addedByUid)) {
+    if (!conversation.participants.includes(invitedByUid)) {
       throw new functions.https.HttpsError(
         'permission-denied',
-        'You must be a member to add others'
+        'You must be a member to invite others'
       );
     }
 
@@ -103,34 +104,47 @@ export const addMemberToGroupChat = functions.https.onCall(
       );
     }
 
-    // 9. Add member to conversation
-    await conversationRef.update({
-      participants: admin.firestore.FieldValue.arrayUnion(newMemberUid),
-      [`participantDetails.${newMemberUid}`]: {
-        displayName: newMemberData.displayName,
-        email: newMemberData.email
-      },
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    // 9. Check for existing pending invitation
+    const existingInvitationQuery = await db
+      .collection('group_chat_invitations')
+      .where('conversationId', '==', conversationId)
+      .where('invitedUserUid', '==', newMemberUid)
+      .where('status', '==', 'pending')
+      .limit(1)
+      .get();
+
+    if (!existingInvitationQuery.empty) {
+      throw new functions.https.HttpsError(
+        'already-exists',
+        `${newMemberData.displayName} already has a pending invitation`
+      );
+    }
+
+    // 10. Get inviter's display name
+    const inviterDoc = await db.collection('users').doc(invitedByUid).get();
+    const inviterData = inviterDoc.data()!;
+
+    // 11. Create invitation
+    const invitationRef = db.collection('group_chat_invitations').doc();
+    await invitationRef.set({
+      conversationId,
+      conversationName: conversation.name || 'Group Chat',
+      invitedByUid,
+      invitedByDisplayName: inviterData.displayName,
+      invitedUserUid: newMemberUid,
+      invitedUserEmail: newMemberData.email,
+      status: 'pending',
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // 10. Send system message
-    await db.collection(`conversations/${conversationId}/messages`).add({
-      text: `${newMemberData.displayName} was added to the group`,
-      senderId: 'system',
-      senderName: 'System',
-      participants: [...conversation.participants, newMemberUid],
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      isSystemMessage: true,
-      embedded: false
-    });
-
-    // 11. Send notification to new member
+    // 12. Send notification to invited user
     // TODO: Push notification implementation
 
     return {
       success: true,
       displayName: newMemberData.displayName,
-      uid: newMemberUid
+      uid: newMemberUid,
+      invitationId: invitationRef.id,
     };
   }
 );

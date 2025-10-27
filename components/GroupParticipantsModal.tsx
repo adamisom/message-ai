@@ -77,11 +77,11 @@ export default function GroupParticipantsModal({
     try {
       const result = await addMemberToGroupChat(conversationId, email);
       
-      Alert.alert('Success', `${result.displayName} added to group`);
+      Alert.alert('Success', `Invitation sent to ${result.displayName}`);
       setMemberEmail('');
       setShowAddMemberModal(false);
       
-      // Callback to refresh conversation data
+      // Callback to refresh conversation data (though they won't appear until they accept)
       if (onMemberAdded) {
         onMemberAdded();
       }

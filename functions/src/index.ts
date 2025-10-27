@@ -32,4 +32,7 @@ export { downgradeToFree, startFreeTrial, upgradeToPro } from './billing';
 
 // Sub-Phase 6.5: Group Chat Management
 export { addMemberToGroupChat } from './groupChats/addMemberToGroupChat';
+export { acceptGroupChatInvitation } from './groupChats/acceptGroupChatInvitation';
+export { declineGroupChatInvitation } from './groupChats/declineGroupChatInvitation';
+export { reportGroupChatInvitationSpam } from './groupChats/reportGroupChatInvitationSpam';
 

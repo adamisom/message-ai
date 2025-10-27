@@ -1,11 +1,10 @@
 /**
- * Sub-Phase 4: Workspace Invitations Screen
- * View and respond to pending workspace invitations
+ * Sub-Phase 6.5: Unified Invitations Screen
+ * View and respond to workspace and group chat invitations
  */
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { httpsCallable } from 'firebase/functions';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,17 +16,42 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { functions } from '../../firebase.config';
-import { getUserWorkspaceInvitations } from '../../services/workspaceService';
+import {
+  getUserGroupChatInvitations,
+  acceptGroupChatInvitation,
+  declineGroupChatInvitation,
+  reportGroupChatInvitationSpam,
+} from '../../services/groupChatService';
+import {
+  getUserWorkspaceInvitations,
+  acceptWorkspaceInvitation,
+  declineWorkspaceInvitation,
+  reportWorkspaceInvitationAsSpam,
+} from '../../services/workspaceService';
 import { useAuthStore } from '../../store/authStore';
-import type { WorkspaceInvitation } from '../../types';
 import { Colors } from '../../utils/colors';
 
-export default function WorkspaceInvitationsScreen() {
+type InvitationType = 'workspace' | 'group_chat';
+
+interface UnifiedInvitation {
+  id: string;
+  type: InvitationType;
+  name: string; // workspace name or conversation name
+  invitedByDisplayName: string;
+  sentAt: any;
+  // Workspace-specific
+  workspaceId?: string;
+  workspaceName?: string;
+  // Group chat-specific
+  conversationId?: string;
+  conversationName?: string;
+}
+
+export default function InvitationsScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
-  
-  const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
+
+  const [invitations, setInvitations] = useState<UnifiedInvitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -39,10 +63,44 @@ export default function WorkspaceInvitationsScreen() {
 
   const loadInvitations = async () => {
     if (!user?.uid) return;
-    
+
     try {
-      const invites = await getUserWorkspaceInvitations(user.uid);
-      setInvitations(invites);
+      // Load both workspace and group chat invitations
+      const [workspaceInvites, groupChatInvites] = await Promise.all([
+        getUserWorkspaceInvitations(user.uid),
+        getUserGroupChatInvitations(user.uid),
+      ]);
+
+      // Combine and format invitations
+      const combined: UnifiedInvitation[] = [
+        ...workspaceInvites.map((inv: any) => ({
+          id: inv.id,
+          type: 'workspace' as InvitationType,
+          name: inv.workspaceName,
+          invitedByDisplayName: inv.invitedByDisplayName,
+          sentAt: inv.sentAt,
+          workspaceId: inv.workspaceId,
+          workspaceName: inv.workspaceName,
+        })),
+        ...groupChatInvites.map((inv: any) => ({
+          id: inv.id,
+          type: 'group_chat' as InvitationType,
+          name: inv.conversationName || 'Group Chat',
+          invitedByDisplayName: inv.invitedByDisplayName,
+          sentAt: inv.sentAt,
+          conversationId: inv.conversationId,
+          conversationName: inv.conversationName || 'Group Chat',
+        })),
+      ];
+
+      // Sort by sentAt (newest first)
+      combined.sort((a, b) => {
+        const aTime = a.sentAt?.toMillis?.() || 0;
+        const bTime = b.sentAt?.toMillis?.() || 0;
+        return bTime - aTime;
+      });
+
+      setInvitations(combined);
     } catch (error) {
       console.error('Error loading invitations:', error);
       Alert.alert('Error', 'Failed to load invitations');
@@ -57,17 +115,20 @@ export default function WorkspaceInvitationsScreen() {
     await loadInvitations();
   };
 
-  const handleAccept = async (invitation: WorkspaceInvitation) => {
+  const handleAccept = async (invitation: UnifiedInvitation) => {
     setProcessingId(invitation.id);
     try {
-      const acceptFn = httpsCallable(functions, 'acceptWorkspaceInvitation');
-      await acceptFn({ invitationId: invitation.id });
-      
-      Alert.alert(
-        'Success!',
-        `You've joined ${invitation.workspaceName}`,
-        [{ text: 'OK', onPress: () => loadInvitations() }]
-      );
+      if (invitation.type === 'workspace') {
+        await acceptWorkspaceInvitation(invitation.id);
+        Alert.alert('Success!', `You've joined ${invitation.name}`, [
+          { text: 'OK', onPress: () => loadInvitations() },
+        ]);
+      } else {
+        await acceptGroupChatInvitation(invitation.id);
+        Alert.alert('Success!', `You've joined ${invitation.name}`, [
+          { text: 'OK', onPress: () => loadInvitations() },
+        ]);
+      }
     } catch (error: any) {
       console.error('Accept invitation error:', error);
       Alert.alert('Error', error.message || 'Failed to accept invitation');
@@ -76,10 +137,11 @@ export default function WorkspaceInvitationsScreen() {
     }
   };
 
-  const handleDecline = async (invitation: WorkspaceInvitation) => {
+  const handleDecline = async (invitation: UnifiedInvitation) => {
+    const typeLabel = invitation.type === 'workspace' ? 'workspace' : 'group chat';
     Alert.alert(
       'Decline Invitation?',
-      `Decline invitation to join ${invitation.workspaceName}?`,
+      `Decline invitation to join ${invitation.name} (${typeLabel})?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -88,8 +150,11 @@ export default function WorkspaceInvitationsScreen() {
           onPress: async () => {
             setProcessingId(invitation.id);
             try {
-              const declineFn = httpsCallable(functions, 'declineWorkspaceInvitation');
-              await declineFn({ invitationId: invitation.id });
+              if (invitation.type === 'workspace') {
+                await declineWorkspaceInvitation(invitation.id);
+              } else {
+                await declineGroupChatInvitation(invitation.id);
+              }
               await loadInvitations();
             } catch (error: any) {
               console.error('Decline invitation error:', error);
@@ -103,7 +168,7 @@ export default function WorkspaceInvitationsScreen() {
     );
   };
 
-  const handleReportSpam = async (invitation: WorkspaceInvitation) => {
+  const handleReportSpam = async (invitation: UnifiedInvitation) => {
     Alert.alert(
       'Report as Spam?',
       `Report this invitation from ${invitation.invitedByDisplayName} as spam?\n\nThis will increment their spam strike count.`,
@@ -115,14 +180,15 @@ export default function WorkspaceInvitationsScreen() {
           onPress: async () => {
             setProcessingId(invitation.id);
             try {
-              const reportFn = httpsCallable(functions, 'reportWorkspaceInvitationSpam');
-              await reportFn({ invitationId: invitation.id });
-              
-              Alert.alert(
-                'Reported',
-                'Thank you for helping keep MessageAI safe.',
-                [{ text: 'OK', onPress: () => loadInvitations() }]
-              );
+              if (invitation.type === 'workspace') {
+                await reportWorkspaceInvitationAsSpam(invitation.id);
+              } else {
+                await reportGroupChatInvitationSpam(invitation.id);
+              }
+
+              Alert.alert('Reported', 'Thank you for helping keep MessageAI safe.', [
+                { text: 'OK', onPress: () => loadInvitations() },
+              ]);
             } catch (error: any) {
               console.error('Report spam error:', error);
               Alert.alert('Error', error.message || 'Failed to report spam');
@@ -151,23 +217,21 @@ export default function WorkspaceInvitationsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={Colors.textDark} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Workspace Invitations</Text>
+        <Text style={styles.headerTitle}>Invitations</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {invitations.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="mail-open-outline" size={64} color={Colors.textLight} />
             <Text style={styles.emptyTitle}>No Invitations</Text>
             <Text style={styles.emptyDescription}>
-              You&apos;ll see workspace invitations here when someone invites you
+              You&apos;ll see workspace and group chat invitations here
             </Text>
           </View>
         ) : (
@@ -188,7 +252,7 @@ export default function WorkspaceInvitationsScreen() {
 }
 
 interface InvitationCardProps {
-  invitation: WorkspaceInvitation;
+  invitation: UnifiedInvitation;
   isProcessing: boolean;
   onAccept: () => void;
   onDecline: () => void;
@@ -205,34 +269,40 @@ function InvitationCard({
   // Format date
   const formatDate = (timestamp: any) => {
     if (!timestamp) return '';
-    const date = typeof timestamp === 'number'
-      ? new Date(timestamp)
-      : timestamp.toDate?.() || new Date();
-    
+    const date =
+      typeof timestamp === 'number' ? new Date(timestamp) : timestamp.toDate?.() || new Date();
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-    
+
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
     return date.toLocaleDateString();
   };
 
+  const isWorkspace = invitation.type === 'workspace';
+  const iconName = isWorkspace ? 'business' : 'people';
+  const iconColor = isWorkspace ? Colors.primary : '#10B981';
+
   return (
     <View style={styles.card}>
       {/* Invitation Header */}
       <View style={styles.cardHeader}>
-        <View style={styles.workspaceIcon}>
-          <Ionicons name="business" size={24} color={Colors.primary} />
+        <View style={[styles.workspaceIcon, { backgroundColor: isWorkspace ? '#E3F2FD' : '#D1FAE5' }]}>
+          <Ionicons name={iconName} size={24} color={iconColor} />
         </View>
         <View style={styles.cardHeaderText}>
-          <Text style={styles.workspaceName}>{invitation.workspaceName}</Text>
-          <Text style={styles.inviterText}>
-            Invited by {invitation.invitedByDisplayName}
-          </Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.workspaceName}>{invitation.name}</Text>
+            <View style={[styles.typeBadge, isWorkspace ? styles.workspaceBadge : styles.groupChatBadge]}>
+              <Text style={styles.typeBadgeText}>{isWorkspace ? 'Workspace' : 'Group'}</Text>
+            </View>
+          </View>
+          <Text style={styles.inviterText}>Invited by {invitation.invitedByDisplayName}</Text>
           <Text style={styles.dateText}>{formatDate(invitation.sentAt)}</Text>
         </View>
       </View>
@@ -246,27 +316,18 @@ function InvitationCard({
       ) : (
         <>
           <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.acceptButton]}
-              onPress={onAccept}
-            >
+            <TouchableOpacity style={[styles.actionButton, styles.acceptButton]} onPress={onAccept}>
               <Ionicons name="checkmark-circle" size={20} color="#FFF" />
               <Text style={styles.acceptText}>Accept</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionButton, styles.declineButton]}
-              onPress={onDecline}
-            >
+            <TouchableOpacity style={[styles.actionButton, styles.declineButton]} onPress={onDecline}>
               <Ionicons name="close-circle-outline" size={20} color={Colors.textMedium} />
               <Text style={styles.declineText}>Decline</Text>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={styles.spamButton}
-            onPress={onReportSpam}
-          >
+          <TouchableOpacity style={styles.spamButton} onPress={onReportSpam}>
             <Ionicons name="flag-outline" size={16} color="#DC2626" />
             <Text style={styles.spamText}>Report as Spam</Text>
           </TouchableOpacity>
@@ -362,11 +423,32 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   workspaceName: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.textDark,
-    marginBottom: 4,
+    marginRight: 8,
+  },
+  typeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  workspaceBadge: {
+    backgroundColor: '#E3F2FD',
+  },
+  groupChatBadge: {
+    backgroundColor: '#D1FAE5',
+  },
+  typeBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.textMedium,
   },
   inviterText: {
     fontSize: 13,
