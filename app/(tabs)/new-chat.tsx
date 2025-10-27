@@ -32,13 +32,16 @@ export default function NewChat() {
   const [validUsers, setValidUsers] = useState<User[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isGroupMode, setIsGroupMode] = useState(false);
 
   const { user } = useAuthStore();
   const { currentWorkspace } = useWorkspaceStore();
   const router = useRouter();
 
-  console.log('📝 [NewChat] Rendering, mode:', isGroupMode ? 'group' : 'direct', 'users:', validUsers.length, 'workspace:', currentWorkspace?.name || 'none');
+  // Auto-detect chat type based on number of users
+  const isGroupChat = validUsers.length >= 2;
+  const canCreateChat = validUsers.length > 0;
+
+  console.log('📝 [NewChat] Rendering, users:', validUsers.length, 'type:', isGroupChat ? 'group' : 'direct', 'workspace:', currentWorkspace?.name || 'none');
 
   const handleAddUser = async () => {
     setError('');
@@ -77,6 +80,13 @@ export default function NewChat() {
         return;
       }
 
+      // Check group limit (25 members including self)
+      if (validUsers.length >= 24) {
+        console.log('❌ [NewChat] Group limit reached');
+        setError('Maximum 25 members per group (including you)');
+        return;
+      }
+
       // Add to list
       console.log('✅ [NewChat] User added:', foundUser.displayName);
       setValidUsers([...validUsers, foundUser]);
@@ -93,10 +103,11 @@ export default function NewChat() {
   const handleRemoveUser = (uid: string) => {
     console.log('➖ [NewChat] Removing user:', uid);
     setValidUsers(validUsers.filter(u => u.uid !== uid));
+    setError(''); // Clear any errors when user count changes
   };
 
-  const handleCreateDirectChat = async () => {
-    if (validUsers.length === 0) {
+  const handleCreateChat = async () => {
+    if (!canCreateChat) {
       setError('Please add at least one user');
       return;
     }
@@ -107,84 +118,49 @@ export default function NewChat() {
     }
 
     setLoading(true);
-    console.log('💬 [NewChat] Creating direct chat', currentWorkspace ? `in workspace: ${currentWorkspace.name}` : '(no workspace)');
     
     try {
-      const conversationId = await createOrOpenConversation(
-        validUsers[0], 
-        user,
-        currentWorkspace?.id,
-        currentWorkspace?.name
-      );
-      console.log('✅ [NewChat] Direct chat created, navigating to:', conversationId);
-      router.push(`/chat/${conversationId}` as any);
+      if (isGroupChat) {
+        // Group chat: 2+ users
+        console.log('👥 [NewChat] Creating group chat with', validUsers.length, 'users', currentWorkspace ? `in workspace: ${currentWorkspace.name}` : '(no workspace)');
+        const conversationId = await createGroupConversation(
+          validUsers, 
+          user,
+          currentWorkspace?.id,
+          currentWorkspace?.name
+        );
+        console.log('✅ [NewChat] Group chat created, navigating to:', conversationId);
+        router.push(`/chat/${conversationId}` as any);
+      } else {
+        // Direct chat: 1 user
+        console.log('💬 [NewChat] Creating direct chat', currentWorkspace ? `in workspace: ${currentWorkspace.name}` : '(no workspace)');
+        const conversationId = await createOrOpenConversation(
+          validUsers[0], 
+          user,
+          currentWorkspace?.id,
+          currentWorkspace?.name
+        );
+        console.log('✅ [NewChat] Direct chat created, navigating to:', conversationId);
+        router.push(`/chat/${conversationId}` as any);
+      }
     } catch (err: any) {
-      console.error('❌ [NewChat] Error creating direct chat:', err);
+      console.error('❌ [NewChat] Error creating chat:', err);
       Alert.alert('Error', err.message || 'Failed to create conversation');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateGroupChat = async () => {
-    if (validUsers.length < 2) {
-      setError('Need at least 2 users for a group chat');
-      return;
-    }
-
-    if (!user) {
-      setError('User not authenticated');
-      return;
-    }
-
-    setLoading(true);
-    console.log('👥 [NewChat] Creating group chat with', validUsers.length, 'users', currentWorkspace ? `in workspace: ${currentWorkspace.name}` : '(no workspace)');
+  // Generate dynamic button text based on context
+  const getCreateButtonText = () => {
+    if (loading) return 'Creating...';
     
-    try {
-      const conversationId = await createGroupConversation(
-        validUsers, 
-        user,
-        currentWorkspace?.id,
-        currentWorkspace?.name
-      );
-      console.log('✅ [NewChat] Group chat created, navigating to:', conversationId);
-      router.push(`/chat/${conversationId}` as any);
-    } catch (err: any) {
-      console.error('❌ [NewChat] Error creating group chat:', err);
-      Alert.alert('Error', err.message || 'Failed to create group');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleModeToggle = () => {
-    console.log('🔄 [NewChat] Toggling mode from', isGroupMode ? 'group' : 'direct', 'to', !isGroupMode ? 'group' : 'direct');
-    
-    // If users have been added, confirm before switching
-    if (validUsers.length > 0) {
-      Alert.alert(
-        'Switch Chat Mode?',
-        'Switching modes will clear your selected users. Continue?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Switch',
-            onPress: () => {
-              console.log('✅ [NewChat] Mode switch confirmed');
-              setIsGroupMode(!isGroupMode);
-              setValidUsers([]);
-              setError('');
-            },
-            style: 'destructive'
-          }
-        ]
-      );
+    if (isGroupChat) {
+      // Group chat: Show member count (including current user)
+      return `Create Group (${validUsers.length + 1} members)`;
     } else {
-      setIsGroupMode(!isGroupMode);
-      setError('');
+      // Direct chat: Show recipient name
+      return `Chat with ${validUsers[0]?.displayName || 'User'}`;
     }
   };
 
@@ -200,12 +176,11 @@ export default function NewChat() {
         </View>
       )}
       
-      {/* Mode toggle */}
-      <View style={styles.modeToggle}>
-        <Button
-          title={isGroupMode ? 'Switch to Direct Chat' : 'Switch to Group Chat'}
-          onPress={handleModeToggle}
-        />
+      {/* Auto-detect info banner */}
+      <View style={styles.infoBanner}>
+        <Text style={styles.infoBannerText}>
+          Add 1 person for direct chat, 2+ for group chat
+        </Text>
       </View>
 
       {/* Email input */}
@@ -219,9 +194,11 @@ export default function NewChat() {
           autoCorrect={false}
           keyboardType="email-address"
           editable={!loading}
+          onSubmitEditing={handleAddUser}
+          returnKeyType="done"
         />
         <Button
-          title={isGroupMode ? 'Add User' : 'Find User'}
+          title="Add User"
           onPress={handleAddUser}
           disabled={loading || !email.trim()}
         />
@@ -236,7 +213,7 @@ export default function NewChat() {
       {validUsers.length > 0 && (
         <View style={styles.usersList}>
           <Text style={styles.usersListTitle}>
-            {isGroupMode ? 'Group Members:' : 'Selected User:'}
+            {isGroupChat ? `Group Members (${validUsers.length + 1}):` : 'Selected User:'}
           </Text>
           <FlatList
             data={validUsers}
@@ -259,18 +236,12 @@ export default function NewChat() {
         </View>
       )}
 
-      {/* Create button */}
-      {validUsers.length > 0 && (
+      {/* Create button - auto-detects direct vs group */}
+      {canCreateChat && (
         <View style={styles.createButtonSection}>
           <Button
-            title={
-              loading
-                ? 'Creating...'
-                : isGroupMode
-                ? `Create Group (${validUsers.length + 1} members)`
-                : 'Create Chat'
-            }
-            onPress={isGroupMode ? handleCreateGroupChat : handleCreateDirectChat}
+            title={getCreateButtonText()}
+            onPress={handleCreateChat}
             disabled={loading}
           />
         </View>
@@ -303,8 +274,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.primary,
   },
-  modeToggle: {
+  infoBanner: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
     marginBottom: 16,
+  },
+  infoBannerText: {
+    fontSize: 14,
+    color: '#1976D2',
+    textAlign: 'center',
   },
   inputSection: {
     flexDirection: 'row',
@@ -371,4 +351,3 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
 });
-
