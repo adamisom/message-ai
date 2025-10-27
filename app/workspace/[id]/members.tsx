@@ -8,7 +8,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,6 +17,7 @@ import {
 import { getWorkspace } from '../../../services/workspaceService';
 import { useAuthStore } from '../../../store/authStore';
 import type { Workspace } from '../../../types';
+import { Alerts } from '../../../utils/alerts';
 import { Colors } from '../../../utils/colors';
 
 export default function WorkspaceMembersScreen() {
@@ -42,7 +42,7 @@ export default function WorkspaceMembersScreen() {
       setWorkspace(ws);
     } catch (error) {
       console.error('Error loading workspace:', error);
-      Alert.alert('Error', 'Failed to load workspace');
+      Alerts.error('Failed to load workspace');
       router.back();
     } finally {
       setIsLoading(false);
@@ -51,24 +51,18 @@ export default function WorkspaceMembersScreen() {
 
   const handleRemoveMember = (memberUid: string, memberName: string) => {
     if (memberUid === workspace?.adminUid) {
-      Alert.alert('Error', 'Cannot remove workspace admin');
+      Alerts.error('Cannot remove workspace admin');
       return;
     }
 
-    Alert.alert(
+    Alerts.confirm(
       'Remove Member?',
       `Remove ${memberName} from workspace?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => {
-            // TODO: Call removeMember Cloud Function
-            Alert.alert('Coming Soon', 'Remove member feature coming soon');
-          },
-        },
-      ]
+      () => {
+        // TODO: Call removeMember Cloud Function
+        Alerts.error('Remove member feature coming soon');
+      },
+      { confirmText: 'Remove', isDestructive: true }
     );
   };
 

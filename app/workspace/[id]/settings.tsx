@@ -9,7 +9,6 @@ import { httpsCallable } from 'firebase/functions';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -17,10 +16,11 @@ import {
     View,
 } from 'react-native';
 import { functions } from '../../../firebase.config';
-import { getWorkspace } from '../../../services/workspaceService';
 import { exportWorkspaceData } from '../../../services/workspaceExportService';
+import { getWorkspace } from '../../../services/workspaceService';
 import { useAuthStore } from '../../../store/authStore';
 import type { Workspace } from '../../../types';
+import { Alerts } from '../../../utils/alerts';
 import { Colors } from '../../../utils/colors';
 
 export default function WorkspaceSettingsScreen() {
@@ -47,7 +47,7 @@ export default function WorkspaceSettingsScreen() {
       setWorkspace(ws);
     } catch (error) {
       console.error('Error loading workspace:', error);
-      Alert.alert('Error', 'Failed to load workspace');
+      Alerts.error('Failed to load workspace');
       router.back();
     } finally {
       setIsLoading(false);
@@ -58,17 +58,11 @@ export default function WorkspaceSettingsScreen() {
     if (!workspace) return;
 
     // Scary confirmation modal
-    Alert.alert(
+    Alerts.confirm(
       '⚠️ Delete Workspace?',
       `This will PERMANENTLY delete "${workspace.name}" and ALL workspace chats.\n\nThis action CANNOT be undone.\n\nAll ${workspace.members.length} members will lose access immediately.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete Forever',
-          style: 'destructive',
-          onPress: confirmDelete,
-        },
-      ]
+      confirmDelete,
+      { confirmText: 'Delete Forever', isDestructive: true }
     );
   };
 
@@ -80,12 +74,10 @@ export default function WorkspaceSettingsScreen() {
       const deleteWorkspaceFn = httpsCallable(functions, 'deleteWorkspace');
       await deleteWorkspaceFn({ workspaceId: workspace.id });
 
-      Alert.alert('Deleted', 'Workspace deleted successfully', [
-        { text: 'OK', onPress: () => router.replace('/workspaces' as any) },
-      ]);
+      Alerts.success('Workspace deleted successfully', () => router.replace('/workspaces' as any));
     } catch (error: any) {
       console.error('Delete workspace error:', error);
-      Alert.alert('Error', error.message || 'Failed to delete workspace');
+      Alerts.error(error.message || 'Failed to delete workspace');
     } finally {
       setIsDeleting(false);
     }
@@ -106,33 +98,27 @@ export default function WorkspaceSettingsScreen() {
           message += `\n\n⚠️ ${metadata.timeoutWarning}`;
         }
         
-        Alert.alert('Export Complete', message);
+        Alerts.success(message);
       } else {
-        Alert.alert('Export Failed', result.error || 'Unknown error');
+        Alerts.error(result.error || 'Unknown error');
       }
     } catch (error: any) {
       console.error('Export workspace error:', error);
-      Alert.alert('Error', error.message || 'Failed to export workspace');
+      Alerts.error(error.message || 'Failed to export workspace');
     } finally {
       setIsExporting(false);
     }
   };
 
   const handleLeaveWorkspace = () => {
-    Alert.alert(
+    Alerts.confirm(
       'Leave Workspace?',
-      `Are you sure you want to leave "${workspace?.name}"?\n\nYou&apos;ll lose access to all workspace chats.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Leave',
-          style: 'destructive',
-          onPress: async () => {
-            // TODO: Implement leaveWorkspace Cloud Function
-            Alert.alert('Coming Soon', 'Leave workspace feature coming soon');
-          },
-        },
-      ]
+      `Are you sure you want to leave "${workspace?.name}"?\n\nYou'll lose access to all workspace chats.`,
+      async () => {
+        // TODO: Implement leaveWorkspace Cloud Function
+        Alerts.error('Leave workspace feature coming soon');
+      },
+      { confirmText: 'Leave', isDestructive: true }
     );
   };
 

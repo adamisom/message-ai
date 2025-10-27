@@ -8,7 +8,6 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -16,12 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {
-  getUserGroupChatInvitations,
-  acceptGroupChatInvitation,
-  declineGroupChatInvitation,
-  reportGroupChatInvitationSpam,
-} from '../../services/groupChatService';
 import { 
   getUserDirectMessageInvitations, 
   acceptDirectMessageInvitation, 
@@ -29,12 +22,19 @@ import {
   reportDirectMessageInvitationSpam 
 } from '../../services/dmInvitationService';
 import {
+  getUserGroupChatInvitations,
+  acceptGroupChatInvitation,
+  declineGroupChatInvitation,
+  reportGroupChatInvitationSpam,
+} from '../../services/groupChatService';
+import {
   getUserWorkspaceInvitations,
   acceptWorkspaceInvitation,
   declineWorkspaceInvitation,
   reportWorkspaceInvitationAsSpam,
 } from '../../services/workspaceService';
 import { useAuthStore } from '../../store/authStore';
+import { Alerts } from '../../utils/alerts';
 import { Colors } from '../../utils/colors';
 
 type InvitationType = 'workspace' | 'group_chat' | 'direct_message';
@@ -117,7 +117,7 @@ export default function InvitationsScreen() {
       setInvitations(combined);
     } catch (error) {
       console.error('Error loading invitations:', error);
-      Alert.alert('Error', 'Failed to load invitations');
+      Alerts.error('Failed to load invitations');
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -134,25 +134,23 @@ export default function InvitationsScreen() {
     try {
       if (invitation.type === 'workspace') {
         await acceptWorkspaceInvitation(invitation.id);
-        Alert.alert('Success!', `You've joined ${invitation.name}`, [
-          { text: 'OK', onPress: () => loadInvitations() },
-        ]);
+        Alerts.success(`You've joined ${invitation.name}`, () => loadInvitations());
       } else if (invitation.type === 'group_chat') {
         await acceptGroupChatInvitation(invitation.id);
-        Alert.alert('Success!', `You've joined ${invitation.name}`, [
-          { text: 'OK', onPress: () => loadInvitations() },
-        ]);
+        Alerts.success(`You've joined ${invitation.name}`, () => loadInvitations());
       } else {
         // DM invitation
         const result = await acceptDirectMessageInvitation(invitation.id);
-        Alert.alert('Success!', `You can now message ${invitation.name}`, [
-          { text: 'Open Chat', onPress: () => router.push(`/chat/${result.conversationId}` as any) },
-          { text: 'Later', onPress: () => loadInvitations() },
-        ]);
+        Alerts.confirm(
+          'Success!',
+          `You can now message ${invitation.name}`,
+          () => router.push(`/chat/${result.conversationId}` as any),
+          { confirmText: 'Open Chat', cancelText: 'Later', onCancel: () => loadInvitations() }
+        );
       }
     } catch (error: any) {
       console.error('Accept invitation error:', error);
-      Alert.alert('Error', error.message || 'Failed to accept invitation');
+      Alerts.error(error.message || 'Failed to accept invitation');
     } finally {
       setProcessingId(null);
     }
@@ -160,69 +158,55 @@ export default function InvitationsScreen() {
 
   const handleDecline = async (invitation: UnifiedInvitation) => {
     const typeLabel = invitation.type === 'workspace' ? 'workspace' : invitation.type === 'group_chat' ? 'group chat' : 'direct message';
-    Alert.alert(
+    Alerts.confirm(
       'Decline Invitation?',
       `Decline invitation to join ${invitation.name} (${typeLabel})?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Decline',
-          style: 'destructive',
-          onPress: async () => {
-            setProcessingId(invitation.id);
-            try {
-              if (invitation.type === 'workspace') {
-                await declineWorkspaceInvitation(invitation.id);
-              } else if (invitation.type === 'group_chat') {
-                await declineGroupChatInvitation(invitation.id);
-              } else {
-                await declineDirectMessageInvitation(invitation.id);
-              }
-              await loadInvitations();
-            } catch (error: any) {
-              console.error('Decline invitation error:', error);
-              Alert.alert('Error', error.message || 'Failed to decline invitation');
-            } finally {
-              setProcessingId(null);
-            }
-          },
-        },
-      ]
+      async () => {
+        setProcessingId(invitation.id);
+        try {
+          if (invitation.type === 'workspace') {
+            await declineWorkspaceInvitation(invitation.id);
+          } else if (invitation.type === 'group_chat') {
+            await declineGroupChatInvitation(invitation.id);
+          } else {
+            await declineDirectMessageInvitation(invitation.id);
+          }
+          await loadInvitations();
+        } catch (error: any) {
+          console.error('Decline invitation error:', error);
+          Alerts.error(error.message || 'Failed to decline invitation');
+        } finally {
+          setProcessingId(null);
+        }
+      },
+      { confirmText: 'Decline', isDestructive: true }
     );
   };
 
   const handleReportSpam = async (invitation: UnifiedInvitation) => {
-    Alert.alert(
+    Alerts.confirm(
       'Report as Spam?',
       `Report this invitation from ${invitation.invitedByDisplayName} as spam?\n\nThis will increment their spam strike count.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Report Spam',
-          style: 'destructive',
-          onPress: async () => {
-            setProcessingId(invitation.id);
-            try {
-              if (invitation.type === 'workspace') {
-                await reportWorkspaceInvitationAsSpam(invitation.id);
-              } else if (invitation.type === 'group_chat') {
-                await reportGroupChatInvitationSpam(invitation.id);
-              } else {
-                await reportDirectMessageInvitationSpam(invitation.id);
-              }
+      async () => {
+        setProcessingId(invitation.id);
+        try {
+          if (invitation.type === 'workspace') {
+            await reportWorkspaceInvitationAsSpam(invitation.id);
+          } else if (invitation.type === 'group_chat') {
+            await reportGroupChatInvitationSpam(invitation.id);
+          } else {
+            await reportDirectMessageInvitationSpam(invitation.id);
+          }
 
-              Alert.alert('Reported', 'Thank you for helping keep MessageAI safe.', [
-                { text: 'OK', onPress: () => loadInvitations() },
-              ]);
-            } catch (error: any) {
-              console.error('Report spam error:', error);
-              Alert.alert('Error', error.message || 'Failed to report spam');
-            } finally {
-              setProcessingId(null);
-            }
-          },
-        },
-      ]
+          Alerts.success('Thank you for helping keep MessageAI safe.', () => loadInvitations());
+        } catch (error: any) {
+          console.error('Report spam error:', error);
+          Alerts.error(error.message || 'Failed to report spam');
+        } finally {
+          setProcessingId(null);
+        }
+      },
+      { confirmText: 'Report Spam', isDestructive: true }
     );
   };
 
