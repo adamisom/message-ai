@@ -2509,6 +2509,286 @@ PERMISSIONS:
 • Workspace chats: Admins can edit (even if other members are Pro)
 ```
 
+#### H.2.1 Cloud Function Implementation Details
+
+**Function: `saveEditedSummary`**
+
+```typescript
+// functions/src/ai/saveEditedSummary.ts
+
+export const saveEditedSummary = functions.https.onCall(async (data, context) => {
+  // 1. AUTHENTICATION CHECK
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  const { conversationId, editedSummary, editedKeyPoints } = data;
+
+  // 2. INPUT VALIDATION
+  if (!conversationId || !editedSummary || !editedKeyPoints) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'conversationId, editedSummary, and editedKeyPoints are required'
+    );
+  }
+
+  // 3. FETCH CONVERSATION
+  const conversationSnap = await db.collection('conversations').doc(conversationId).get();
+  if (!conversationSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'Conversation not found');
+  }
+  const conversation = conversationSnap.data();
+
+  // 4. PERMISSION CHECK (Workspace vs. Personal)
+  if (conversation.isWorkspaceChat && conversation.workspaceId) {
+    // WORKSPACE CHAT: Must be admin
+    const workspaceSnap = await db.collection('workspaces').doc(conversation.workspaceId).get();
+    if (!workspaceSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Workspace not found');
+    }
+    const workspace = workspaceSnap.data();
+    
+    if (workspace.adminUid !== context.auth.uid) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        'Only workspace admins can edit summaries in workspace chats'
+      );
+    }
+  } else {
+    // PERSONAL CHAT: Must be Pro user or in active trial
+    const userSnap = await db.collection('users').doc(context.auth.uid).get();
+    if (!userSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'User not found');
+    }
+    const user = userSnap.data();
+    
+    // Check Pro status
+    if (!user.isPaidUser) {
+      // Check trial status
+      if (!user.trialEndsAt || user.trialEndsAt.toMillis() < Date.now()) {
+        throw new functions.https.HttpsError(
+          'permission-denied',
+          'Pro subscription required to edit summaries'
+        );
+      }
+    }
+  }
+
+  // 5. FETCH OR CREATE SUMMARY DOCUMENT
+  const summariesRef = db.collection('conversations').doc(conversationId).collection('ai_summaries');
+  const summariesSnap = await summariesRef.orderBy('generatedAt', 'desc').limit(1).get();
+
+  let summaryDocRef;
+  let existingSummary = null;
+
+  if (!summariesSnap.empty) {
+    // Use existing summary document
+    summaryDocRef = summariesSnap.docs[0].ref;
+    existingSummary = summariesSnap.docs[0].data();
+  } else {
+    // No summary exists yet - create new document
+    summaryDocRef = summariesRef.doc();
+  }
+
+  // 6. PREPARE UPDATE DATA
+  const updateData: any = {
+    summary: editedSummary,
+    keyPoints: editedKeyPoints,
+    editedByAdmin: true,
+    savedByAdmin: context.auth.uid,
+    savedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  // 7. PRESERVE ORIGINAL AI VERSION (if not already preserved)
+  if (existingSummary && !existingSummary.editedByAdmin) {
+    // First time editing - preserve original AI version
+    updateData.originalAiVersion = {
+      summary: existingSummary.summary,
+      keyPoints: existingSummary.keyPoints,
+      generatedAt: existingSummary.generatedAt,
+    };
+  }
+
+  // 8. If new document, add required fields
+  if (!existingSummary) {
+    updateData.messageCount = 0; // Will be updated by AI generation
+    updateData.messageCountAtGeneration = 0;
+    updateData.generatedAt = admin.firestore.FieldValue.serverTimestamp();
+    updateData.generatedBy = context.auth.uid;
+    updateData.model = 'manual-edit';
+  }
+
+  // 9. SAVE TO FIRESTORE
+  await summaryDocRef.set(updateData, { merge: true });
+
+  return { success: true };
+});
+```
+
+**Data Flow Diagram:**
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                   EDIT AI CONTENT - DATA FLOW                                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+CLIENT SIDE:
+-----------
+[User clicks "Edit & Save"]
+     │
+     ↓
+[EditSummaryModal opens]
+• Pre-fills with current summary/keyPoints
+• User edits content
+     │
+     ↓
+[User clicks "Save"]
+     │
+     ↓
+[Call saveEditedSummary(conversationId, editedSummary, editedKeyPoints)]
+     │
+     ↓
+
+CLOUD FUNCTION:
+--------------
+[Authentication & Input Validation]
+     │
+     ↓
+[Fetch Conversation]
+     │
+     ├─→ isWorkspaceChat? → Check workspace admin
+     └─→ Personal chat? → Check Pro user or trial
+     │
+     ↓
+[Fetch Latest Summary Document]
+     │
+     ├─→ Exists?
+     │   └─→ summariesRef.orderBy('generatedAt', 'desc').limit(1)
+     │
+     └─→ Not exists? → Create new document
+     │
+     ↓
+[Check if First Edit]
+     │
+     ├─→ existingSummary.editedByAdmin === false?
+     │   └─→ YES: Preserve original in originalAiVersion field
+     │
+     └─→ Already edited? → Don't overwrite originalAiVersion
+     │
+     ↓
+[Prepare Update Data]
+{
+  summary: editedSummary,                    // NEW content
+  keyPoints: editedKeyPoints,                // NEW content
+  editedByAdmin: true,                       // Flag: this is edited
+  savedByAdmin: context.auth.uid,            // Who edited it
+  savedAt: serverTimestamp(),                // When edited
+  originalAiVersion?: {                      // PRESERVED (first edit only)
+    summary: original.summary,
+    keyPoints: original.keyPoints,
+    generatedAt: original.generatedAt
+  }
+}
+     │
+     ↓
+[Write to Firestore]
+/conversations/{conversationId}/ai_summaries/{summaryId}
+     │
+     ↓
+[Return Success]
+     │
+     ↓
+
+CLIENT SIDE:
+-----------
+[Reload Summary]
+     │
+     ↓
+[SummaryModal displays saved version]
+• Shows edited content
+• Badge: "✏️ Edited by [Admin Name]"
+• Buttons:
+  - "Get Fresh AI Analysis" (generates new, doesn't overwrite saved)
+  - "Re-edit" (opens edit modal again with saved content)
+```
+
+**Interaction with Fresh AI Generation:**
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│               SAVED VERSION vs. FRESH AI GENERATION                           │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+STATE 1: NO SAVED VERSION
+-------------------------
+[User opens Summary modal]
+     │
+     ↓
+[generateSummary() called]
+     │
+     ↓
+[AI generates fresh summary]
+     │
+     ↓
+[Display AI-generated content]
+• No "edited" badge
+• "Edit & Save" button (if admin/Pro)
+
+STATE 2: SAVED VERSION EXISTS
+-----------------------------
+[User opens Summary modal]
+     │
+     ↓
+[generateSummary() called]
+     │
+     ↓
+[Fetch latest summary from Firestore]
+     │
+     ├─→ summary.editedByAdmin === true?
+     │   └─→ Display SAVED version (default)
+     │       • Badge: "✏️ Edited by [Admin Name]"
+     │       • Button: "Get Fresh AI Analysis"
+     │       • Button: "Re-edit"
+     │
+     └─→ summary.editedByAdmin === false?
+         └─→ Display AI-generated version
+             • No badge
+             • "Edit & Save" button
+
+STATE 3: USER REQUESTS FRESH AI (After Saved Version Exists)
+------------------------------------------------------------
+[User clicks "Get Fresh AI Analysis"]
+     │
+     ↓
+[generateSummary() called with forceRegenerate flag]
+     │
+     ↓
+[AI generates NEW summary]
+• Does NOT overwrite saved version in Firestore
+• Stored in component state only (freshAiSummary)
+• User can compare fresh AI vs. saved version
+     │
+     ↓
+[Display fresh AI-generated content]
+• Toggle button: "View Saved Version"
+• User can switch between saved and fresh
+• Fresh version is NOT persisted (temporary view)
+```
+
+**Same Pattern for Decisions & Action Items:**
+
+The same implementation pattern applies to:
+
+- `saveEditedDecision` (decisions)
+- `saveEditedActionItems` (action items)
+
+All three functions follow the same:
+
+1. Permission validation (admin for workspace, Pro for personal)
+2. Original preservation (first edit only)
+3. Saved version becomes default view
+4. Fresh AI generation available but doesn't overwrite
+
 ### H.3 Manual Urgency Markers
 
 ```
