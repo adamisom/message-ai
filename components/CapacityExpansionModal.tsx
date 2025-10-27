@@ -1,15 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { commonModalStyles } from '../styles/commonModalStyles';
 import { Workspace } from '../types/workspace';
 import { Colors } from '../utils/colors';
 import { ModalHeader } from './modals/ModalHeader';

@@ -38,6 +38,7 @@ import { FailedMessagesService } from '../../services/failedMessagesService';
 import { reportDirectMessageSpam } from '../../services/groupChatService';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
+import { Workspace } from '../../types/workspace';
 import { MESSAGE_LIMIT, MESSAGE_TIMEOUT_MS, TYPING_DEBOUNCE_MS } from '../../utils/constants';
 import { ErrorLogger } from '../../utils/errorLogger';
 
@@ -87,6 +88,15 @@ export default function ChatScreen() {
   
   // Phase C: Blocked user check
   const [isBlockedByRecipient, setIsBlockedByRecipient] = useState(false);
+
+  // Sub-Phase 7: Workspace admin features
+  const [showMessageToolbar, setShowMessageToolbar] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [showPinnedModal, setShowPinnedModal] = useState(false);
+  const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showCapacityModal, setShowCapacityModal] = useState(false);
 
   // Track pending message timeouts
   const timeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());

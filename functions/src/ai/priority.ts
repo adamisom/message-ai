@@ -1,8 +1,8 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import {callClaudeWithTool} from '../utils/anthropic';
-import {analyzeMessagePriorityTool} from '../utils/aiTools';
-import {quickPriorityCheck} from '../utils/priorityHeuristics';
+import { analyzeMessagePriorityTool } from '../utils/aiTools';
+import { callClaudeWithTool } from '../utils/anthropic';
+import { quickPriorityCheck } from '../utils/priorityHeuristics';
 
 const db = admin.firestore();
 
