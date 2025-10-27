@@ -20,13 +20,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Colors } from '../../utils/colors';
 import { validatePhoneNumber } from '../../utils/validators';
-
-interface User {
-  uid: string;
-  email: string;
-  displayName: string;
-  phoneNumber: string;
-}
+import type { User } from '../../types';
 
 export default function NewChat() {
   const [phoneNumber, setPhoneNumber] = useState('');

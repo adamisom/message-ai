@@ -19,6 +19,7 @@ interface User {
   uid: string;
   email: string;
   displayName: string;
+  phoneNumber: string;
   isOnline?: boolean;
   lastSeenAt?: any;
   createdAt?: any;

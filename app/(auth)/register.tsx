@@ -133,7 +133,7 @@ export default function RegisterScreen() {
                 <Text style={styles.inputErrorText}>{errors.phoneNumber}</Text>
               ) : (
                 <Text style={styles.helperText}>
-                  Phone number is required because that's how friends find you
+                  Phone number is required because that&apos;s how friends find you
                 </Text>
               )}
             </View>

@@ -53,4 +53,7 @@ export { getUserSpamStatus } from './spam/getUserSpamStatus';
 // Sub-Phase 10: Export Workspace
 export { exportWorkspace } from './workspaces/exportWorkspace';
 
+// Sub-Phase 11: Export User Conversations
+export { exportUserConversations } from './user/exportUserConversations';
+
 

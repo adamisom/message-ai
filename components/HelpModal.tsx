@@ -22,9 +22,18 @@ interface HelpModalProps {
   onClose: () => void;
   onRefresh: () => Promise<void>;
   isRefreshing: boolean;
+  onExportConversations?: () => Promise<void>;
+  isExporting?: boolean;
 }
 
-export function HelpModal({ visible, onClose, onRefresh, isRefreshing }: HelpModalProps) {
+export function HelpModal({ 
+  visible, 
+  onClose, 
+  onRefresh, 
+  isRefreshing,
+  onExportConversations,
+  isExporting = false,
+}: HelpModalProps) {
   return (
     <Modal
       visible={visible}
@@ -50,6 +59,25 @@ export function HelpModal({ visible, onClose, onRefresh, isRefreshing }: HelpMod
           </View>
 
           <View style={styles.helpModalBody}>
+            {/* Export Conversations Button */}
+            {onExportConversations && (
+              <TouchableOpacity
+                style={[styles.exportButton, isExporting && styles.refreshButtonDisabled]}
+                onPress={onExportConversations}
+                activeOpacity={0.7}
+                disabled={isExporting}
+              >
+                <Ionicons 
+                  name={isExporting ? "hourglass-outline" : "download-outline"} 
+                  size={20} 
+                  color={isExporting ? '#999' : '#007AFF'} 
+                />
+                <Text style={[styles.exportButtonText, isExporting && styles.refreshButtonTextDisabled]}>
+                  {isExporting ? 'Exporting...' : 'Export My Conversations'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
             {/* Refresh Button */}
             <TouchableOpacity
               style={[styles.refreshButtonLarge, isRefreshing && styles.refreshButtonDisabled]}
@@ -151,6 +179,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 20,
     gap: 8,
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0FFF4',
+    borderWidth: 2,
+    borderColor: '#10B981',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  exportButtonText: {
+    color: '#10B981',
+    fontSize: 16,
+    fontWeight: '600',
   },
   refreshButtonDisabled: {
     opacity: 0.5,

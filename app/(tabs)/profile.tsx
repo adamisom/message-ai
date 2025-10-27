@@ -22,6 +22,7 @@ import { HelpModal, SpamWarningBanner, UpgradeToProModal, UserSettingsModal } fr
 import { logoutUser, updateUserProfile } from '../../services/authService';
 import { getUserGroupChatInvitations } from '../../services/groupChatService';
 import { getUserSpamStatus, SpamStatus } from '../../services/spamService';
+import { exportUserConversationsData } from '../../services/userExportService';
 import { getUserWorkspaceInvitations } from '../../services/workspaceService';
 import { useAuthStore } from '../../store/authStore';
 import type { WorkspaceInvitation } from '../../types';
@@ -73,6 +74,7 @@ export default function ProfileScreen() {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [isStartingTrial, setIsStartingTrial] = useState(false);
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
   const [spamStatus, setSpamStatus] = useState<SpamStatus | null>(null);
@@ -292,6 +294,32 @@ export default function ProfileScreen() {
       await refreshUserProfile();
     } catch (error: any) {
       throw new Error(error.message || 'Failed to update settings');
+    }
+  };
+  
+  // Export user conversations
+  const handleExportConversations = async () => {
+    setIsExporting(true);
+    try {
+      const result = await exportUserConversationsData();
+      
+      if (result.success && result.data) {
+        const { metadata } = result.data;
+        let message = `Exported ${metadata.totalConversations} conversations with ${metadata.totalMessages} messages.`;
+        
+        if (metadata.timeoutWarning) {
+          message += `\n\n⚠️ ${metadata.timeoutWarning}`;
+        }
+        
+        Alert.alert('Export Complete', message);
+      } else {
+        Alert.alert('Export Failed', result.error || 'Unknown error');
+      }
+    } catch (error: any) {
+      console.error('Export conversations error:', error);
+      Alert.alert('Error', error.message || 'Failed to export conversations');
+    } finally {
+      setIsExporting(false);
     }
   };
   
@@ -517,6 +545,8 @@ export default function ProfileScreen() {
         onClose={() => setShowHelpModal(false)}
         onRefresh={handleManualRefresh}
         isRefreshing={isRefreshing}
+        onExportConversations={handleExportConversations}
+        isExporting={isExporting}
       />
       
       {/* Sub-Phase 11: User Settings Modal */}
