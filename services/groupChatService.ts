@@ -72,3 +72,16 @@ export async function reportGroupChatInvitationSpam(
   return result.data as { success: boolean };
 }
 
+/**
+ * Report a direct message as spam
+ * Blocks user and hides conversation
+ */
+export async function reportDirectMessageSpam(
+  conversationId: string,
+  reportedUserUid: string
+): Promise<{ success: boolean }> {
+  const report = httpsCallable(functions, 'reportDirectMessageSpam');
+  const result = await report({ conversationId, reportedUserUid });
+  return result.data as { success: boolean };
+}
+

@@ -35,4 +35,5 @@ export { addMemberToGroupChat } from './groupChats/addMemberToGroupChat';
 export { acceptGroupChatInvitation } from './groupChats/acceptGroupChatInvitation';
 export { declineGroupChatInvitation } from './groupChats/declineGroupChatInvitation';
 export { reportGroupChatInvitationSpam } from './groupChats/reportGroupChatInvitationSpam';
+export { reportDirectMessageSpam } from './groupChats/reportDirectMessageSpam';
 

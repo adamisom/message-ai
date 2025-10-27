@@ -1,9 +1,49 @@
 # Sub-Phase 6.5: Group Chat Member Management & Invitations
 
-**Status:** 📋 Planning  
+**Status:** ✅ Complete  
 **Priority:** High (Blocker for Sub-Phase 8 Spam Prevention)  
-**Est. Duration:** 3-4 days  
+**Duration:** 3 days (Phases A-C)  
 **Dependencies:** Sub-Phases 1-6 Complete
+
+---
+
+## Implementation Summary
+
+**Phase A (Instant Add):** ✅ Implemented & Committed  
+**Phase B (Invitation System):** ✅ Implemented & Committed  
+**Phase C (DM Spam Reporting):** ✅ Implemented & Committed
+
+### Key Implementation Details
+
+**Dual Ban Logic:**
+- **24-hour temporary ban:** Triggered by 2 spam reports within any 24-hour window
+- **Indefinite ban:** Triggered by 5 total spam reports within any 30-day window
+- Both bans prevent workspace creation, group chat creation, and sending direct messages
+- Temporary ban ends 24 hours after the second strike timestamp
+- Indefinite ban persists until old strikes decay (30-day rolling window)
+- If both conditions are met, user receives both ban types with appropriate notifications
+
+**Spam Report Abuse:**
+- No spam report abuse prevention implemented (per user decision)
+- Users can report spam freely without throttling or validation
+
+**Spam Appeal:**
+- No appeal mechanism implemented (per user decision)
+
+**User Blocking:**
+- `blockedUsers` array added to user documents
+- Blocked users cannot send direct messages to the blocker
+- Blocking does NOT affect group chats or workspaces
+- No unblocking functionality (permanent)
+- Implemented via client-side check + Firestore security rules (no Cloud Function trigger needed)
+
+**Conversation Hiding:**
+- `hiddenConversations` array added to user documents
+- Conversations are hidden from the list when marked as spam
+- Applies to direct messages, group chats, and workspaces
+
+**Test Script:**
+- Built as part of Sub-Phase 6.5 for testing spam strike logic (dual ban validation)
 
 ---
 
@@ -947,19 +987,32 @@ node scripts/testDirectMessageSpam.js adam1@test.com spammer@test.com
 ### Spam Strike Logic (Unified)
 
 **All spam types contribute to spam strikes:**
-- Workspace invitation spam: +1 strike (1-month decay)
-- Group chat invitation spam: +1 strike (1-month decay)
-- Direct message spam: +1 strike (1-month decay)
+- Workspace invitation spam: +1 strike (30-day decay)
+- Group chat invitation spam: +1 strike (30-day decay)
+- Direct message spam: +1 strike (30-day decay)
 
-**Total strikes >= 5:** User banned from:
-- Creating workspaces
-- Creating group chats
-- (Still can create direct chats and accept invitations)
+**Dual Ban System:**
 
-**Direct message specific threshold:**
-- 5 reports in same month → immediate ban (regardless of total strikes)
-- Tracked separately in `directMessageSpamReports.{month}`
-- Resets monthly
+1. **24-hour Temporary Ban:**
+   - Triggered by: 2+ strikes within any 24-hour window
+   - Bans user from: Sending direct messages, creating group chats, creating workspaces
+   - Duration: 24 hours from the timestamp of the second strike
+   - Notification: "You've been temporarily banned for 24 hours due to spam reports"
+
+2. **Indefinite Ban:**
+   - Triggered by: 5+ total strikes within any 30-day rolling window
+   - Bans user from: Creating workspaces, creating group chats, sending direct messages
+   - Duration: Until enough strikes decay that total drops below 5
+   - Notification: "You've been banned indefinitely due to repeated spam reports"
+
+**Both bans can be active simultaneously:**
+- If a user gets 5 strikes total AND has 2 strikes in 24h, both bans apply
+- Notifications differentiate between the two ban types
+- Temporary ban ends after 24h, but indefinite ban may still be active
+
+**No spam report abuse prevention:**
+- Per user decision, no throttling or validation on spam reports
+- Users can report as many times as they want
 
 ### Future Enhancements
 

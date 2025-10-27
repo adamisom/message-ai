@@ -57,6 +57,9 @@ export interface UserProfile {
     workspaceId?: string;
     conversationId?: string;
   }[];
+  // Sub-Phase 6.5: Direct message spam prevention (Phase C)
+  blockedUsers?: string[]; // Array of user IDs that this user has blocked
+  hiddenConversations?: string[]; // Array of conversation IDs hidden due to spam reports
 }
 
 /**

@@ -11,17 +11,17 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import React, { useCallback, useState } from 'react';
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { HelpModal, UpgradeToProModal } from '../../components';
 import { logoutUser } from '../../services/authService';
-import { getUserWorkspaceInvitations } from '../../services/workspaceService';
 import { getUserGroupChatInvitations } from '../../services/groupChatService';
+import { getUserWorkspaceInvitations } from '../../services/workspaceService';
 import { useAuthStore } from '../../store/authStore';
 import type { WorkspaceInvitation } from '../../types';
 import { Colors } from '../../utils/colors';

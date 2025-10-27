@@ -31,9 +31,22 @@ export default function ConversationsList() {
   console.log('📋 [ConversationsList] Rendering with', conversations.length, 'conversations, loading:', loading, 'user:', user?.uid, 'workspace:', currentWorkspace?.name || 'none');
 
   // Phase 5: Filter conversations by workspace
+  // Phase C: Also filter out hidden conversations
   const filteredConversations = currentWorkspace
-    ? conversations.filter(conv => conv.workspaceId === currentWorkspace.id)
-    : conversations.filter(conv => !conv.workspaceId); // Show only non-workspace chats when no workspace selected
+    ? conversations.filter(conv => {
+        // Filter by workspace
+        if (conv.workspaceId !== currentWorkspace.id) return false;
+        // Filter out hidden conversations
+        if (user?.hiddenConversations?.includes(conv.id)) return false;
+        return true;
+      })
+    : conversations.filter(conv => {
+        // Show only non-workspace chats when no workspace selected
+        if (conv.workspaceId) return false;
+        // Filter out hidden conversations
+        if (user?.hiddenConversations?.includes(conv.id)) return false;
+        return true;
+      });
 
   console.log('🔍 [ConversationsList] After filtering:', filteredConversations.length, 'conversations');
 

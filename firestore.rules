@@ -132,9 +132,38 @@ service cloud.firestore {
     // ===== MESSAGES =====
     
     // Messages - only conversation participants can read/write
+    // Blocked users cannot send direct messages
     match /conversations/{conversationId}/messages/{messageId} {
-      allow read, write: if request.auth != null && 
+      allow read: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+      
+      allow create: if request.auth != null && 
+        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
+        !isBlockedInDirectMessage(conversationId);
+      
+      allow update, delete: if request.auth != null && 
+        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+    }
+    
+    // Helper function to check if sender is blocked by recipient (direct messages only)
+    function isBlockedInDirectMessage(conversationId) {
+      let conversation = get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+      
+      // If not a direct message, blocking doesn't apply
+      if (conversation.type != 'direct') {
+        return false;
+      }
+      
+      // Get the other participant (recipient)
+      let otherParticipant = conversation.participants[0] == request.auth.uid 
+        ? conversation.participants[1] 
+        : conversation.participants[0];
+      
+      // Check if recipient has blocked sender
+      let recipientDoc = get(/databases/$(database)/documents/users/$(otherParticipant)).data;
+      let blockedUsers = recipientDoc.blockedUsers;
+      
+      return blockedUsers != null && request.auth.uid in blockedUsers;
     }
     
     // Typing indicators - only conversation participants (Phase 5)

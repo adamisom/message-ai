@@ -18,7 +18,7 @@ import {
     updateDoc
 } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActionSheetIOS, ActivityIndicator, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
 import { DecisionsModal } from '../../components/DecisionsModal';
@@ -35,6 +35,7 @@ import { UpgradeToProModal } from '../../components/UpgradeToProModal';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
 import { FailedMessagesService } from '../../services/failedMessagesService';
+import { reportDirectMessageSpam } from '../../services/groupChatService';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
 import { MESSAGE_LIMIT, MESSAGE_TIMEOUT_MS, TYPING_DEBOUNCE_MS } from '../../utils/constants';
@@ -83,6 +84,9 @@ export default function ChatScreen() {
   
   // Phase 5: Read receipts tracking
   const lastMarkedReadRef = useRef<string | null>(null);
+  
+  // Phase C: Blocked user check
+  const [isBlockedByRecipient, setIsBlockedByRecipient] = useState(false);
 
   // Track pending message timeouts
   const timeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -127,6 +131,43 @@ export default function ChatScreen() {
     };
 
     checkAIAccess();
+  }, [user, conversation]);
+  
+  // Phase C: Check if current user is blocked by the recipient (direct messages only)
+  useEffect(() => {
+    if (!user || !conversation || conversation.type !== 'direct') {
+      setIsBlockedByRecipient(false);
+      return;
+    }
+
+    const otherParticipantId = conversation.participants.find(id => id !== user.uid);
+    if (!otherParticipantId) {
+      setIsBlockedByRecipient(false);
+      return;
+    }
+
+    console.log('🚫 [ChatScreen] Checking if blocked by:', otherParticipantId);
+
+    // Listen to the other participant's blockedUsers array
+    const unsubscribe = onSnapshot(
+      doc(db, 'users', otherParticipantId),
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const blockedUsers = docSnapshot.data().blockedUsers || [];
+          const isBlocked = blockedUsers.includes(user.uid);
+          console.log('🚫 [ChatScreen] Blocked status:', isBlocked);
+          setIsBlockedByRecipient(isBlocked);
+        } else {
+          setIsBlockedByRecipient(false);
+        }
+      },
+      (error) => {
+        console.error('❌ [ChatScreen] Error listening to blocked status:', error);
+        setIsBlockedByRecipient(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, [user, conversation]);
 
   // Helper: Deduplicate messages by ID (safety net for race conditions)
@@ -780,6 +821,87 @@ export default function ChatScreen() {
     );
   };
 
+  // Handle message long-press for spam reporting (Phase C)
+  const handleMessageLongPress = async (message: Message) => {
+    console.log('👆 [ChatScreen] Message long-press:', message.id);
+    
+    // Only show spam reporting for direct messages from other users
+    if (conversation?.type !== 'direct' || message.senderId === user?.uid) {
+      return;
+    }
+    
+    const options = ['Report Spam', 'Cancel'];
+    const destructiveButtonIndex = 0;
+    const cancelButtonIndex = 1;
+    
+    const showActionSheet = () => {
+      if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options,
+            destructiveButtonIndex,
+            cancelButtonIndex,
+            title: 'Message Options',
+          },
+          async (buttonIndex) => {
+            if (buttonIndex === 0) {
+              // Report Spam
+              await handleReportSpam(message);
+            }
+          }
+        );
+      } else {
+        // Android fallback using Alert
+        Alert.alert(
+          'Message Options',
+          'What would you like to do?',
+          [
+            {
+              text: 'Report Spam',
+              onPress: () => handleReportSpam(message),
+              style: 'destructive',
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+          ]
+        );
+      }
+    };
+    
+    showActionSheet();
+  };
+  
+  const handleReportSpam = async (message: Message) => {
+    try {
+      console.log('🚨 [ChatScreen] Reporting spam:', message.id);
+      
+      if (!user?.uid || !conversationId || typeof conversationId !== 'string') {
+        throw new Error('Invalid conversation or user');
+      }
+      
+      await reportDirectMessageSpam(conversationId, message.senderId);
+      
+      Alert.alert(
+        'Spam Reported',
+        'This message has been reported. The sender has been blocked, and this conversation has been hidden from your list.',
+        [{ text: 'OK' }]
+      );
+      
+      // Navigate back to conversation list
+      navigation.goBack();
+      
+    } catch (error: any) {
+      console.error('❌ [ChatScreen] Error reporting spam:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to report spam. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   // Jump to message from search results
   const handleJumpToMessage = (messageId: string) => {
     console.log('🎯 [ChatScreen] Jumping to message:', messageId);
@@ -978,18 +1100,27 @@ export default function ChatScreen() {
         onLoadMore={loadMoreMessages}
         onRetryMessage={handleRetryMessage}
         onDeleteMessage={handleDeleteMessage}
+        onMessageLongPress={handleMessageLongPress}
         isLoadingMore={isLoadingMore}
         hasMoreMessages={hasMoreMessages}
         onScrollToBottom={handleScrollToBottom}
         onScrollAwayFromBottom={handleScrollAwayFromBottom}
       />
       <TypingIndicator typingUsers={typingUsers} />
-      <MessageInput
-        onSend={sendMessage}
-        onTyping={handleTyping}
-        onStopTyping={handleStopTyping}
-        disabled={false} // Can send even when offline (will queue)
-      />
+      {!isBlockedByRecipient ? (
+        <MessageInput
+          onSend={sendMessage}
+          onTyping={handleTyping}
+          onStopTyping={handleStopTyping}
+          disabled={false} // Can send even when offline (will queue)
+        />
+      ) : (
+        <View style={styles.blockedMessageContainer}>
+          <Text style={styles.blockedMessageText}>
+            You cannot send messages to this user
+          </Text>
+        </View>
+      )}
       
       {/* Jump to Bottom Button (shows when user has scrolled away from bottom) */}
       {showScrollToBottom && (
@@ -1136,5 +1267,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  blockedMessageContainer: {
+    padding: 16,
+    backgroundColor: '#F2F2F7',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+    alignItems: 'center',
+  },
+  blockedMessageText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontStyle: 'italic',
   },
 });

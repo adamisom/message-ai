@@ -18,8 +18,8 @@ import {
 } from 'react-native';
 import { TrialWorkspaceModal } from '../../components/TrialWorkspaceModal';
 import { UpgradeToProModal } from '../../components/UpgradeToProModal';
-import { getUserWorkspaceInvitations } from '../../services/workspaceService';
 import { getUserGroupChatInvitations } from '../../services/groupChatService';
+import { getUserWorkspaceInvitations } from '../../services/workspaceService';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { Workspace } from '../../types';

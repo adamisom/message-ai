@@ -156,7 +156,7 @@
 - ❌ Spam strike decay notifications
 - ❌ Spam appeal Cloud Function (Enterprise tier)
 
-**Note:** Core spam prevention (workspace invitations, group chat invitations, direct message spam) is implemented in Sub-Phases 4 and 6.5. Sub-Phase 8 adds polish and appeal mechanisms.
+**Note:** Core spam prevention (workspace invitations, group chat invitations, direct message spam reporting with dual ban logic) is fully implemented in Sub-Phases 4 and 6.5. See `PRD-SUPPLEMENT-SUB-PHASE-6.5-GROUP-CHAT-INVITES.md` for detailed discussion of the dual ban system (24h temp ban for 2 strikes in 24h, indefinite ban for 5 strikes in 30d), blocking functionality, conversation hiding, and spam reporting decisions (no abuse prevention, no appeal mechanism). Sub-Phase 8 adds polish, enhanced UI, and enterprise appeal mechanisms.
 
 **Sub-Phase 9: Production Sign-In**
 
