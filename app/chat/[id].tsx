@@ -21,13 +21,17 @@ import { useEffect, useRef, useState } from 'react';
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
+import CapacityExpansionModal from '../../components/CapacityExpansionModal';
 import { DecisionsModal } from '../../components/DecisionsModal';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
 import { MeetingSchedulerModal } from '../../components/MeetingSchedulerModal';
 import MessageInput from '../../components/MessageInput';
 import MessageList, { MessageListRef } from '../../components/MessageList';
+import MessageToolbar from '../../components/MessageToolbar';
 import OfflineBanner from '../../components/OfflineBanner';
+import PinnedMessagesModal from '../../components/PinnedMessagesModal';
+import ReadOnlyWorkspaceBanner from '../../components/ReadOnlyWorkspaceBanner';
 import { SearchModal } from '../../components/SearchModal';
 import { SummaryModal } from '../../components/SummaryModal';
 import TypingIndicator from '../../components/TypingIndicator';
@@ -36,6 +40,13 @@ import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
 import { FailedMessagesService } from '../../services/failedMessagesService';
 import { reportDirectMessageSpam } from '../../services/groupChatService';
+import {
+  expandWorkspaceCapacity,
+  markMessageUrgent,
+  pinMessage,
+  unmarkMessageUrgent,
+  unpinMessage,
+} from '../../services/workspaceAdminService';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
 import { Workspace } from '../../types/workspace';
@@ -221,6 +232,57 @@ export default function ChatScreen() {
     };
   }, [conversation, user]);
 
+  // Sub-Phase 7: Fetch workspace data if workspace chat
+  useEffect(() => {
+    if (!conversation?.workspaceId) {
+      setWorkspace(null);
+      setIsAdmin(false);
+      return;
+    }
+
+    const unsubscribe = onSnapshot(
+      doc(db, 'workspaces', conversation.workspaceId),
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          setWorkspace({ id: docSnapshot.id, ...docSnapshot.data() } as Workspace);
+          setIsAdmin(docSnapshot.data()?.adminUid === user?.uid);
+        }
+      },
+      (error) => {
+        console.error('❌ [ChatScreen] Error fetching workspace:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [conversation, user]);
+
+  // Sub-Phase 7: Fetch pinned messages
+  useEffect(() => {
+    if (!conversation?.pinnedMessages?.length) {
+      setPinnedMessages([]);
+      return;
+    }
+
+    const fetchPinned = async () => {
+      try {
+        const pinned = await Promise.all(
+          (conversation.pinnedMessages || []).map(async (pin: any) => {
+            const msgDoc = await getDoc(doc(db, `conversations/${conversationId}/messages`, pin.messageId));
+            if (msgDoc.exists()) {
+              return { id: msgDoc.id, ...msgDoc.data() } as Message;
+            }
+            return null;
+          })
+        );
+        setPinnedMessages(pinned.filter(Boolean) as Message[]);
+      } catch (error) {
+        console.error('❌ [ChatScreen] Error fetching pinned messages:', error);
+      }
+    };
+
+    fetchPinned();
+  }, [conversation, conversationId]);
+
   // Update header title when conversation loads (Phase 4 + Phase 5: added status badge)
   useEffect(() => {
     if (conversation && user) {
@@ -258,12 +320,33 @@ export default function ChatScreen() {
         const participantCount = conversation.participants.length;
         title = conversation.name || `Group (${participantCount} members)`;
         
-        // Add info button for group participants + AI features
+        // Add info button for group participants + AI features + pins (Sub-Phase 7)
+        const pinnedCount = conversation.pinnedMessages?.length || 0;
         headerRight = () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, gap: 12 }}>
             <TouchableOpacity onPress={() => setShowAIMenu(true)}>
               <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
             </TouchableOpacity>
+            {conversation.workspaceId && pinnedCount > 0 && (
+              <TouchableOpacity onPress={() => setShowPinnedModal(true)}>
+                <View style={{ position: 'relative' }}>
+                  <Ionicons name="pin" size={24} color="#007AFF" />
+                  <View style={{
+                    position: 'absolute',
+                    top: -6,
+                    right: -6,
+                    backgroundColor: '#FF3B30',
+                    borderRadius: 8,
+                    minWidth: 16,
+                    height: 16,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{pinnedCount}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity onPress={() => setShowParticipantsModal(true)}>
               <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
             </TouchableOpacity>
