@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Modal,
     StyleSheet,
     Text,
@@ -10,6 +9,7 @@ import {
     View,
 } from 'react-native';
 import { Workspace } from '../types/workspace';
+import { Alerts } from '../utils/alerts';
 import { Colors } from '../utils/colors';
 import { ModalHeader } from './modals/ModalHeader';
 
@@ -46,10 +46,10 @@ export default function CapacityExpansionModal({
     setIsExpanding(true);
     try {
       await onExpand(newMemberCount);
-      Alert.alert('Success', 'Workspace expanded! Invitation sent.');
+      Alerts.success('Workspace expanded! Invitation sent.');
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to expand workspace');
+      Alerts.error(error.message || 'Failed to expand workspace');
     } finally {
       setIsExpanding(false);
     }
