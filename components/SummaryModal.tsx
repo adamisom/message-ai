@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import {
-    Alert,
     Modal,
     ScrollView,
     StyleSheet,
@@ -14,6 +13,7 @@ import { generateSummary, saveEditedSummary } from '../services/aiService';
 import { useAuthStore } from '../store/authStore';
 import { commonModalStyles } from '../styles/commonModalStyles';
 import { Summary } from '../types';
+import { Alerts } from '../utils/alerts';
 import { Colors } from '../utils/colors';
 import EditSummaryModal from './EditSummaryModal';
 import { EmptyState } from './modals/EmptyState';
@@ -71,7 +71,7 @@ export function SummaryModal({
   const handleSaveEdit = async (editedSummary: string, editedKeyPoints: string[]) => {
     try {
       await saveEditedSummary(conversationId, editedSummary, editedKeyPoints);
-      Alert.alert('Success', 'Summary saved successfully');
+      Alerts.success('Summary saved successfully');
       reload(); // Reload to show saved version
     } catch (error: any) {
       throw error; // Let EditSummaryModal handle it
@@ -84,7 +84,7 @@ export function SummaryModal({
       setFreshAiSummary(fresh);
       setViewMode('fresh');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to generate fresh summary');
+      Alerts.error(error.message || 'Failed to generate fresh summary');
     }
   };
 

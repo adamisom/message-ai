@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-    Alert,
     Modal,
     ScrollView,
     StyleSheet,
@@ -12,6 +11,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useAIFeature } from '../hooks/useAIFeature';
 import { suggestMeetingTimes } from '../services/aiService';
 import { commonModalStyles } from '../styles/commonModalStyles';
+import { Alerts } from '../utils/alerts';
 import { Colors } from '../utils/colors';
 import { EmptyState } from './modals/EmptyState';
 import { ErrorState } from './modals/ErrorState';
@@ -63,11 +63,7 @@ export function MeetingSchedulerModal({
     const text = formatSuggestionForClipboard(suggestion);
     await Clipboard.setStringAsync(text);
     
-    Alert.alert(
-      'Copied!',
-      'Meeting suggestions copied to clipboard',
-      [{ text: 'OK' }]
-    );
+    Alerts.success('Meeting suggestions copied to clipboard');
   };
 
   const formatSuggestionForClipboard = (suggestion: MeetingSuggestion): string => {

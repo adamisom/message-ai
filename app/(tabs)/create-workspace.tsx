@@ -9,7 +9,6 @@ import { httpsCallable } from 'firebase/functions';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -22,6 +21,7 @@ import {
 import { functions } from '../../firebase.config';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { Alerts } from '../../utils/alerts';
 import { Colors } from '../../utils/colors';
 
 export default function CreateWorkspaceScreen() {
@@ -46,12 +46,12 @@ export default function CreateWorkspaceScreen() {
   const handleCreate = async () => {
     // Validation
     if (!workspaceName.trim()) {
-      Alert.alert('Error', 'Please enter a workspace name');
+      Alerts.error('Please enter a workspace name');
       return;
     }
 
     if (!maxUsers || parseInt(maxUsers) < 2 || parseInt(maxUsers) > 25) {
-      Alert.alert('Error', 'Capacity must be between 2 and 25 users');
+      Alerts.error('Capacity must be between 2 and 25 users');
       return;
     }
 
@@ -71,23 +71,17 @@ export default function CreateWorkspaceScreen() {
         addWorkspace(workspaceData);
       }
 
-      Alert.alert(
-        'Success!',
+      Alerts.success(
         `Workspace "${workspaceName}" created successfully!`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Navigate to workspaces tab
-              router.replace('/workspaces' as any);
-              
-              // Reload workspaces list to ensure sync
-              if (user?.uid) {
-                useWorkspaceStore.getState().loadWorkspaces(user.uid);
-              }
-            },
-          },
-        ]
+        () => {
+          // Navigate to workspaces tab
+          router.replace('/workspaces' as any);
+          
+          // Reload workspaces list to ensure sync
+          if (user?.uid) {
+            useWorkspaceStore.getState().loadWorkspaces(user.uid);
+          }
+        }
       );
     } catch (error: any) {
       console.error('Create workspace error:', error);
@@ -104,7 +98,7 @@ export default function CreateWorkspaceScreen() {
         errorMessage = 'Account restricted from creating workspaces';
       }
 
-      Alert.alert('Error', errorMessage);
+      Alerts.error(errorMessage);
     } finally {
       setIsCreating(false);
     }

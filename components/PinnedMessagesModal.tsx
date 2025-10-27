@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Modal,
     ScrollView,
     StyleSheet,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { commonModalStyles } from '../styles/commonModalStyles';
 import { Conversation, Message } from '../types';
+import { Alerts } from '../utils/alerts';
 import { Colors } from '../utils/colors';
 import { formatMessageTime } from '../utils/timeFormat';
 import { ModalHeader } from './modals/ModalHeader';
@@ -38,26 +38,20 @@ export default function PinnedMessagesModal({
   const [unpinning, setUnpinning] = useState<string | null>(null);
 
   const handleUnpin = (messageId: string) => {
-    Alert.alert(
+    Alerts.confirm(
       'Unpin Message',
       'Remove this pinned message?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Unpin',
-          style: 'destructive',
-          onPress: async () => {
-            setUnpinning(messageId);
-            try {
-              await onUnpin(messageId);
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to unpin message');
-            } finally {
-              setUnpinning(null);
-            }
-          },
-        },
-      ]
+      async () => {
+        setUnpinning(messageId);
+        try {
+          await onUnpin(messageId);
+        } catch (error: any) {
+          Alerts.error(error.message || 'Failed to unpin message');
+        } finally {
+          setUnpinning(null);
+        }
+      },
+      { confirmText: 'Unpin', isDestructive: true }
     );
   };
 

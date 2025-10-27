@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    Alert,
     Button,
     FlatList,
     StyleSheet,
@@ -11,17 +10,18 @@ import {
     View
 } from 'react-native';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
+import { createDirectMessageInvitation } from '../../services/dmInvitationService';
 import {
     createGroupConversation,
     createOrOpenConversation,
     findUserByPhoneNumber
 } from '../../services/firestoreService';
-import { createDirectMessageInvitation } from '../../services/dmInvitationService';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import type { User } from '../../types';
+import { Alerts } from '../../utils/alerts';
 import { Colors } from '../../utils/colors';
 import { validatePhoneNumber } from '../../utils/validators';
-import type { User } from '../../types';
 
 export default function NewChat() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -138,22 +138,21 @@ export default function NewChat() {
           
           try {
             const result = await createDirectMessageInvitation(recipient.uid);
-            Alert.alert(
-              'Invitation Sent',
+            Alerts.success(
               `Your message request has been sent to ${result.recipientName}. They can accept or decline it from their invitations.`,
-              [{ text: 'OK', onPress: () => router.back() }]
+              () => router.back()
             );
             return;
           } catch (inviteError: any) {
             // Handle specific error cases
             if (inviteError.message?.includes('already have a pending invitation')) {
-              Alert.alert('Already Sent', 'You already have a pending invitation to this user');
+              Alerts.error('You already have a pending invitation to this user');
               return;
             } else if (inviteError.message?.includes('Conversation already exists')) {
-              Alert.alert('Already Connected', 'You can already message this user');
+              Alerts.error('You can already message this user');
               return;
             } else if (inviteError.message?.includes('banned for spam')) {
-              Alert.alert('Cannot Send', 'You are temporarily unable to send invitations');
+              Alerts.error('You are temporarily unable to send invitations');
               return;
             }
             throw inviteError; // Re-throw other errors
@@ -172,7 +171,7 @@ export default function NewChat() {
       }
     } catch (err: any) {
       console.error('❌ [NewChat] Error creating chat:', err);
-      Alert.alert('Error', err.message || 'Failed to create conversation');
+      Alerts.error(err.message || 'Failed to create conversation');
     } finally {
       setLoading(false);
     }

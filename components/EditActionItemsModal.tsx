@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Modal,
     ScrollView,
     StyleSheet,
@@ -12,6 +11,7 @@ import {
     View,
 } from 'react-native';
 import { ActionItem } from '../types';
+import { Alerts } from '../utils/alerts';
 
 interface EditActionItemsModalProps {
   visible: boolean;
@@ -69,7 +69,7 @@ export default function EditActionItemsModal({
     // Validation
     const nonEmptyItems = editedItems.filter(item => item.text.trim() !== '');
     if (nonEmptyItems.length === 0) {
-      Alert.alert('Error', 'At least one action item is required');
+      Alerts.error('At least one action item is required');
       return;
     }
 
@@ -78,7 +78,7 @@ export default function EditActionItemsModal({
       await onSave(nonEmptyItems);
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save action items');
+      Alerts.error(error.message || 'Failed to save action items');
     } finally {
       setIsSaving(false);
     }

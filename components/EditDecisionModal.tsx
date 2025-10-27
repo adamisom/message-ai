@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Modal,
     ScrollView,
     StyleSheet,
@@ -12,6 +11,7 @@ import {
     View,
 } from 'react-native';
 import { Decision } from '../types';
+import { Alerts } from '../utils/alerts';
 
 interface EditDecisionModalProps {
   visible: boolean;
@@ -41,12 +41,12 @@ export default function EditDecisionModal({
   const handleSave = async () => {
     // Validation
     if (!editedDecision.trim()) {
-      Alert.alert('Error', 'Decision cannot be empty');
+      Alerts.error('Decision cannot be empty');
       return;
     }
 
     if (!editedContext.trim()) {
-      Alert.alert('Error', 'Context cannot be empty');
+      Alerts.error('Context cannot be empty');
       return;
     }
 
@@ -55,7 +55,7 @@ export default function EditDecisionModal({
       await onSave(editedDecision.trim(), editedContext.trim());
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save decision');
+      Alerts.error(error.message || 'Failed to save decision');
     } finally {
       setIsSaving(false);
     }

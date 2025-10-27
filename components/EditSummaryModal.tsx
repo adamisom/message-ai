@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Modal,
     ScrollView,
     StyleSheet,
@@ -12,6 +11,7 @@ import {
     View,
 } from 'react-native';
 import { Summary } from '../types';
+import { Alerts } from '../utils/alerts';
 
 interface EditSummaryModalProps {
   visible: boolean;
@@ -56,13 +56,13 @@ export default function EditSummaryModal({
   const handleSave = async () => {
     // Validation
     if (!editedSummary.trim()) {
-      Alert.alert('Error', 'Summary cannot be empty');
+      Alerts.error('Summary cannot be empty');
       return;
     }
 
     const nonEmptyKeyPoints = editedKeyPoints.filter(kp => kp.trim() !== '');
     if (nonEmptyKeyPoints.length === 0) {
-      Alert.alert('Error', 'At least one key point is required');
+      Alerts.error('At least one key point is required');
       return;
     }
 
@@ -71,7 +71,7 @@ export default function EditSummaryModal({
       await onSave(editedSummary.trim(), nonEmptyKeyPoints);
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save summary');
+      Alerts.error(error.message || 'Failed to save summary');
     } finally {
       setIsSaving(false);
     }

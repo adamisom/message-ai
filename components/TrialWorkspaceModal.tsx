@@ -8,7 +8,6 @@ import { httpsCallable } from 'firebase/functions';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -17,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { functions } from '../firebase.config';
+import { Alerts } from '../utils/alerts';
 import { Colors } from '../utils/colors';
 
 interface TrialWorkspaceModalProps {
@@ -34,42 +34,29 @@ export function TrialWorkspaceModal({
 
   const handleUpgrade = async () => {
     // MVP: Dummy payment - instant upgrade via Cloud Function
-    Alert.alert(
+    Alerts.confirm(
       'Upgrade to Pro',
       'MVP Mode: Instant upgrade (no real payment)\n\nIn production, this would open Stripe payment flow.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Upgrade Now',
-          onPress: async () => {
-            setIsUpgrading(true);
-            try {
-              const upgradeToPro = httpsCallable(functions, 'upgradeToPro');
-              const result = await upgradeToPro({});
-              
-              Alert.alert(
-                'Success!',
-                'You\'ve been upgraded to Pro! 🎉',
-                [{ 
-                  text: 'OK', 
-                  onPress: () => {
-                    onClose();
-                    onUpgradeSuccess();
-                  }
-                }]
-              );
-            } catch (error: any) {
-              Alert.alert(
-                'Error',
-                `Failed to upgrade: ${error.message}`,
-                [{ text: 'OK' }]
-              );
-            } finally {
-              setIsUpgrading(false);
+      async () => {
+        setIsUpgrading(true);
+        try {
+          const upgradeToPro = httpsCallable(functions, 'upgradeToPro');
+          const result = await upgradeToPro({});
+          
+          Alerts.success(
+            'You\'ve been upgraded to Pro! 🎉',
+            () => {
+              onClose();
+              onUpgradeSuccess();
             }
-          },
-        },
-      ]
+          );
+        } catch (error: any) {
+          Alerts.error(`Failed to upgrade: ${error.message}`);
+        } finally {
+          setIsUpgrading(false);
+        }
+      },
+      { confirmText: 'Upgrade Now' }
     );
   };
   return (

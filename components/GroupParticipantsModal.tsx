@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { 
   ActivityIndicator,
-  Alert, 
   Modal, 
   ScrollView, 
   StyleSheet, 
@@ -11,9 +10,10 @@ import {
   TouchableOpacity, 
   View 
 } from 'react-native';
+import { addMemberToGroupChat } from '../services/groupChatService';
+import { Alerts } from '../utils/alerts';
 import { translateError } from '../utils/errorTranslator';
 import { validateEmail } from '../utils/validators';
-import { addMemberToGroupChat } from '../services/groupChatService';
 
 interface Participant {
   uid: string;
@@ -63,12 +63,12 @@ export default function GroupParticipantsModal({
 
     // Validation
     if (!email) {
-      Alert.alert('Error', 'Please enter an email address');
+      Alerts.error('Please enter an email address');
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      Alerts.error('Please enter a valid email address');
       return;
     }
 
@@ -77,7 +77,7 @@ export default function GroupParticipantsModal({
     try {
       const result = await addMemberToGroupChat(conversationId, email);
       
-      Alert.alert('Success', `Invitation sent to ${result.displayName}`);
+      Alerts.success(`Invitation sent to ${result.displayName}`);
       setMemberEmail('');
       setShowAddMemberModal(false);
       
@@ -87,7 +87,7 @@ export default function GroupParticipantsModal({
       }
     } catch (error: any) {
       const friendlyError = translateError(error);
-      Alert.alert(friendlyError.title, friendlyError.message);
+      Alerts.error(friendlyError.message);
     } finally {
       setIsAddingMember(false);
     }
