@@ -1,7 +1,6 @@
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import {
-    Alert,
     FlatList,
     Modal,
     StyleSheet,
@@ -16,6 +15,7 @@ import { assignActionItem, extractActionItems } from '../services/aiService';
 import { useAuthStore } from '../store/authStore';
 import { commonModalStyles } from '../styles/commonModalStyles';
 import type { ActionItem } from '../types';
+import { Alerts } from '../utils/alerts';
 import { getPriorityColor } from '../utils/colorHelpers';
 import { Colors } from '../utils/colors';
 import { formatDateString } from '../utils/dateFormat';
@@ -186,7 +186,7 @@ export function ActionItemsModal({
       console.log('[ActionItemsModal] Cache invalidated - fresh data on next open');
     } catch (err: any) {
       console.error('[ActionItemsModal] Assign error:', err);
-      Alert.alert('Error', err.message || 'Failed to assign task. Please try again.');
+      Alerts.error(err.message || 'Failed to assign task. Please try again.');
       // Revert on error
       setItems((prev) =>
         prev.map((item) =>
