@@ -3,9 +3,7 @@
  * Sub-Phase 11 (Polish): Export non-workspace conversations
  */
 
-import { httpsCallable } from 'firebase/functions';
-import { Share } from 'react-native';
-import { functions } from '../firebase.config';
+import { exportAndShare } from './exportHelpers';
 
 export interface UserConversationsExportData {
   userId: string;
@@ -42,38 +40,11 @@ export async function exportUserConversationsData(): Promise<{
   data?: UserConversationsExportData;
   error?: string;
 }> {
-  try {
-    console.log('[exportUserConversations] Starting export...');
-    
-    // Call Cloud Function to generate export
-    const exportFn = httpsCallable(functions, 'exportUserConversations');
-    const result = await exportFn({});
-    const exportData = result.data as UserConversationsExportData;
-
-    console.log('[exportUserConversations] Export received:', 
-      exportData.metadata.totalMessages, 'messages,',
-      exportData.metadata.totalConversations, 'conversations'
-    );
-
-    // Convert to formatted JSON string
-    const jsonString = JSON.stringify(exportData, null, 2);
-
-    // Share the file
-    await Share.share({
-      message: jsonString,
-      title: `My Conversations Export`,
-    });
-
-    return {
-      success: true,
-      data: exportData,
-    };
-  } catch (error: any) {
-    console.error('[exportUserConversations] Error:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to export conversations',
-    };
-  }
+  const timestamp = new Date().toISOString().split('T')[0];
+  const filename = `my_conversations_${timestamp}.json`;
+  
+  return exportAndShare<UserConversationsExportData>(
+    'exportUserConversations',
+    filename
+  );
 }
-

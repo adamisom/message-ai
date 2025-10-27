@@ -8,10 +8,8 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import React, { useCallback, useState } from 'react';
 import {
-    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -22,11 +20,14 @@ import { HelpModal, SpamWarningBanner, UpgradeToProModal, UserSettingsModal } fr
 import { logoutUser, updateUserProfile } from '../../services/authService';
 import { getUserGroupChatInvitations } from '../../services/groupChatService';
 import { getUserSpamStatus, SpamStatus } from '../../services/spamService';
+import { startFreeTrial, showTrialStartedAlert, showTrialErrorAlert } from '../../services/subscriptionService';
 import { exportUserConversationsData } from '../../services/userExportService';
 import { getUserWorkspaceInvitations } from '../../services/workspaceService';
 import { useAuthStore } from '../../store/authStore';
 import type { WorkspaceInvitation } from '../../types';
+import { Alerts } from '../../utils/alerts';
 import { Colors } from '../../utils/colors';
+import { getUserPermissions } from '../../utils/userPermissions';
 
 /**
  * Get initials from display name (matches ProfileButton logic)
@@ -146,29 +147,15 @@ export default function ProfileScreen() {
     setIsStartingTrial(true);
     try {
       console.log('🎉 [ProfileScreen] Starting 5-day free trial...');
-      
-      // Call the startFreeTrial Cloud Function
-      const functions = getFunctions();
-      const startTrialFn = httpsCallable(functions, 'startFreeTrial');
-      await startTrialFn();
-      
+      await startFreeTrial();
       console.log('✅ [ProfileScreen] Trial started successfully');
       
       // Refresh user data to get updated trial status
       await refreshUserProfile();
-      
-      Alert.alert(
-        '🎉 Trial Started!',
-        'You now have 5 days of free access to all Pro features. Enjoy!',
-        [{ text: 'OK' }]
-      );
+      showTrialStartedAlert();
     } catch (error: any) {
       console.error('❌ [ProfileScreen] Failed to start trial:', error);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to start trial. Please try again.',
-        [{ text: 'OK' }]
-      );
+      showTrialErrorAlert(error);
     } finally {
       setIsStartingTrial(false);
     }
@@ -184,58 +171,18 @@ export default function ProfileScreen() {
   
   const initials = getInitials(user.displayName || '');
   
-  // Determine status badge and details
-  let statusBadge = '';
-  let statusColor = '#8E8E93'; // Gray
-  let statusDetail = '';
-  let showTrialButton = false;
-  let showUpgradeButton = false;
-  let showManageButton = false;
+  // Get comprehensive user permissions using helper
+  const permissions = getUserPermissions(user);
   
-  const now = Date.now();
-  
-  if (user.isPaidUser) {
-    // Pro User
-    statusBadge = '💎 Pro User';
-    statusColor = Colors.primary;
-    statusDetail = user.subscriptionEndsAt 
-      ? `Expires: ${formatDate(user.subscriptionEndsAt)}`
-      : '';
-    showManageButton = true;
-  } else if (user.trialEndsAt) {
-    // User has trial data - check if active
-    const trialEndsAt = user.trialEndsAt.toMillis ? user.trialEndsAt.toMillis() : user.trialEndsAt;
-    
-    if (now < trialEndsAt) {
-      // Active Trial User - show upgrade button
-      const daysRemaining = Math.ceil((trialEndsAt - now) / (1000 * 60 * 60 * 24));
-      statusBadge = '🎉 Trial User';
-      statusColor = '#FFD700'; // Gold
-      statusDetail = `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`;
-      showUpgradeButton = true;
-    } else {
-      // Free User (trial expired)
-      statusBadge = '🔓 Free User';
-      statusColor = '#8E8E93';
-      statusDetail = 'Trial ended';
-      
-      // Check if they're eligible for trial again (test script scenario)
-      if (!user.trialUsed) {
-        showTrialButton = true;
-      }
-      showUpgradeButton = true;
-    }
-  } else {
-    // Free User (never had trial) - show trial + upgrade
-    statusBadge = '🔓 Free User';
-    statusColor = '#8E8E93';
-    statusDetail = '';
-    
-    if (!user.trialUsed) {
-      showTrialButton = true;
-    }
-    showUpgradeButton = true;
-  }
+  // Extract for backward compatibility with existing JSX
+  const {
+    statusBadge,
+    statusColor,
+    statusDetail,
+    showTrialButton,
+    showUpgradeButton,
+    showManageButton,
+  } = permissions;
   
   const handleUpgradeSuccess = async () => {
     setShowUpgradeModal(false);
@@ -266,22 +213,16 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
+    Alerts.confirm(
       'Logout',
       'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            console.log('👋 [ProfileScreen] Logging out');
-            await logoutUser();
-            logout();
-            router.replace('/(auth)/login');
-          },
-        },
-      ]
+      async () => {
+        console.log('👋 [ProfileScreen] Logging out');
+        await logoutUser();
+        logout();
+        router.replace('/(auth)/login');
+      },
+      { confirmText: 'Logout', isDestructive: true }
     );
   };
   
@@ -311,13 +252,13 @@ export default function ProfileScreen() {
           message += `\n\n⚠️ ${metadata.timeoutWarning}`;
         }
         
-        Alert.alert('Export Complete', message);
+        Alerts.success(message);
       } else {
-        Alert.alert('Export Failed', result.error || 'Unknown error');
+        Alerts.error(result.error || 'Export failed');
       }
     } catch (error: any) {
       console.error('Export conversations error:', error);
-      Alert.alert('Error', error.message || 'Failed to export conversations');
+      Alerts.error(error);
     } finally {
       setIsExporting(false);
     }

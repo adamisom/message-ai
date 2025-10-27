@@ -4,11 +4,9 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { httpsCallable } from 'firebase/functions';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -16,7 +14,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { functions } from '../firebase.config';
+import {
+  upgradeUserToPro,
+  startFreeTrial,
+  showUpgradeSuccessAlert,
+  showTrialStartedAlert,
+  showUpgradeErrorAlert,
+  showTrialErrorAlert,
+} from '../services/subscriptionService';
 import { useAuthStore } from '../store/authStore';
 
 interface UpgradeToProModalProps {
@@ -44,85 +49,35 @@ export const UpgradeToProModal: React.FC<UpgradeToProModalProps> = ({
   const isTrialEligible = !user?.trialUsed && !trialDaysRemaining;
 
   const handleUpgrade = async () => {
-    // MVP: Dummy payment - instant upgrade via Cloud Function
-    Alert.alert(
-      'Upgrade to Pro',
-      'MVP Mode: Instant upgrade (no real payment)\n\nIn production, this would open Stripe payment flow.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Upgrade Now',
-          onPress: async () => {
-            setIsUpgrading(true);
-            try {
-              const upgradeToPro = httpsCallable(functions, 'upgradeToPro');
-              const result = await upgradeToPro({});
-              
-              Alert.alert(
-                'Success!',
-                'You\'ve been upgraded to Pro! 🎉',
-                [{ 
-                  text: 'OK', 
-                  onPress: () => {
-                    onClose();
-                    onUpgradeSuccess?.();
-                  }
-                }]
-              );
-            } catch (error: any) {
-              Alert.alert(
-                'Error',
-                `Failed to upgrade: ${error.message}`,
-                [{ text: 'OK' }]
-              );
-            } finally {
-              setIsUpgrading(false);
-            }
-          },
-        },
-      ]
-    );
+    setIsUpgrading(true);
+    try {
+      await upgradeUserToPro();
+      showUpgradeSuccessAlert(() => {
+        onClose();
+        onUpgradeSuccess?.();
+      });
+    } catch (error: any) {
+      if (error.message !== 'Upgrade cancelled') {
+        showUpgradeErrorAlert(error);
+      }
+    } finally {
+      setIsUpgrading(false);
+    }
   };
 
   const handleStartTrial = async () => {
-    // MVP: Start 5-day trial via Cloud Function
-    Alert.alert(
-      'Start Free Trial',
-      'Start your 5-day free trial with full Pro access?\n\nNo credit card required.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Start Trial',
-          onPress: async () => {
-            setIsStartingTrial(true);
-            try {
-              const startFreeTrial = httpsCallable(functions, 'startFreeTrial');
-              const result = await startFreeTrial({});
-              
-              Alert.alert(
-                'Trial Started!',
-                'Enjoy 5 days of full Pro access! 🎉',
-                [{ 
-                  text: 'OK', 
-                  onPress: () => {
-                    onClose();
-                    onTrialStart?.();
-                  }
-                }]
-              );
-            } catch (error: any) {
-              Alert.alert(
-                'Error',
-                `Failed to start trial: ${error.message}`,
-                [{ text: 'OK' }]
-              );
-            } finally {
-              setIsStartingTrial(false);
-            }
-          },
-        },
-      ]
-    );
+    setIsStartingTrial(true);
+    try {
+      await startFreeTrial();
+      showTrialStartedAlert(() => {
+        onClose();
+        onTrialStart?.();
+      });
+    } catch (error: any) {
+      showTrialErrorAlert(error);
+    } finally {
+      setIsStartingTrial(false);
+    }
   };
 
   const features = [
