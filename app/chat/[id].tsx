@@ -1041,17 +1041,13 @@ export default function ChatScreen() {
       options.push('Delete Message');
     }
     
-    // Workspace admins can mark urgent, pin, report spam
+    // Workspace admins can mark urgent and pin messages
     if (isWorkspaceChat && isAdmin) {
       const isUrgent = message.manuallyMarkedUrgent || message.priority === 'high';
       options.push(isUrgent ? 'Unmark Urgent' : 'Mark Urgent');
       
       const isPinned = (conversation.pinnedMessages || []).some(pm => pm.messageId === message.id);
       options.push(isPinned ? 'Unpin Message' : 'Pin Message');
-      
-      if (!isOwnMessage) {
-        options.push('Report Spam');
-      }
     }
     
     // Direct messages: report spam
