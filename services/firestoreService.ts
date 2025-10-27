@@ -19,6 +19,7 @@ interface User {
   uid: string;
   email: string;
   displayName: string;
+  phoneNumber: string;
   isOnline?: boolean;
   lastSeenAt?: any;
   createdAt?: any;
@@ -55,6 +56,39 @@ export const findUserByEmail = async (email: string): Promise<User | null> => {
   
   const userDoc = snapshot.docs[0];
   const user = { 
+    uid: userDoc.id,
+    ...userDoc.data(),
+  } as User;
+  
+  console.log('✅ [firestoreService] User found:', user.displayName);
+  return user;
+};
+
+/**
+ * Find a user by phone number
+ * Used in New Chat screen for phone-based user discovery
+ */
+export const findUserByPhoneNumber = async (phoneNumber: string): Promise<User | null> => {
+  // Normalize to 10 digits only
+  const normalizedPhone = phoneNumber.replace(/\D/g, '');
+  
+  console.log('🔍 [firestoreService] Finding user by phone:', normalizedPhone);
+  
+  const q = query(
+    collection(db, 'users'),
+    where('phoneNumber', '==', normalizedPhone),
+    limit(1)
+  );
+  
+  const snapshot = await getDocs(q);
+  
+  if (snapshot.empty) {
+    console.log('❌ [firestoreService] User not found');
+    return null;
+  }
+  
+  const userDoc = snapshot.docs[0];
+  const user = { 
     uid: userDoc.id, 
     ...userDoc.data() 
   } as User;
@@ -68,17 +102,21 @@ export const findUserByEmail = async (email: string): Promise<User | null> => {
  * Uses sorted UIDs as conversation ID for consistency
  * @param otherUser - The other user's data
  * @param currentUser - Current user's data
+ * @param workspaceId - Optional workspace ID for workspace-scoped chats
+ * @param workspaceName - Optional workspace name for workspace-scoped chats
  * @returns conversationId
  */
 export const createOrOpenConversation = async (
   otherUser: User, 
-  currentUser: User
+  currentUser: User,
+  workspaceId?: string,
+  workspaceName?: string
 ): Promise<string> => {
   // Sort UIDs to ensure consistent conversation ID
   const conversationId = generateConversationId(currentUser.uid, otherUser.uid);
   const conversationRef = doc(db, 'conversations', conversationId);
   
-  console.log('💬 [firestoreService] Creating/opening conversation:', conversationId);
+  console.log('💬 [firestoreService] Creating/opening conversation:', conversationId, workspaceId ? `(workspace: ${workspaceName})` : '(no workspace)');
   
   const conversationDoc = await getDoc(conversationRef);
 
@@ -103,6 +141,12 @@ export const createOrOpenConversation = async (
       lastMessage: null,
       lastRead: {},
       messageCount: 0, // For AI cache invalidation
+      // Phase 5: Workspace context
+      ...(workspaceId && {
+        workspaceId,
+        workspaceName,
+        isWorkspaceChat: true,
+      }),
     });
     console.log('✅ [firestoreService] New conversation created');
   } else {
@@ -116,11 +160,15 @@ export const createOrOpenConversation = async (
  * Create a group conversation
  * @param participants - Array of user objects (excluding current user)
  * @param currentUser - Current user's data
+ * @param workspaceId - Optional workspace ID for workspace-scoped chats
+ * @param workspaceName - Optional workspace name for workspace-scoped chats
  * @returns conversationId
  */
 export const createGroupConversation = async (
   participants: User[], 
-  currentUser: User
+  currentUser: User,
+  workspaceId?: string,
+  workspaceName?: string
 ): Promise<string> => {
   if (participants.length < 2) {
     throw new Error('Group chat requires at least 2 other participants');
@@ -141,7 +189,7 @@ export const createGroupConversation = async (
     };
   });
 
-  console.log('👥 [firestoreService] Creating group conversation with', participantIds.length, 'members');
+  console.log('👥 [firestoreService] Creating group conversation with', participantIds.length, 'members', workspaceId ? `(workspace: ${workspaceName})` : '(no workspace)');
 
   const conversationRef = await addDoc(collection(db, 'conversations'), {
     type: 'group',
@@ -154,6 +202,12 @@ export const createGroupConversation = async (
     lastMessage: null,
     lastRead: {},
     messageCount: 0, // For AI cache invalidation
+    // Phase 5: Workspace context
+    ...(workspaceId && {
+      workspaceId,
+      workspaceName,
+      isWorkspaceChat: true,
+    }),
   });
 
   console.log('✅ [firestoreService] Group conversation created:', conversationRef.id);

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Conversation, UserStatusInfo } from '../types';
+import { Colors } from '../utils/colors';
 import { getConversationName } from '../utils/conversationHelpers';
 import { formatConversationTime } from '../utils/timeFormat';
 import UserStatusBadge from './UserStatusBadge';
@@ -105,6 +106,12 @@ export default function ConversationItem({
             <Text style={[styles.name, isUnread && styles.unreadText]} numberOfLines={1}>
               {getConversationName(conversation, currentUserId)}
             </Text>
+            {/* Phase 5: Show workspace badge */}
+            {conversation.isWorkspaceChat && conversation.workspaceName && (
+              <View style={styles.workspaceBadge}>
+                <Ionicons name="business" size={12} color={Colors.primary} />
+              </View>
+            )}
             {/* Phase 5: Show online status badge for direct chats */}
             {directChatStatus && (
               <UserStatusBadge 
@@ -159,6 +166,14 @@ const styles = StyleSheet.create({
   },
   groupIcon: {
     marginRight: 4,
+  },
+  workspaceBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    backgroundColor: Colors.surfaceLight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   name: {
     fontSize: 16,

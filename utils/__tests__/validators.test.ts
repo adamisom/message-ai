@@ -10,6 +10,8 @@ import {
   getEmailError,
   getPasswordError,
   getDisplayNameError,
+  validatePhoneNumber,
+  getPhoneNumberError,
 } from '../validators';
 
 describe('validateEmail', () => {
@@ -204,6 +206,70 @@ describe('getDisplayNameError', () => {
     expect(getDisplayNameError('a'.repeat(51))).toBe(
       'Display name must be 50 characters or less'
     );
+  });
+});
+
+// Sub-Phase 11 (Polish): Phone Number Validation Tests
+describe('validatePhoneNumber', () => {
+  describe('valid phone numbers', () => {
+    it('should accept valid 10-digit phone numbers', () => {
+      expect(validatePhoneNumber('5551234567')).toBe(true);
+      expect(validatePhoneNumber('1234567890')).toBe(true);
+      expect(validatePhoneNumber('9999999999')).toBe(true);
+    });
+
+    it('should accept phone numbers with formatting', () => {
+      expect(validatePhoneNumber('(555) 123-4567')).toBe(true);
+      expect(validatePhoneNumber('555-123-4567')).toBe(true);
+      expect(validatePhoneNumber('555.123.4567')).toBe(true);
+      expect(validatePhoneNumber('1-555-123-4567')).toBe(true);
+      expect(validatePhoneNumber('+1 555 123 4567')).toBe(true);
+    });
+  });
+
+  describe('invalid phone numbers', () => {
+    it('should reject phone numbers with too few digits', () => {
+      expect(validatePhoneNumber('123456789')).toBe(false);
+      expect(validatePhoneNumber('55512345')).toBe(false);
+      expect(validatePhoneNumber('123')).toBe(false);
+    });
+
+    it('should reject phone numbers with too many digits', () => {
+      expect(validatePhoneNumber('22345678901')).toBe(false); // 11 digits but doesn't start with 1
+      expect(validatePhoneNumber('555123456789')).toBe(false); // 12 digits
+      expect(validatePhoneNumber('123456789012')).toBe(false); // 12 digits starting with 1
+    });
+
+    it('should reject empty or invalid input', () => {
+      expect(validatePhoneNumber('')).toBe(false);
+      expect(validatePhoneNumber('   ')).toBe(false);
+      expect(validatePhoneNumber('abcd1234567')).toBe(false);
+      expect(validatePhoneNumber('!@#$%^&*()')).toBe(false);
+    });
+  });
+});
+
+describe('getPhoneNumberError', () => {
+  it('should return required error for empty phone', () => {
+    const error = getPhoneNumberError('');
+    expect(error).toBe("Phone number is required because that's how friends find you");
+  });
+
+  it('should return required error for whitespace-only phone', () => {
+    const error = getPhoneNumberError('   ');
+    expect(error).toBe("Phone number is required because that's how friends find you");
+  });
+
+  it('should return invalid format error for invalid phone', () => {
+    expect(getPhoneNumberError('123')).toBe('Please enter a valid 10-digit phone number (US/Canada only)');
+    expect(getPhoneNumberError('abcd1234567')).toBe('Please enter a valid 10-digit phone number (US/Canada only)');
+    expect(getPhoneNumberError('22345678901')).toBe('Please enter a valid 10-digit phone number (US/Canada only)');
+  });
+
+  it('should return null for valid phone', () => {
+    expect(getPhoneNumberError('5551234567')).toBeNull();
+    expect(getPhoneNumberError('(555) 123-4567')).toBeNull();
+    expect(getPhoneNumberError('555-123-4567')).toBeNull();
   });
 });
 

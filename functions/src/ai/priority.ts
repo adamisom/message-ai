@@ -1,8 +1,8 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import {callClaudeWithTool} from '../utils/anthropic';
-import {analyzeMessagePriorityTool} from '../utils/aiTools';
-import {quickPriorityCheck} from '../utils/priorityHeuristics';
+import { analyzeMessagePriorityTool } from '../utils/aiTools';
+import { callClaudeWithTool } from '../utils/anthropic';
+import { quickPriorityCheck } from '../utils/priorityHeuristics';
 
 const db = admin.firestore();
 
@@ -59,6 +59,16 @@ export const batchAnalyzePriority = functions.pubsub
 
     for (const messageDoc of needsAnalysis.docs) {
       const message = messageDoc.data();
+
+      // Sub-Phase 7: Skip AI analysis if admin manually marked urgent
+      if (message.manuallyMarkedUrgent === true) {
+        await messageDoc.ref.update({
+          priorityNeedsAnalysis: false,
+          priorityAnalyzedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log(`Skipping AI analysis for admin-marked message: ${messageDoc.id}`);
+        continue; // Don't overwrite admin's decision
+      }
 
       try {
         const aiPriority = await analyzeMessagePriorityWithAI(message.text);

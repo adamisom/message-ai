@@ -1,0 +1,12 @@
+# Ignore compiled output
+lib/
+
+# Ignore node_modules
+node_modules/
+
+# Ignore build artifacts
+*.js.map
+
+# Ignore service account key
+serviceAccountKey.json
+

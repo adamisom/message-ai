@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    Alert,
     Button,
     FlatList,
     StyleSheet,
@@ -11,52 +10,55 @@ import {
     View
 } from 'react-native';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
+import { createDirectMessageInvitation } from '../../services/dmInvitationService';
 import {
     createGroupConversation,
     createOrOpenConversation,
-    findUserByEmail
+    findUserByPhoneNumber
 } from '../../services/firestoreService';
 import { useAuthStore } from '../../store/authStore';
-import { validateEmail } from '../../utils/validators';
-
-interface User {
-  uid: string;
-  email: string;
-  displayName: string;
-}
+import { useWorkspaceStore } from '../../store/workspaceStore';
+import type { User } from '../../types';
+import { Alerts } from '../../utils/alerts';
+import { Colors } from '../../utils/colors';
+import { validatePhoneNumber } from '../../utils/validators';
 
 export default function NewChat() {
-  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [validUsers, setValidUsers] = useState<User[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isGroupMode, setIsGroupMode] = useState(false);
 
   const { user } = useAuthStore();
+  const { currentWorkspace } = useWorkspaceStore();
   const router = useRouter();
 
-  console.log('📝 [NewChat] Rendering, mode:', isGroupMode ? 'group' : 'direct', 'users:', validUsers.length);
+  // Auto-detect chat type based on number of users
+  const isGroupChat = validUsers.length >= 2;
+  const canCreateChat = validUsers.length > 0;
+
+  console.log('📝 [NewChat] Rendering, users:', validUsers.length, 'type:', isGroupChat ? 'group' : 'direct', 'workspace:', currentWorkspace?.name || 'none');
 
   const handleAddUser = async () => {
     setError('');
     setLoading(true);
 
-    console.log('🔍 [NewChat] Adding user with email:', email);
+    console.log('🔍 [NewChat] Adding user with phone:', phoneNumber);
 
     try {
-      // Validate email format first
-      if (!validateEmail(email)) {
-        console.log('❌ [NewChat] Invalid email format');
-        setError('Invalid email format');
+      // Validate phone number format first
+      if (!validatePhoneNumber(phoneNumber)) {
+        console.log('❌ [NewChat] Invalid phone number format');
+        setError('Invalid phone number (must be 10 digits, US/Canada only)');
         return;
       }
 
-      // Find user in Firestore
-      const foundUser = await findUserByEmail(email);
+      // Find user in Firestore by phone number
+      const foundUser = await findUserByPhoneNumber(phoneNumber);
       
       if (!foundUser) {
         console.log('❌ [NewChat] User not found');
-        setError('No user found with that email');
+        setError('No user found with that phone number');
         return;
       }
 
@@ -74,10 +76,17 @@ export default function NewChat() {
         return;
       }
 
+      // Check group limit (25 members including self)
+      if (validUsers.length >= 24) {
+        console.log('❌ [NewChat] Group limit reached');
+        setError('Maximum 25 members per group (including you)');
+        return;
+      }
+
       // Add to list
       console.log('✅ [NewChat] User added:', foundUser.displayName);
       setValidUsers([...validUsers, foundUser]);
-      setEmail('');
+      setPhoneNumber('');
       
     } catch (err: any) {
       console.error('❌ [NewChat] Error adding user:', err);
@@ -90,10 +99,11 @@ export default function NewChat() {
   const handleRemoveUser = (uid: string) => {
     console.log('➖ [NewChat] Removing user:', uid);
     setValidUsers(validUsers.filter(u => u.uid !== uid));
+    setError(''); // Clear any errors when user count changes
   };
 
-  const handleCreateDirectChat = async () => {
-    if (validUsers.length === 0) {
+  const handleCreateChat = async () => {
+    if (!canCreateChat) {
       setError('Please add at least one user');
       return;
     }
@@ -104,107 +114,117 @@ export default function NewChat() {
     }
 
     setLoading(true);
-    console.log('💬 [NewChat] Creating direct chat');
     
     try {
-      const conversationId = await createOrOpenConversation(
-        validUsers[0], 
-        user
-      );
-      console.log('✅ [NewChat] Direct chat created, navigating to:', conversationId);
-      router.push(`/chat/${conversationId}` as any);
-    } catch (err: any) {
-      console.error('❌ [NewChat] Error creating direct chat:', err);
-      Alert.alert('Error', err.message || 'Failed to create conversation');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateGroupChat = async () => {
-    if (validUsers.length < 2) {
-      setError('Need at least 2 users for a group chat');
-      return;
-    }
-
-    if (!user) {
-      setError('User not authenticated');
-      return;
-    }
-
-    setLoading(true);
-    console.log('👥 [NewChat] Creating group chat with', validUsers.length, 'users');
-    
-    try {
-      const conversationId = await createGroupConversation(validUsers, user);
-      console.log('✅ [NewChat] Group chat created, navigating to:', conversationId);
-      router.push(`/chat/${conversationId}` as any);
-    } catch (err: any) {
-      console.error('❌ [NewChat] Error creating group chat:', err);
-      Alert.alert('Error', err.message || 'Failed to create group');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleModeToggle = () => {
-    console.log('🔄 [NewChat] Toggling mode from', isGroupMode ? 'group' : 'direct', 'to', !isGroupMode ? 'group' : 'direct');
-    
-    // If users have been added, confirm before switching
-    if (validUsers.length > 0) {
-      Alert.alert(
-        'Switch Chat Mode?',
-        'Switching modes will clear your selected users. Continue?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Switch',
-            onPress: () => {
-              console.log('✅ [NewChat] Mode switch confirmed');
-              setIsGroupMode(!isGroupMode);
-              setValidUsers([]);
-              setError('');
-            },
-            style: 'destructive'
+      if (isGroupChat) {
+        // Group chat: 2+ users
+        console.log('👥 [NewChat] Creating group chat with', validUsers.length, 'users', currentWorkspace ? `in workspace: ${currentWorkspace.name}` : '(no workspace)');
+        const conversationId = await createGroupConversation(
+          validUsers, 
+          user,
+          currentWorkspace?.id,
+          currentWorkspace?.name
+        );
+        console.log('✅ [NewChat] Group chat created, navigating to:', conversationId);
+        router.push(`/chat/${conversationId}` as any);
+      } else {
+        // Direct chat: 1 user
+        const recipient = validUsers[0];
+        console.log('💬 [NewChat] Creating direct chat', currentWorkspace ? `in workspace: ${currentWorkspace.name}` : '(no workspace)');
+        
+        // Check if recipient has private DM settings (requires invitation)
+        if (!currentWorkspace && recipient.dmPrivacySetting === 'private') {
+          console.log('🔒 [NewChat] Recipient has private DM settings, creating invitation');
+          
+          try {
+            const result = await createDirectMessageInvitation(recipient.uid);
+            Alerts.success(
+              `Your message request has been sent to ${result.recipientName}. They can accept or decline it from their invitations.`,
+              () => router.back()
+            );
+            return;
+          } catch (inviteError: any) {
+            // Handle specific error cases
+            if (inviteError.message?.includes('already have a pending invitation')) {
+              Alerts.error('You already have a pending invitation to this user');
+              return;
+            } else if (inviteError.message?.includes('Conversation already exists')) {
+              Alerts.error('You can already message this user');
+              return;
+            } else if (inviteError.message?.includes('banned for spam')) {
+              Alerts.error('You are temporarily unable to send invitations');
+              return;
+            }
+            throw inviteError; // Re-throw other errors
           }
-        ]
-      );
+        }
+        
+        // Either workspace chat or public DM setting - create conversation directly
+        const conversationId = await createOrOpenConversation(
+          recipient, 
+          user,
+          currentWorkspace?.id,
+          currentWorkspace?.name
+        );
+        console.log('✅ [NewChat] Direct chat created, navigating to:', conversationId);
+        router.push(`/chat/${conversationId}` as any);
+      }
+    } catch (err: any) {
+      console.error('❌ [NewChat] Error creating chat:', err);
+      Alerts.error(err.message || 'Failed to create conversation');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generate dynamic button text based on context
+  const getCreateButtonText = () => {
+    if (loading) return 'Creating...';
+    
+    if (isGroupChat) {
+      // Group chat: Show member count (including current user)
+      return `Create Group (${validUsers.length + 1} members)`;
     } else {
-      setIsGroupMode(!isGroupMode);
-      setError('');
+      // Direct chat: Show recipient name
+      return `Chat with ${validUsers[0]?.displayName || 'User'}`;
     }
   };
 
   return (
     <ErrorBoundary level="screen">
       <View style={styles.container}>
-      {/* Mode toggle */}
-      <View style={styles.modeToggle}>
-        <Button
-          title={isGroupMode ? 'Switch to Direct Chat' : 'Switch to Group Chat'}
-          onPress={handleModeToggle}
-        />
+      {/* Phase 5: Workspace context banner */}
+      {currentWorkspace && (
+        <View style={styles.workspaceBanner}>
+          <Text style={styles.workspaceBannerText}>
+            Creating chat in: <Text style={styles.workspaceName}>{currentWorkspace.name}</Text>
+          </Text>
+        </View>
+      )}
+      
+      {/* Auto-detect info banner */}
+      <View style={styles.infoBanner}>
+        <Text style={styles.infoBannerText}>
+          Add 1 person for direct chat, 2+ for group chat
+        </Text>
       </View>
 
       {/* Email input */}
       <View style={styles.inputSection}>
         <TextInput
           style={styles.input}
-          placeholder="Enter email address"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
+          placeholder="Enter phone number (10 digits)"
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
+          keyboardType="phone-pad"
           editable={!loading}
+          onSubmitEditing={handleAddUser}
+          returnKeyType="done"
         />
         <Button
-          title={isGroupMode ? 'Add User' : 'Find User'}
+          title="Add User"
           onPress={handleAddUser}
-          disabled={loading || !email.trim()}
+          disabled={loading || !phoneNumber.trim()}
         />
       </View>
 
@@ -217,7 +237,7 @@ export default function NewChat() {
       {validUsers.length > 0 && (
         <View style={styles.usersList}>
           <Text style={styles.usersListTitle}>
-            {isGroupMode ? 'Group Members:' : 'Selected User:'}
+            {isGroupChat ? `Group Members (${validUsers.length + 1}):` : 'Selected User:'}
           </Text>
           <FlatList
             data={validUsers}
@@ -240,18 +260,12 @@ export default function NewChat() {
         </View>
       )}
 
-      {/* Create button */}
-      {validUsers.length > 0 && (
+      {/* Create button - auto-detects direct vs group */}
+      {canCreateChat && (
         <View style={styles.createButtonSection}>
           <Button
-            title={
-              loading
-                ? 'Creating...'
-                : isGroupMode
-                ? `Create Group (${validUsers.length + 1} members)`
-                : 'Create Chat'
-            }
-            onPress={isGroupMode ? handleCreateGroupChat : handleCreateDirectChat}
+            title={getCreateButtonText()}
+            onPress={handleCreateChat}
             disabled={loading}
           />
         </View>
@@ -267,8 +281,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 16,
   },
-  modeToggle: {
+  workspaceBanner: {
+    backgroundColor: Colors.surfaceLight,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
     marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.primary,
+  },
+  workspaceBannerText: {
+    fontSize: 14,
+    color: Colors.textMedium,
+  },
+  workspaceName: {
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  infoBanner: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  infoBannerText: {
+    fontSize: 14,
+    color: '#1976D2',
+    textAlign: 'center',
   },
   inputSection: {
     flexDirection: 'row',
@@ -335,4 +375,3 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
 });
-

@@ -2,11 +2,137 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Users collection - any authenticated user can read, users can only write their own doc
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+    // ===== HELPER FUNCTIONS =====
+    
+    function isAuthenticated() {
+      return request.auth != null;
     }
+    
+    function isUser(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+    
+    // TEMPORARILY DISABLED - Testing if get() calls cause issues
+    // function isPaidUser() {
+    //   return isAuthenticated() && 
+    //          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isPaidUser == true;
+    // }
+    
+    // function isInTrial() {
+    //   let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    //   return user.trialEndsAt != null && user.trialEndsAt > request.time;
+    // }
+    
+    // Simplified versions without get() calls - for testing
+    function isPaidUser() {
+      return isAuthenticated();
+    }
+    
+    function isInTrial() {
+      return false;
+    }
+    
+    function isWorkspaceAdmin(workspaceId) {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.adminUid == request.auth.uid;
+    }
+    
+    function isWorkspaceMember(workspaceId) {
+      return isAuthenticated() &&
+             request.auth.uid in get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.members;
+    }
+    
+    // ===== PHASE 4: WORKSPACES =====
+    
+    // Workspaces collection - top-level
+    match /workspaces/{workspaceId} {
+      // Get individual workspace: members can read
+      allow get: if isWorkspaceMember(workspaceId);
+      
+      // List workspaces: authenticated users can query (rules check each doc via 'list' below)
+      // Security is enforced per-document: user must be admin OR member
+      allow list: if isAuthenticated() && (
+        resource.data.adminUid == request.auth.uid ||
+        request.auth.uid in resource.data.members
+      );
+      
+      // Only Pro users can create workspaces (trial users cannot)
+      allow create: if isPaidUser() && 
+                       isUser(request.resource.data.adminUid) &&
+                       !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.spamBanned;
+      
+      // Only admin can update workspace
+      allow update: if isWorkspaceAdmin(workspaceId);
+      
+      // Only admin can delete workspace
+      allow delete: if isWorkspaceAdmin(workspaceId);
+    }
+    
+    // Workspace invitations
+    match /workspace_invitations/{invitationId} {
+      // Invitee and inviter can read
+      allow read: if isAuthenticated() && 
+                     (isUser(resource.data.invitedUserUid) || 
+                      isUser(resource.data.invitedByUid));
+      
+      // Pro users (non-banned) can create invitations
+      allow create: if isPaidUser() &&
+                       !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.spamBanned;
+      
+      // Invitee can update (accept/decline/spam)
+      allow update: if isUser(resource.data.invitedUserUid);
+      
+      // Invitee or inviter can delete
+      allow delete: if isUser(resource.data.invitedUserUid) || 
+                       isUser(resource.data.invitedByUid);
+    }
+    
+    // Group chat invitations (Sub-Phase 6.5)
+    match /group_chat_invitations/{invitationId} {
+      // Invitee and inviter can read
+      allow read: if isAuthenticated() && 
+                     (isUser(resource.data.invitedUserUid) || 
+                      isUser(resource.data.invitedByUid));
+      
+      // Authenticated users (non-banned) can create invitations
+      allow create: if isAuthenticated() &&
+                       !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.spamBanned;
+      
+      // Invitee can update (accept/decline/spam)
+      allow update: if isUser(resource.data.invitedUserUid);
+      
+      // Invitee or inviter can delete
+      allow delete: if isUser(resource.data.invitedUserUid) || 
+                       isUser(resource.data.invitedByUid);
+    }
+
+    // Direct message invitations (Sub-Phase 11: DM Privacy)
+    match /dm_invitations/{invitationId} {
+      // Invitee and inviter can read
+      allow read: if isAuthenticated() && 
+                     (isUser(resource.data.inviteeId) || 
+                      isUser(resource.data.inviterId));
+      
+      // Authenticated users (non-banned) can create invitations
+      allow create: if isAuthenticated() &&
+                       !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.spamBanned;
+      
+      // Invitee can update (accept/decline/spam)
+      allow update: if isUser(resource.data.inviteeId);
+      
+      // Invitee or inviter can delete
+      allow delete: if isUser(resource.data.inviteeId) || 
+                       isUser(resource.data.inviterId);
+    }
+    
+    // ===== USERS COLLECTION =====
+    
+    // WIDE OPEN FOR DEBUGGING - TODO: Restrict properly
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    
+    // ===== CONVERSATIONS =====
     
     // Conversations - only participants can read/write
     match /conversations/{conversationId} {
@@ -22,10 +148,47 @@ service cloud.firestore {
         request.auth.uid in resource.data.participants;
     }
     
+    // ===== MESSAGES =====
+    
     // Messages - only conversation participants can read/write
+    // Blocked users cannot send direct messages
+    // Spam-banned users cannot send any messages
     match /conversations/{conversationId}/messages/{messageId} {
-      allow read, write: if request.auth != null && 
+      allow read: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+      
+      allow create: if request.auth != null && 
+        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
+        !isBlockedInDirectMessage(conversationId) &&
+        !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.spamBanned;
+      
+      // Sub-Phase 11: Only message sender can edit/delete (Pro feature enforced in Cloud Function)
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.senderId;
+      
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.senderId;
+    }
+    
+    // Helper function to check if sender is blocked by recipient (direct messages only)
+    function isBlockedInDirectMessage(conversationId) {
+      let conversation = get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+      
+      // If not a direct message, blocking doesn't apply
+      if (conversation.type != 'direct') {
+        return false;
+      }
+      
+      // Get the other participant (recipient)
+      let otherParticipant = conversation.participants[0] == request.auth.uid 
+        ? conversation.participants[1] 
+        : conversation.participants[0];
+      
+      // Check if recipient has blocked sender
+      let recipientDoc = get(/databases/$(database)/documents/users/$(otherParticipant)).data;
+      let blockedUsers = recipientDoc.blockedUsers;
+      
+      return blockedUsers != null && request.auth.uid in blockedUsers;
     }
     
     // Typing indicators - only conversation participants (Phase 5)
@@ -33,6 +196,8 @@ service cloud.firestore {
       allow read, write: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
     }
+    
+    // ===== AI FEATURES (Phase 3/4) =====
     
     // AI Summaries - only conversation participants can read
     match /conversations/{conversationId}/ai_summaries/{summaryId} {
@@ -47,9 +212,7 @@ service cloud.firestore {
       allow read: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
       
-      // Phase 3: Read-only for users
-      // Phase 4: Workspace admins will be able to assign/edit action items
-      // Only Cloud Functions can create/update/delete
+      // Phase 4: Cloud Functions handle all writes (including admin assignments)
       allow write: if false;
     }
     
@@ -61,9 +224,7 @@ service cloud.firestore {
       allow write: if false;
     }
     
-    // AI Cache Documents (subcollection: /conversations/{id}/ai_cache/{docId})
-    // Phase 3: Read-only for users
-    // Phase 4: Workspace admins can invalidate cache when editing AI content
+    // AI Cache Documents
     match /conversations/{conversationId}/ai_cache/{cacheDocId} {
       allow read: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;

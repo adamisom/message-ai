@@ -1,19 +1,22 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { Button, FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ConversationItem from '../../components/ConversationItem';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { db } from '../../firebase.config';
-import { logoutUser } from '../../services/authService';
 import { scheduleMessageNotification } from '../../services/notificationService';
 import { useAuthStore } from '../../store/authStore';
 import { useChatStore } from '../../store/chatStore';
+import { useWorkspaceStore } from '../../store/workspaceStore';
 import { UserStatusInfo } from '../../types';
+import { Colors } from '../../utils/colors';
 
 export default function ConversationsList() {
-  const { user, logout } = useAuthStore();
+  const { user, loading } = useAuthStore();
   const { conversations, setConversations } = useChatStore();
+  const { currentWorkspace, setCurrentWorkspace } = useWorkspaceStore();
   const router = useRouter();
   
   // Phase 5: Track online statuses for all conversation participants
@@ -25,12 +28,33 @@ export default function ConversationsList() {
   // Track if initial load has completed
   const [isLoading, setIsLoading] = useState(true);
 
-  console.log('📋 [ConversationsList] Rendering with', conversations.length, 'conversations');
+  console.log('📋 [ConversationsList] Rendering with', conversations.length, 'conversations, loading:', loading, 'user:', user?.uid, 'workspace:', currentWorkspace?.name || 'none');
+
+  // Phase 5: Filter conversations by workspace
+  // Phase C: Also filter out hidden conversations
+  const filteredConversations = currentWorkspace
+    ? conversations.filter(conv => {
+        // Filter by workspace
+        if (conv.workspaceId !== currentWorkspace.id) return false;
+        // Filter out hidden conversations
+        if (user?.hiddenConversations?.includes(conv.id)) return false;
+        return true;
+      })
+    : conversations.filter(conv => {
+        // Show only non-workspace chats when no workspace selected
+        if (conv.workspaceId) return false;
+        // Filter out hidden conversations
+        if (user?.hiddenConversations?.includes(conv.id)) return false;
+        return true;
+      });
+
+  console.log('🔍 [ConversationsList] After filtering:', filteredConversations.length, 'conversations');
 
   // Real-time listener for conversations
   useEffect(() => {
-    if (!user) {
-      console.log('⚠️ [ConversationsList] No user, skipping listener setup');
+    // Wait for auth to finish loading AND user to be present
+    if (loading || !user) {
+      console.log('⚠️ [ConversationsList] Waiting for auth...', { loading, hasUser: !!user });
       return;
     }
 
@@ -120,7 +144,7 @@ export default function ConversationsList() {
       console.log('🔌 [ConversationsList] Cleaning up listener');
       unsubscribe();
     };
-  }, [user, setConversations]);
+  }, [user, setConversations, loading]); // Include loading in deps array
 
   // Phase 5: Listen to participant statuses
   useEffect(() => {
@@ -160,36 +184,49 @@ export default function ConversationsList() {
       console.log('🔌 [ConversationsList] Cleaning up status listeners');
       unsubscribes.forEach(unsub => unsub());
     };
-  }, [user, conversations]);
-
-  const handleLogout = async () => {
-    console.log('👋 [ConversationsList] Logging out');
-    await logoutUser();
-    logout();
-    router.replace('/(auth)/login');
-  };
+  }, [user, conversations, loading]);
 
   return (
     <ErrorBoundary level="screen">
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Button title="Logout" onPress={handleLogout} />
-        </View>
+        {/* Phase 5: Workspace mode toggle */}
+        {currentWorkspace && (
+          <View style={styles.workspaceBanner}>
+            <View style={styles.workspaceBannerContent}>
+              <Ionicons name="business" size={20} color={Colors.primary} />
+              <Text style={styles.workspaceBannerText}>
+                {currentWorkspace.name}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setCurrentWorkspace(null)}
+              style={styles.clearWorkspaceButton}
+            >
+              <Text style={styles.clearWorkspaceButtonText}>View All</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         
         {isLoading ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>Loading conversations...</Text>
           </View>
-        ) : conversations.length === 0 ? (
+        ) : filteredConversations.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No conversations yet</Text>
+            <Text style={styles.emptyText}>
+              {currentWorkspace
+                ? `No chats in ${currentWorkspace.name} yet`
+                : 'No conversations yet'}
+            </Text>
             <Text style={styles.emptySubtext}>
-              Tap &quot;New Chat&quot; to start a conversation
+              {currentWorkspace
+                ? 'Start a conversation with workspace members'
+                : 'Tap "New Chat" to start a conversation'}
             </Text>
           </View>
         ) : (
           <FlatList
-            data={conversations}
+            data={filteredConversations}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <ConversationItem
@@ -214,10 +251,36 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  header: {
-    padding: 16,
+  workspaceBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.surfaceLight,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: Colors.border,
+  },
+  workspaceBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  workspaceBannerText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.textDark,
+  },
+  clearWorkspaceButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: Colors.primary,
+    borderRadius: 6,
+  },
+  clearWorkspaceButtonText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyState: {
     flex: 1,

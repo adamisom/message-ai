@@ -1,16 +1,26 @@
+import { Ionicons } from '@expo/vector-icons';
+import { doc, getDoc } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
 import {
     FlatList,
     Modal,
     StyleSheet,
     Text,
+    TouchableOpacity,
     View,
 } from 'react-native';
+import { db } from '../firebase.config';
 import { useAIFeature } from '../hooks/useAIFeature';
-import { trackDecisions } from '../services/aiService';
+import { saveEditedDecision, trackDecisions } from '../services/aiService';
+import { useAuthStore } from '../store/authStore';
 import { commonModalStyles } from '../styles/commonModalStyles';
+import { Decision } from '../types';
+import { Alerts } from '../utils/alerts';
 import { getConfidenceColor } from '../utils/colorHelpers';
 import { Colors } from '../utils/colors';
 import { formatDateDetailed } from '../utils/dateFormat';
+import { isWorkspaceAdmin } from '../utils/workspacePermissions';
+import EditDecisionModal from './EditDecisionModal';
 import { EmptyState } from './modals/EmptyState';
 import { ErrorState } from './modals/ErrorState';
 import { LoadingState } from './modals/LoadingState';
@@ -27,6 +37,12 @@ export function DecisionsModal({
   conversationId,
   onClose,
 }: DecisionsModalProps) {
+  const { user } = useAuthStore();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingDecision, setEditingDecision] = useState<Decision | null>(null);
+  
   const { data, loading, loadingSlowly, error, reload } = useAIFeature<any>({
     visible,
     conversationId,
@@ -35,104 +51,195 @@ export function DecisionsModal({
 
   const decisions = (data as any)?.decisions || [];
 
+  // Fetch workspace admin status
+  useEffect(() => {
+    if (!visible || !conversationId || !user) return;
+
+    const checkAdminStatus = async () => {
+      try {
+        const convRef = doc(db, 'conversations', conversationId);
+        const convSnap = await getDoc(convRef);
+        
+        if (convSnap.exists()) {
+          const convData = convSnap.data();
+          if (convData.workspaceId) {
+            setWorkspaceId(convData.workspaceId);
+            const adminStatus = await isWorkspaceAdmin(user.uid, convData.workspaceId);
+            setIsAdmin(adminStatus);
+          } else {
+            // Personal chat - check if Pro user
+            setIsAdmin(user.isPaidUser || false);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check admin status:', error);
+        setIsAdmin(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [visible, conversationId, user]);
+
+  const canEdit = workspaceId ? isAdmin : user?.isPaidUser;
+
   const handleClose = () => {
+    setShowEditModal(false);
+    setEditingDecision(null);
     onClose();
   };
 
+  const handleEditPress = (decision: Decision) => {
+    setEditingDecision(decision);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (editedDecision: string, editedContext: string) => {
+    if (!editingDecision) return;
+    
+    try {
+      await saveEditedDecision(
+        conversationId,
+        editingDecision.id,
+        editedDecision,
+        editedContext
+      );
+      Alerts.success('Decision saved successfully');
+      setShowEditModal(false);
+      setEditingDecision(null);
+      reload(); // Reload to show saved version
+    } catch (error: any) {
+      throw error; // Let EditDecisionModal handle it
+    }
+  };
+
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={handleClose}
-    >
-      <View style={commonModalStyles.container}>
-        <ModalHeader title="Decisions" onClose={handleClose} />
+    <>
+      <Modal
+        visible={visible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleClose}
+      >
+        <View style={commonModalStyles.container}>
+          <ModalHeader title="Decisions" onClose={handleClose} />
 
-        {/* Loading State */}
-        {loading && (
-          <LoadingState
-            message="Analyzing decisions..."
-            submessage={loadingSlowly ? "Still working on it, thanks for your patience..." : undefined}
-          />
-        )}
+          {/* Loading State */}
+          {loading && (
+            <LoadingState
+              message="Analyzing decisions..."
+              submessage={loadingSlowly ? "Still working on it, thanks for your patience..." : undefined}
+            />
+          )}
 
-        {/* Error State */}
-        {error && !loading && (
-          <ErrorState error={error} onRetry={reload} />
-        )}
+          {/* Error State */}
+          {error && !loading && (
+            <ErrorState error={error} onRetry={reload} />
+          )}
 
-        {/* Decisions List */}
-        {!loading && !error && (
-          <FlatList
-            data={decisions}
-            keyExtractor={(item, index) => item.id || `decision-${index}`}
-            renderItem={({item}) => (
-              <View style={styles.decisionCard}>
-                {/* Timeline Indicator */}
-                <View style={styles.timelineContainer}>
-                  <View style={styles.timelineDot} />
-                  <View style={styles.timelineLine} />
-                </View>
+          {/* Decisions List */}
+          {!loading && !error && (
+            <FlatList
+              data={decisions}
+              keyExtractor={(item, index) => item.id || `decision-${index}`}
+              renderItem={({item}) => (
+                <View style={styles.decisionCard}>
+                  {/* Timeline Indicator */}
+                  <View style={styles.timelineContainer}>
+                    <View style={styles.timelineDot} />
+                    <View style={styles.timelineLine} />
+                  </View>
 
-                {/* Decision Content */}
-                <View style={styles.decisionContent}>
-                  {/* Date */}
-                  <Text style={styles.dateText}>
-                    {formatDateDetailed(item.decidedAt)}
-                  </Text>
-
-                  {/* Decision Text */}
-                  <Text style={styles.decisionText}>{item.decision}</Text>
-
-                  {/* Context */}
-                  <Text style={styles.contextText}>{item.context}</Text>
-
-                  {/* Footer */}
-                  <View style={styles.footer}>
-                    {/* Confidence Badge */}
-                    <View style={styles.confidenceBadge}>
-                      <View
-                        style={[
-                          styles.confidenceDot,
-                          {backgroundColor: getConfidenceColor(item.confidence)},
-                        ]}
-                      />
-                      <Text style={styles.confidenceText}>
-                        {Math.round(item.confidence * 100)}% confidence
-                      </Text>
-                    </View>
-
-                    {/* Participants Count */}
-                    {item.participants && item.participants.length > 0 && (
-                      <Text style={styles.participantsText}>
-                        {item.participants.length}{' '}
-                        {item.participants.length === 1
-                          ? 'participant'
-                          : 'participants'}
-                      </Text>
+                  {/* Decision Content */}
+                  <View style={styles.decisionContent}>
+                    {/* Edited Badge */}
+                    {item.editedByAdmin && (
+                      <View style={styles.editedBadge}>
+                        <Ionicons name="pencil" size={14} color={Colors.primary} />
+                        <Text style={styles.editedBadgeText}>Edited by Admin</Text>
+                      </View>
                     )}
+
+                    {/* Date */}
+                    <Text style={styles.dateText}>
+                      {formatDateDetailed(item.decidedAt)}
+                    </Text>
+
+                    {/* Decision Text */}
+                    <Text style={styles.decisionText}>{item.decision}</Text>
+
+                    {/* Context */}
+                    <Text style={styles.contextText}>{item.context}</Text>
+
+                    {/* Edit Button */}
+                    {canEdit && (
+                      <TouchableOpacity
+                        style={styles.editButton}
+                        onPress={() => handleEditPress(item)}
+                      >
+                        <Ionicons name="pencil" size={16} color={Colors.primary} />
+                        <Text style={styles.editButtonText}>
+                          {item.editedByAdmin ? 'Re-edit' : 'Edit & Save'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Footer */}
+                    <View style={styles.footer}>
+                      {/* Confidence Badge */}
+                      <View style={styles.confidenceBadge}>
+                        <View
+                          style={[
+                            styles.confidenceDot,
+                            {backgroundColor: getConfidenceColor(item.confidence)},
+                          ]}
+                        />
+                        <Text style={styles.confidenceText}>
+                          {Math.round(item.confidence * 100)}% confidence
+                        </Text>
+                      </View>
+
+                      {/* Participants Count */}
+                      {item.participants && item.participants.length > 0 && (
+                        <Text style={styles.participantsText}>
+                          {item.participants.length}{' '}
+                          {item.participants.length === 1
+                            ? 'participant'
+                            : 'participants'}
+                        </Text>
+                      )}
+                    </View>
                   </View>
                 </View>
-              </View>
-            )}
-            ListEmptyComponent={
-              !loading && !error ? (
-                <EmptyState
-                  icon="💡"
-                  message="No decisions found"
-                  submessage="AI didn't detect any clear decisions in this conversation"
-                />
-              ) : null
-            }
-            contentContainerStyle={[
-              styles.listContent,
-              decisions.length === 0 && styles.listContentEmpty,
-            ]}
-          />
-        )}
-      </View>
-    </Modal>
+              )}
+              ListEmptyComponent={
+                !loading && !error ? (
+                  <EmptyState
+                    icon="💡"
+                    message="No decisions found"
+                    submessage="AI didn't detect any clear decisions in this conversation"
+                  />
+                ) : null
+              }
+              contentContainerStyle={[
+                styles.listContent,
+                decisions.length === 0 && styles.listContentEmpty,
+              ]}
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* Edit Modal */}
+      <EditDecisionModal
+        visible={showEditModal}
+        decision={editingDecision}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingDecision(null);
+        }}
+        onSave={handleSaveEdit}
+      />
+    </>
   );
 }
 
@@ -171,6 +278,22 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
   },
+  editedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  editedBadgeText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
   dateText: {
     fontSize: 12,
     color: Colors.textLight,
@@ -187,6 +310,22 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: Colors.textMedium,
     marginBottom: 12,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 12,
+    gap: 6,
+  },
+  editButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
   },
   footer: {
     flexDirection: 'row',

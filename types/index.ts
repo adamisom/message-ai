@@ -20,6 +20,18 @@ export interface Message {
   priorityQuick?: 'high' | 'low' | 'unknown';
   priorityAnalyzedAt?: any;
   priorityNeedsAnalysis?: boolean;
+
+  // Sub-Phase 11: Message editing/deletion (Pro feature)
+  isEdited?: boolean;
+  editedAt?: any;
+  isDeleted?: boolean;
+  deletedAt?: any;
+  deletedBy?: string; // UID of user who deleted it
+  
+  // Sub-Phase 7: Manual urgency markers
+  manuallyMarkedUrgent?: boolean;     // Admin override
+  markedUrgentBy?: string;            // Admin UID
+  markedUrgentAt?: any;
 }
 
 // ===== CONVERSATION TYPES =====
@@ -37,6 +49,18 @@ export interface Conversation {
   createdAt?: any;
   creatorId?: string;
   messageCount?: number;
+  // Phase 4: Workspace fields
+  workspaceId?: string;
+  workspaceName?: string;
+  isWorkspaceChat?: boolean;
+  
+  // Sub-Phase 7: Pinned messages
+  pinnedMessages?: {          // Max 5
+    messageId: string;              // Reference to message doc
+    pinnedBy: string;               // Admin UID
+    pinnedAt: any;
+    order: number;                  // 0-4, for display sequence
+  }[];
 }
 
 // ===== USER TYPES =====
@@ -45,8 +69,43 @@ export interface User {
   uid: string;
   email: string;
   displayName: string;
+  phoneNumber: string; // 10 digits, US/Canada only - REQUIRED for signup
   isOnline?: boolean;
   lastSeenAt?: any;
+  
+  // Phase 4: Paid tier fields
+  isPaidUser?: boolean;
+  subscriptionTier?: 'free' | 'pro';
+  subscriptionStartedAt?: any;
+  subscriptionEndsAt?: any;
+  stripeCustomerId?: string;
+  
+  // Phase 4: Free trial fields
+  trialStartedAt?: any;
+  trialEndsAt?: any;
+  trialUsed?: boolean;
+  
+  // Phase 4: Workspace fields
+  workspacesOwned?: string[];
+  workspacesMemberOf?: string[];
+  
+  // Phase 4: Spam prevention
+  spamStrikes?: number;
+  spamBanned?: boolean;
+  spamReportsReceived?: {
+    reportedBy: string;
+    reason: 'workspace' | 'groupChat';
+    timestamp: any;
+    workspaceId?: string;
+    conversationId?: string;
+  }[];
+  
+  // Sub-Phase 6.5: User blocking & conversation hiding
+  blockedUsers?: string[]; // UIDs of users this user has blocked (DM only)
+  hiddenConversations?: string[]; // Conversation IDs this user has hidden (spam reports)
+  
+  // Sub-Phase 11 (Polish): DM Privacy Settings
+  dmPrivacySetting?: 'private' | 'public'; // Default: 'private' (requires invitation)
 }
 
 export interface UserStatusInfo {
@@ -75,6 +134,17 @@ export interface Summary {
   messageCount: number;
   generatedAt: any;
   generatedBy: string;
+  model?: string;
+  
+  // Sub-Phase 7: Edit & Save AI Content
+  editedByAdmin?: boolean;        // Flag: admin saved custom version
+  savedByAdmin?: string;          // Admin UID who saved
+  savedAt?: any;                  // When saved
+  originalAiVersion?: {           // Keep original AI for reference
+    summary: string;
+    keyPoints: string[];
+    generatedAt: any;
+  };
 }
 
 export interface ActionItem {
@@ -91,6 +161,11 @@ export interface ActionItem {
   extractedAt: any;
   extractedBy: string;
   completedAt?: any;
+  
+  // Sub-Phase 7: Edit & Save AI Content
+  editedByAdmin?: boolean;        // Flag: admin saved custom version
+  savedByAdmin?: string;          // Admin UID who saved
+  savedAt?: any;                  // When saved
 }
 
 export interface Decision {
@@ -102,6 +177,16 @@ export interface Decision {
   confidence: number;
   decidedAt: any;
   extractedAt: any;
+  
+  // Sub-Phase 7: Edit & Save AI Content
+  editedByAdmin?: boolean;        // Flag: admin saved custom version
+  savedByAdmin?: string;          // Admin UID who saved
+  savedAt?: any;                  // When saved
+  originalAiVersion?: {           // Keep original AI for reference
+    decision: string;
+    context: string;
+    extractedAt: any;
+  };
 }
 
 export interface SearchResult {
@@ -115,4 +200,6 @@ export interface SearchResult {
   source?: 'vector' | 'local';
 }
 
+// ===== PHASE 4: WORKSPACE TYPES =====
 
+export * from './workspace';

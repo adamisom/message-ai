@@ -15,6 +15,8 @@ interface MessageBubbleProps {
   isHighlighted?: boolean; // For search result highlighting
   onRetry?: (messageId: string) => void; // Retry failed message
   onDelete?: (messageId: string) => void; // Delete failed message
+  onLongPress?: (message: Message) => void; // NEW: Long-press handler for context menu
+  conversationType?: 'direct' | 'group'; // NEW: To determine if spam reporting is available
 }
 
 export default function MessageBubble({ 
@@ -25,7 +27,9 @@ export default function MessageBubble({
   readDetails,
   isHighlighted = false,
   onRetry,
-  onDelete
+  onDelete,
+  onLongPress,
+  conversationType = 'direct'
 }: MessageBubbleProps) {
   const getTimestamp = () => {
     if (!message.createdAt) return 'Sending...';
@@ -55,8 +59,16 @@ export default function MessageBubble({
   };
 
   const priorityBadge = getPriorityBadge();
-
-  return (
+  
+  // Determine if long-press should be enabled
+  const shouldEnableLongPress = onLongPress;
+  
+  // Format message text (handle deleted messages)
+  const displayText = message.isDeleted 
+    ? '[Message deleted]'
+    : message.text;
+  
+  const bubbleContent = (
     <View style={[
       styles.container, 
       isOwnMessage ? styles.ownMessage : styles.otherMessage,
@@ -74,9 +86,10 @@ export default function MessageBubble({
       ]}>
         <Text style={[
           styles.text,
-          isOwnMessage ? styles.ownText : styles.otherText
+          isOwnMessage ? styles.ownText : styles.otherText,
+          message.isDeleted && styles.deletedText
         ]}>
-          {message.text}
+          {displayText}
         </Text>
         {priorityBadge && (
           <Text style={styles.priorityBadge}>{priorityBadge}</Text>
@@ -87,7 +100,7 @@ export default function MessageBubble({
             styles.time,
             isOwnMessage ? styles.ownTime : styles.otherTime
           ]}>
-            {getTimestamp()}
+            {getTimestamp()}{message.isEdited && ' (edited)'}
           </Text>
           
           {/* Show status for own messages */}
@@ -141,6 +154,21 @@ export default function MessageBubble({
       )}
     </View>
   );
+  
+  // Wrap with TouchableOpacity for long-press if enabled
+  if (shouldEnableLongPress) {
+    return (
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onLongPress={() => onLongPress(message)}
+        delayLongPress={500}
+      >
+        {bubbleContent}
+      </TouchableOpacity>
+    );
+  }
+
+  return bubbleContent;
 }
 
 const styles = StyleSheet.create({
@@ -188,6 +216,10 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 16,
     lineHeight: 20,
+  },
+  deletedText: {
+    fontStyle: 'italic',
+    opacity: 0.6,
   },
   priorityBadge: {
     fontSize: 16,

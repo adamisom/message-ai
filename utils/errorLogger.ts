@@ -82,9 +82,31 @@ export class ErrorLogger {
       const stored = await AsyncStorage.getItem(ERROR_LOG_KEY);
       if (!stored) return [];
       
-      return JSON.parse(stored) as ErrorLog[];
+      const parsed = JSON.parse(stored);
+      
+      // Validate that parsed data is an array
+      if (!Array.isArray(parsed)) {
+        console.warn('[ErrorLogger] Corrupted data (not an array), clearing');
+        await AsyncStorage.removeItem(ERROR_LOG_KEY);
+        return [];
+      }
+      
+      // Filter out any invalid entries (basic validation)
+      const validated = parsed.filter((item: any) => {
+        return item && item.timestamp && item.name && item.message;
+      });
+      
+      // If we filtered out corrupted entries, save the cleaned data
+      if (validated.length !== parsed.length) {
+        console.warn('[ErrorLogger] Removed corrupted entries:', parsed.length - validated.length);
+        await AsyncStorage.setItem(ERROR_LOG_KEY, JSON.stringify(validated));
+      }
+      
+      return validated as ErrorLog[];
     } catch (error) {
-      console.warn('[ErrorLogger] Failed to retrieve logs:', error);
+      console.warn('[ErrorLogger] Failed to retrieve logs, clearing corrupted data:', error);
+      // Clear corrupted data to prevent repeated errors
+      await AsyncStorage.removeItem(ERROR_LOG_KEY);
       return [];
     }
   }

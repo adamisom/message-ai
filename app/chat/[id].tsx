@@ -21,34 +21,55 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
+import CapacityExpansionModal from '../../components/CapacityExpansionModal';
 import { DecisionsModal } from '../../components/DecisionsModal';
+import { EditMessageModal } from '../../components/EditMessageModal';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import GroupParticipantsModal from '../../components/GroupParticipantsModal';
 import { MeetingSchedulerModal } from '../../components/MeetingSchedulerModal';
 import MessageInput from '../../components/MessageInput';
 import MessageList, { MessageListRef } from '../../components/MessageList';
 import OfflineBanner from '../../components/OfflineBanner';
+import PinnedMessagesModal from '../../components/PinnedMessagesModal';
+import ReadOnlyWorkspaceBanner from '../../components/ReadOnlyWorkspaceBanner';
 import { SearchModal } from '../../components/SearchModal';
 import { SummaryModal } from '../../components/SummaryModal';
 import TypingIndicator from '../../components/TypingIndicator';
+import { UpgradeToProModal } from '../../components/UpgradeToProModal';
 import UserStatusBadge from '../../components/UserStatusBadge';
 import { db } from '../../firebase.config';
+import { useModalManager } from '../../hooks/useModalManager';
 import { FailedMessagesService } from '../../services/failedMessagesService';
+import { reportDirectMessageSpam } from '../../services/groupChatService';
+import { deleteMessage as deleteMessageService, editMessage as editMessageService } from '../../services/messageEditService';
+import {
+  expandWorkspaceCapacity,
+  markMessageUrgent,
+  pinMessage,
+  unmarkMessageUrgent,
+  unpinMessage,
+} from '../../services/workspaceAdminService';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation, Message, TypingUser, UserStatusInfo } from '../../types';
+import { Workspace } from '../../types/workspace';
+import { Alerts } from '../../utils/alerts';
 import { MESSAGE_LIMIT, MESSAGE_TIMEOUT_MS, TYPING_DEBOUNCE_MS } from '../../utils/constants';
 import { ErrorLogger } from '../../utils/errorLogger';
+import { canAccessAIInContext } from '../../utils/userPermissions';
 
 export default function ChatScreen() {
   const { id: conversationId } = useLocalSearchParams();
-  const { user } = useAuthStore();
+  const { user, refreshUserProfile } = useAuthStore();
   const navigation = useNavigation();
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
-  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [canAccessAI, setCanAccessAI] = useState(false); // AI access control
+  
+  // Modal state - consolidated with useModalManager
+  const modals = useModalManager();
   
   // Pagination state
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -58,14 +79,6 @@ export default function ChatScreen() {
   const unsubscribeRef = useRef<(() => void) | null>(null); // Store listener unsubscribe function
   const [showScrollToBottom, setShowScrollToBottom] = useState(false); // Show jump to bottom button
   const [isPaginationMode, setIsPaginationMode] = useState(false); // Track if we're in pagination mode
-  
-  // AI Features Modals
-  const [showAIMenu, setShowAIMenu] = useState(false);
-  const [showSearchModal, setShowSearchModal] = useState(false);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [showActionItemsModal, setShowActionItemsModal] = useState(false);
-  const [showDecisionsModal, setShowDecisionsModal] = useState(false);
-  const [showMeetingSchedulerModal, setShowMeetingSchedulerModal] = useState(false);
   
   // Jump to message functionality
   const messageListRef = useRef<MessageListRef>(null);
@@ -80,11 +93,76 @@ export default function ChatScreen() {
   
   // Phase 5: Read receipts tracking
   const lastMarkedReadRef = useRef<string | null>(null);
+  
+  // Phase C: Blocked user check
+  const [isBlockedByRecipient, setIsBlockedByRecipient] = useState(false);
+
+  // Sub-Phase 7: Workspace admin features
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Sub-Phase 11: Message editing/deletion (Pro feature)
+  const [messageToEdit, setMessageToEdit] = useState<Message | null>(null);
 
   // Track pending message timeouts
   const timeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   console.log('💬 [ChatScreen] Rendering, conversationId:', conversationId, 'messagesCount:', messages.length);
+
+  // Check AI access based on user subscription, trial, or workspace membership
+  useEffect(() => {
+    if (!user || !conversation) {
+      setCanAccessAI(false);
+      return;
+    }
+
+    const checkAIAccess = () => {
+      // Use centralized helper for AI access check
+      const hasAccess = canAccessAIInContext(user, !!conversation.workspaceId);
+      setCanAccessAI(hasAccess);
+    };
+
+    checkAIAccess();
+  }, [user, conversation]);
+  
+  // Phase C: Check if current user is blocked by the recipient (direct messages only)
+  useEffect(() => {
+    if (!user || !conversation || conversation.type !== 'direct') {
+      setIsBlockedByRecipient(false);
+      return;
+    }
+
+    const otherParticipantId = conversation.participants.find(id => id !== user.uid);
+    if (!otherParticipantId) {
+      setIsBlockedByRecipient(false);
+      return;
+    }
+
+    console.log('🚫 [ChatScreen] Checking if blocked by:', otherParticipantId);
+
+    // Listen to the other participant's blockedUsers array
+    const unsubscribe = onSnapshot(
+      doc(db, 'users', otherParticipantId),
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const blockedUsers = docSnapshot.data().blockedUsers || [];
+          const isBlocked = blockedUsers.includes(user.uid);
+          console.log('🚫 [ChatScreen] Blocked status:', isBlocked);
+          setIsBlockedByRecipient(isBlocked);
+        } else {
+          setIsBlockedByRecipient(false);
+        }
+      },
+      (error) => {
+        console.error('❌ [ChatScreen] Error listening to blocked status:', error);
+        setIsBlockedByRecipient(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user, conversation]);
 
   // Helper: Deduplicate messages by ID (safety net for race conditions)
   const deduplicateMessages = (msgs: Message[]): Message[] => {
@@ -127,6 +205,57 @@ export default function ChatScreen() {
     };
   }, [conversation, user]);
 
+  // Sub-Phase 7: Fetch workspace data if workspace chat
+  useEffect(() => {
+    if (!conversation?.workspaceId) {
+      setWorkspace(null);
+      setIsAdmin(false);
+      return;
+    }
+
+    const unsubscribe = onSnapshot(
+      doc(db, 'workspaces', conversation.workspaceId),
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          setWorkspace({ id: docSnapshot.id, ...docSnapshot.data() } as Workspace);
+          setIsAdmin(docSnapshot.data()?.adminUid === user?.uid);
+        }
+      },
+      (error) => {
+        console.error('❌ [ChatScreen] Error fetching workspace:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [conversation, user]);
+
+  // Sub-Phase 7: Fetch pinned messages
+  useEffect(() => {
+    if (!conversation?.pinnedMessages?.length) {
+      setPinnedMessages([]);
+      return;
+    }
+
+    const fetchPinned = async () => {
+      try {
+        const pinned = await Promise.all(
+          (conversation.pinnedMessages || []).map(async (pin: any) => {
+            const msgDoc = await getDoc(doc(db, `conversations/${conversationId}/messages`, pin.messageId));
+            if (msgDoc.exists()) {
+              return { id: msgDoc.id, ...msgDoc.data() } as Message;
+            }
+            return null;
+          })
+        );
+        setPinnedMessages(pinned.filter(Boolean) as Message[]);
+      } catch (error) {
+        console.error('❌ [ChatScreen] Error fetching pinned messages:', error);
+      }
+    };
+
+    fetchPinned();
+  }, [conversation, conversationId]);
+
   // Update header title when conversation loads (Phase 4 + Phase 5: added status badge)
   useEffect(() => {
     if (conversation && user) {
@@ -150,10 +279,10 @@ export default function ChatScreen() {
                   showText={true}
                 />
               )}
-              <TouchableOpacity onPress={() => setShowAIMenu(true)}>
+              <TouchableOpacity onPress={() => modals.open('aiMenu')}>
                 <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowParticipantsModal(true)}>
+              <TouchableOpacity onPress={() => modals.open('participants')}>
                 <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
               </TouchableOpacity>
             </View>
@@ -164,13 +293,34 @@ export default function ChatScreen() {
         const participantCount = conversation.participants.length;
         title = conversation.name || `Group (${participantCount} members)`;
         
-        // Add info button for group participants + AI features
+        // Add info button for group participants + AI features + pins (Sub-Phase 7)
+        const pinnedCount = conversation.pinnedMessages?.length || 0;
         headerRight = () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, gap: 12 }}>
-            <TouchableOpacity onPress={() => setShowAIMenu(true)}>
+            <TouchableOpacity onPress={() => modals.open('aiMenu')}>
               <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowParticipantsModal(true)}>
+            {conversation.workspaceId && pinnedCount > 0 && (
+              <TouchableOpacity onPress={() => modals.open('pinned')}>
+                <View style={{ position: 'relative' }}>
+                  <Ionicons name="pin" size={24} color="#007AFF" />
+                  <View style={{
+                    position: 'absolute',
+                    top: -6,
+                    right: -6,
+                    backgroundColor: '#FF3B30',
+                    borderRadius: 8,
+                    minWidth: 16,
+                    height: 16,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{pinnedCount}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => modals.open('participants')}>
               <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
             </TouchableOpacity>
           </View>
@@ -180,7 +330,7 @@ export default function ChatScreen() {
       console.log('📝 [ChatScreen] Setting header title:', title);
       navigation.setOptions({ title, headerRight });
     }
-  }, [conversation, user, userStatuses, navigation]);
+  }, [conversation, user, userStatuses, navigation, modals]);
 
   // Listen to network status
   useEffect(() => {
@@ -714,47 +864,21 @@ export default function ChatScreen() {
   };
 
   // Delete a failed message
-  const handleDeleteMessage = (messageId: string) => {
+  const handleDeleteFailedMessage = (messageId: string) => {
     console.log('🗑️ [ChatScreen] Deleting failed message:', messageId);
     
-    Alert.alert(
+    Alerts.confirm(
       'Delete Message',
       'Are you sure you want to delete this failed message?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            // Remove from AsyncStorage
-            await FailedMessagesService.removeFailedMessage(messageId);
-            
-            // Remove from UI
-            setMessages(prev => prev.filter(m => m.id !== messageId));
-          },
-        },
-      ]
+      async () => {
+        // Remove from AsyncStorage
+        await FailedMessagesService.removeFailedMessage(messageId);
+        
+        // Remove from UI
+        setMessages(prev => prev.filter(m => m.id !== messageId));
+      },
+      { confirmText: 'Delete', isDestructive: true }
     );
-  };
-
-  // Jump to message from search results
-  const handleJumpToMessage = (messageId: string) => {
-    console.log('🎯 [ChatScreen] Jumping to message:', messageId);
-    
-    const index = messages.findIndex(m => m.id === messageId);
-    if (index !== -1) {
-      messageListRef.current?.scrollToIndex({
-        index,
-        animated: true,
-        viewPosition: 0.5, // Center the message in viewport
-      });
-      
-      // Highlight the message for 2 seconds
-      setHighlightedMessageId(messageId);
-      setTimeout(() => setHighlightedMessageId(null), 2000);
-    } else {
-      console.warn('⚠️ [ChatScreen] Message not found in current messages list');
-    }
   };
 
   // Phase 5: Typing indicator handlers
@@ -893,6 +1017,198 @@ export default function ChatScreen() {
     return { readBy, unreadBy };
   };
 
+  // Sub-Phase 7: Workspace Admin Handlers
+  const handleMessageLongPress = (message: Message) => {
+    // Skip deleted messages
+    if (message.isDeleted) return;
+    
+    const isOwnMessage = message.senderId === user?.uid;
+    const isPro = user?.isPaidUser || (user?.trialEndsAt && Date.now() < (typeof user.trialEndsAt === 'number' ? user.trialEndsAt : user.trialEndsAt.toMillis?.() || 0));
+    const isWorkspaceChat = !!conversation?.workspaceId;
+    
+    // Build action sheet options
+    const options: string[] = [];
+    
+    // Pro users can edit/delete their own messages
+    if (isOwnMessage && isPro) {
+      options.push('Edit Message');
+      options.push('Delete Message');
+    }
+    
+    // Workspace admins can mark urgent and pin messages
+    if (isWorkspaceChat && isAdmin) {
+      const isUrgent = message.manuallyMarkedUrgent || message.priority === 'high';
+      options.push(isUrgent ? 'Unmark Urgent' : 'Mark Urgent');
+      
+      const isPinned = (conversation.pinnedMessages || []).some(pm => pm.messageId === message.id);
+      options.push(isPinned ? 'Unpin Message' : 'Pin Message');
+    }
+    
+    // Direct messages: report spam
+    if (conversation?.type === 'direct' && !isOwnMessage) {
+      options.push('Report Spam');
+    }
+    
+    // No options available
+    if (options.length === 0) return;
+    
+    options.push('Cancel');
+    
+    Alert.alert('Message Actions', 'Choose an action', [
+      ...options.map((option) => ({
+        text: option,
+        style: (option === 'Cancel' ? 'cancel' : option.includes('Delete') || option.includes('Spam') ? 'destructive' : 'default') as 'default' | 'cancel' | 'destructive',
+        onPress: () => {
+          if (option === 'Edit Message') {
+            setMessageToEdit(message);
+            modals.open('edit');
+          } else if (option === 'Delete Message') {
+            handleDeleteMessage(message);
+          } else if (option === 'Mark Urgent') {
+            setSelectedMessage(message);
+            handleMarkUrgent();
+          } else if (option === 'Unmark Urgent') {
+            setSelectedMessage(message);
+            handleUnmarkUrgent();
+          } else if (option === 'Pin Message') {
+            setSelectedMessage(message);
+            handlePinMessage();
+          } else if (option === 'Unpin Message') {
+            handleUnpinMessage(message.id);
+          } else if (option === 'Report Spam') {
+            setSelectedMessage(message);
+            handleReportSpam(message);
+          }
+        },
+      })),
+    ]);
+  };
+
+  const handleMarkUrgent = async () => {
+    if (!selectedMessage || !conversation?.workspaceId) return;
+    
+    try {
+      await markMessageUrgent(conversationId as string, selectedMessage.id);
+      Alerts.success('Message marked as urgent');
+      setSelectedMessage(null);
+    } catch (error: any) {
+      Alerts.error(error.message || 'Failed to mark message as urgent');
+    }
+  };
+
+  const handleUnmarkUrgent = async () => {
+    if (!selectedMessage || !conversation?.workspaceId) return;
+    
+    try {
+      await unmarkMessageUrgent(conversationId as string, selectedMessage.id);
+      Alerts.success('Urgency marker removed');
+      setSelectedMessage(null);
+    } catch (error: any) {
+      Alerts.error(error.message || 'Failed to remove urgency marker');
+    }
+  };
+
+  const handlePinMessage = async () => {
+    if (!selectedMessage || !conversation?.workspaceId) return;
+    
+    try {
+      await pinMessage(conversationId as string, selectedMessage.id);
+      Alerts.success('Message pinned');
+      setSelectedMessage(null);
+    } catch (error: any) {
+      Alerts.error(error.message || 'Failed to pin message');
+    }
+  };
+
+  const handleUnpinMessage = async (messageId: string) => {
+    if (!conversation?.workspaceId) return;
+    
+    try {
+      await unpinMessage(conversationId as string, messageId);
+      Alerts.success('Message unpinned');
+    } catch (error: any) {
+      Alerts.error(error.message || 'Failed to unpin message');
+    }
+  };
+
+  const handleJumpToMessage = (messageId: string) => {
+    // Close pinned modal
+    modals.close();
+    
+    // Find message index and scroll
+    const index = messages.findIndex(m => m.id === messageId);
+    if (index !== -1) {
+      messageListRef.current?.scrollToIndex({
+        index,
+        animated: true,
+        viewPosition: 0.5, // Center in viewport
+      });
+      
+      // Highlight message
+      setHighlightedMessageId(messageId);
+      setTimeout(() => setHighlightedMessageId(null), 2000);
+    }
+  };
+
+  const handleExpandCapacity = async (newCapacity: number) => {
+    if (!workspace) return;
+    
+    try {
+      await expandWorkspaceCapacity(workspace.id, newCapacity);
+      Alerts.success('Workspace capacity expanded successfully');
+      modals.close();
+    } catch (error: any) {
+      Alerts.error(error.message || 'Failed to expand capacity');
+    }
+  };
+
+  const handleReportSpam = async (message: Message) => {
+    if (conversation?.type !== 'direct') return;
+    
+    const otherUserId = conversation.participants.find(id => id !== user?.uid);
+    if (!otherUserId) return;
+
+    try {
+      await reportDirectMessageSpam(conversationId as string, otherUserId);
+      Alerts.success(
+        'User reported for spam and blocked. This conversation will be hidden.',
+        () => navigation.goBack()
+      );
+    } catch (error: any) {
+      Alerts.error(error.message || 'Failed to report spam');
+    }
+  };
+
+  // Sub-Phase 11: Message Edit/Delete Handlers
+  const handleEditMessage = async (newText: string) => {
+    if (!messageToEdit) return;
+    
+    try {
+      await editMessageService(conversationId as string, messageToEdit.id, newText);
+      // Success - message will update via real-time listener
+      modals.close();
+      setMessageToEdit(null);
+    } catch (error: any) {
+      throw error; // Let EditMessageModal handle the error display
+    }
+  };
+
+  const handleDeleteMessage = (message: Message) => {
+    Alerts.confirm(
+      'Delete Message?',
+      'This message will be deleted for everyone. This action cannot be undone.',
+      async () => {
+        try {
+          await deleteMessageService(conversationId as string, message.id);
+          // Success - message will update via real-time listener
+        } catch (error: any) {
+          Alerts.error(error.message || 'Failed to delete message');
+        }
+      },
+      { confirmText: 'Delete', isDestructive: true }
+    );
+  };
+
   // Cleanup all timeouts on unmount
   useEffect(() => {
     const timeouts = timeoutRefs.current;
@@ -934,19 +1250,28 @@ export default function ChatScreen() {
         highlightedMessageId={highlightedMessageId}
         onLoadMore={loadMoreMessages}
         onRetryMessage={handleRetryMessage}
-        onDeleteMessage={handleDeleteMessage}
+        onDeleteMessage={handleDeleteFailedMessage}
+        onMessageLongPress={handleMessageLongPress}
         isLoadingMore={isLoadingMore}
         hasMoreMessages={hasMoreMessages}
         onScrollToBottom={handleScrollToBottom}
         onScrollAwayFromBottom={handleScrollAwayFromBottom}
       />
       <TypingIndicator typingUsers={typingUsers} />
-      <MessageInput
-        onSend={sendMessage}
-        onTyping={handleTyping}
-        onStopTyping={handleStopTyping}
-        disabled={false} // Can send even when offline (will queue)
-      />
+      {!isBlockedByRecipient ? (
+        <MessageInput
+          onSend={sendMessage}
+          onTyping={handleTyping}
+          onStopTyping={handleStopTyping}
+          disabled={false} // Can send even when offline (will queue)
+        />
+      ) : (
+        <View style={styles.blockedMessageContainer}>
+          <Text style={styles.blockedMessageText}>
+            You cannot send messages to this user
+          </Text>
+        </View>
+      )}
       
       {/* Jump to Bottom Button (shows when user has scrolled away from bottom) */}
       {showScrollToBottom && (
@@ -960,59 +1285,149 @@ export default function ChatScreen() {
       
       {/* Participants Modal (for both direct and group chats) */}
       <GroupParticipantsModal
-        visible={showParticipantsModal}
+        visible={modals.isOpen('participants')}
         participants={Object.entries(conversation.participantDetails).map(([uid, details]) => ({
           uid,
           displayName: details.displayName,
           email: details.email,
         }))}
         currentUserId={user?.uid || ''}
-        onClose={() => setShowParticipantsModal(false)}
+        conversationId={conversationId as string}
+        conversationType={conversation.type}
+        isWorkspaceChat={!!conversation.workspaceId}
+        onClose={() => modals.close()}
+        onMemberAdded={async () => {
+          // Refresh conversation to update participant list
+          const conversationRef = doc(db, 'conversations', conversationId as string);
+          const updatedConversation = await getDoc(conversationRef);
+          if (updatedConversation.exists()) {
+            setConversation(updatedConversation.data() as Conversation);
+          }
+        }}
       />
 
       {/* AI Features Menu */}
       <AIFeaturesMenu
-        visible={showAIMenu}
-        onClose={() => setShowAIMenu(false)}
-        onOpenSearch={() => setShowSearchModal(true)}
-        onOpenSummary={() => setShowSummaryModal(true)}
-        onOpenActionItems={() => setShowActionItemsModal(true)}
-        onOpenDecisions={() => setShowDecisionsModal(true)}
-        onOpenMeetingScheduler={() => setShowMeetingSchedulerModal(true)}
+        visible={modals.isOpen('aiMenu')}
+        onClose={() => modals.close()}
+        onOpenSearch={() => modals.open('search')}
+        onOpenSummary={() => modals.open('summary')}
+        onOpenActionItems={() => modals.open('actionItems')}
+        onOpenDecisions={() => modals.open('decisions')}
+        onOpenMeetingScheduler={() => modals.open('meetingScheduler')}
         isGroupChat={conversation.type === 'group'}
+        canAccessAI={canAccessAI}
+        onUpgradeRequired={() => modals.open('upgrade')}
       />
 
       {/* AI Feature Modals */}
       <SearchModal
-        visible={showSearchModal}
+        visible={modals.isOpen('search')}
         conversationId={conversationId as string}
-        onClose={() => setShowSearchModal(false)}
+        onClose={() => modals.close()}
         onSelectMessage={handleJumpToMessage}
       />
 
       <SummaryModal
-        visible={showSummaryModal}
+        visible={modals.isOpen('summary')}
         conversationId={conversationId as string}
-        onClose={() => setShowSummaryModal(false)}
+        isWorkspaceChat={conversation?.isWorkspaceChat || false}
+        isAdmin={isAdmin}
+        onClose={() => modals.close()}
+      />
+
+      <EditMessageModal
+        visible={modals.isOpen('edit')}
+        onClose={() => {
+          modals.close();
+          setMessageToEdit(null);
+        }}
+        originalText={messageToEdit?.text || ''}
+        onSave={handleEditMessage}
       />
 
       <ActionItemsModal
-        visible={showActionItemsModal}
+        visible={modals.isOpen('actionItems')}
         conversationId={conversationId as string}
-        onClose={() => setShowActionItemsModal(false)}
+        onClose={() => modals.close()}
       />
 
       <DecisionsModal
-        visible={showDecisionsModal}
+        visible={modals.isOpen('decisions')}
         conversationId={conversationId as string}
-        onClose={() => setShowDecisionsModal(false)}
+        onClose={() => modals.close()}
       />
 
       <MeetingSchedulerModal
-        visible={showMeetingSchedulerModal}
+        visible={modals.isOpen('meetingScheduler')}
         conversationId={conversationId as string}
-        onClose={() => setShowMeetingSchedulerModal(false)}
+        onClose={() => modals.close()}
       />
+
+      {/* Upgrade to Pro Modal */}
+      <UpgradeToProModal
+        visible={modals.isOpen('upgrade')}
+        onClose={() => modals.close()}
+        onUpgradeSuccess={async () => {
+          modals.close();
+          // Refresh user data from Firestore to get new Pro status
+          if (user?.uid) {
+            try {
+              await refreshUserProfile();
+              Alerts.success('Welcome to Pro! 🎉\n\nYou now have AI features everywhere.');
+            } catch (error) {
+              console.error('Failed to refresh user data after upgrade:', error);
+              Alerts.success('Upgrade successful! Please restart the app to see changes.');
+            }
+          }
+        }}
+        onTrialStart={async () => {
+          modals.close();
+          // Refresh user data from Firestore to get trial status
+          if (user?.uid) {
+            try {
+              await refreshUserProfile();
+              Alerts.success('Enjoy 5 days of full Pro access! 🎉');
+            } catch (error) {
+              console.error('Failed to refresh user data after trial start:', error);
+              Alerts.success('Please restart the app to see changes.');
+            }
+          }
+        }}
+      />
+
+      {/* Sub-Phase 7: Workspace Admin Modals */}
+      {conversation?.workspaceId && (
+        <>
+          {/* Read-Only Banner (shows if workspace inactive) */}
+          {workspace && !workspace.isActive && (
+            <ReadOnlyWorkspaceBanner
+              visible={true}
+              reason="inactive"
+            />
+          )}
+
+          <PinnedMessagesModal
+            visible={modals.isOpen('pinned')}
+            pinnedMessages={pinnedMessages}
+            conversation={conversation}
+            isAdmin={isAdmin}
+            onClose={() => modals.close()}
+            onUnpin={handleUnpinMessage}
+            onJumpToMessage={handleJumpToMessage}
+          />
+
+          {isAdmin && workspace && (
+            <CapacityExpansionModal
+              visible={modals.isOpen('capacity')}
+              workspace={workspace}
+              newMemberCount={conversation.participants.length + 1}
+              onClose={() => modals.close()}
+              onExpand={handleExpandCapacity}
+            />
+          )}
+        </>
+      )}
     </View>
     </ErrorBoundary>
   );
@@ -1048,5 +1463,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  blockedMessageContainer: {
+    padding: 16,
+    backgroundColor: '#F2F2F7',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+    alignItems: 'center',
+  },
+  blockedMessageText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontStyle: 'italic',
   },
 });

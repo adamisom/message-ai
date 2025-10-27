@@ -155,7 +155,7 @@ describe('ErrorLogger', () => {
 
       expect(result).toEqual([]);
       expect(console.warn).toHaveBeenCalledWith(
-        '[ErrorLogger] Failed to retrieve logs:',
+        '[ErrorLogger] Failed to retrieve logs, clearing corrupted data:',
         expect.any(Error)
       );
     });

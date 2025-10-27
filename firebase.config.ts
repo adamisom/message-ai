@@ -36,7 +36,7 @@ try {
 let db: Firestore;
 try {
   db = initializeFirestore(app, {
-    cacheSizeBytes: 40 * 1024 * 1024, // 40MB cache (recommended for mobile)
+    cacheSizeBytes: 0, // DISABLE CACHE FOR DEBUGGING
   });
 } catch (error) {
   // If firestore already initialized, get existing instance

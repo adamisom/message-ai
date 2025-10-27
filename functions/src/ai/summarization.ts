@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import {canAccessAIFeatures} from '../utils/aiAccess';
 import {callClaudeWithTool} from '../utils/anthropic';
 import {generateSummaryTool} from '../utils/aiTools';
 import {getCachedResult} from '../utils/caching';
@@ -29,6 +30,15 @@ export const generateSummary = functions
 
     // 2. Verify access
     await verifyConversationAccess(context.auth.uid, data.conversationId);
+
+    // 2.5. Phase 4: Check AI feature access (Pro/Trial/Workspace)
+    const aiAccess = await canAccessAIFeatures(context.auth.uid, data.conversationId);
+    if (!aiAccess.canAccess) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        aiAccess.reason || 'AI features require Pro subscription or active trial'
+      );
+    }
 
     // 3. Rate limit check
     const allowed = await checkAIRateLimit(context.auth.uid, 'summary');

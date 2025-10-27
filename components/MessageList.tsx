@@ -16,6 +16,7 @@ interface MessageListProps {
   onLoadMore?: () => void;
   onRetryMessage?: (messageId: string) => void;
   onDeleteMessage?: (messageId: string) => void;
+  onMessageLongPress?: (message: Message) => void; // NEW: For spam reporting
   isLoadingMore?: boolean;
   hasMoreMessages?: boolean;
   onScrollToBottom?: () => void; // Callback when user scrolls to bottom
@@ -37,6 +38,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
   onLoadMore,
   onRetryMessage,
   onDeleteMessage,
+  onMessageLongPress,
   isLoadingMore = false,
   hasMoreMessages = false,
   onScrollToBottom,
@@ -137,6 +139,8 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
           isHighlighted={highlightedMessageId === item.id}
           onRetry={onRetryMessage}
           onDelete={onDeleteMessage}
+          onLongPress={onMessageLongPress}
+          conversationType={conversationType}
         />
       )}
       contentContainerStyle={styles.container}

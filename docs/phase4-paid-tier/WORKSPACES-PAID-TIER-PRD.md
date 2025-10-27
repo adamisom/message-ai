@@ -1,10 +1,216 @@
 # MessageAI - Workspaces & Paid Tier PRD
 
-**Status:** Planning Phase  
+**Status:** 🚧 In Progress - Partial Implementation  
 **Target:** Post-MVP Enhancement (Phase 4 - BONUS WORK)  
 **Est. Implementation:** 3-4 weeks
 
 > ⚠️ **IMPORTANT:** This phase will ONLY be implemented AFTER the currently-planned "final" phase (Phase 3) is complete and polished, including the brain lift and demo video. This is bonus work to be done after Phase 3.
+
+---
+
+## 🎯 Implementation Progress
+
+**Last Updated:** October 27, 2025  
+**Current Branch:** `PaidTier`  
+**Overall Status:** Sub-Phases 1-8, 10 Complete ✅ | Sub-Phases 9, 11+ Pending ❌
+
+### ✅ Completed (Sub-Phases 1-6)
+
+**Sub-Phase 1: Free Trial & Billing Foundation**
+
+- ✅ 5-day free trial for all new users (auto-granted on signup)
+- ✅ Trial tracking fields (`trialStartedAt`, `trialEndsAt`) in user documents
+- ✅ 500 user MVP limit (enforced in `authService.registerUser`)
+- ✅ Mock upgrade flow (instant Pro access without payment)
+- ✅ Trial/Pro status display on profile screen
+- ✅ Cloud Function: `startFreeTrial` (manual trial activation)
+- ✅ Cloud Function: `upgradeToPro` (MVP mode, no real payments)
+- ✅ Trial management script (`manageTrial.js`) for testing
+- ✅ `UpgradeToProModal` component with pricing and features
+
+**Sub-Phase 2: Workspaces Core**
+
+- ✅ Workspace creation (Pro users only, 5 workspace limit per user)
+- ✅ Cloud Function: `createWorkspace` (validation, capacity limits, billing calculation)
+- ✅ Cloud Function: `deleteWorkspace` (cascading delete of conversations, member notifications)
+- ✅ Firestore schema: `workspaces` collection with full billing fields
+- ✅ Security rules: Admin-only write access, member read access
+- ✅ Workspace list screen (`app/(tabs)/workspaces.tsx`)
+- ✅ Workspace settings screen (`app/workspace/[id]/settings.tsx`)
+- ✅ Unique workspace name validation (case-insensitive, per-user)
+- ✅ Workspace switcher UI (current workspace indicator)
+- ✅ Trial users blocked from creating workspaces (`TrialWorkspaceModal`)
+
+**Sub-Phase 3: Admin Features**
+
+- ✅ Member management screen (`app/workspace/[id]/members.tsx`)
+- ✅ Action item assignment to workspace members (admin-only)
+- ✅ Cloud Function: `assignActionItem` (admin validation, Firestore updates)
+- ✅ Member picker modal in ActionItemsModal component
+- ✅ Workspace permissions helper (`utils/workspacePermissions.ts`)
+- ✅ Optimistic UI updates for action item assignment
+
+**Sub-Phase 4: Invitations System**
+
+- ✅ Workspace invitation Cloud Functions:
+  - `acceptWorkspaceInvitation` (adds member, updates user's workspacesMemberOf)
+  - `declineWorkspaceInvitation` (marks invitation as declined)
+  - `reportWorkspaceInvitationSpam` (increments spam strikes, potential ban)
+- ✅ Invitations management screen (`app/workspace/invitations.tsx`)
+- ✅ Spam strike tracking with 1-month decay
+- ✅ Invitation badge on profile button (upper-left, red, shows count up to 9+)
+- ✅ Notifications section on profile screen (displays pending workspace invitations)
+- ✅ Invitations banner on workspaces list screen
+- ✅ Real-time invitation count updates (30s polling + screen focus refresh)
+
+**Note:** Invitations apply to:
+
+- Workspace membership (always requires invitation) ✅
+- Group chats outside workspaces (requires invitation) ❌ To be implemented in Sub-Phase 6.5
+- Group chats within workspaces: NO invitation needed (any member can add others directly) N/A
+- Direct messages: NO invitation needed (anyone can start a direct message with anyone) N/A
+
+**Sub-Phase 5: Workspace Chats**
+
+- ✅ Create chats within workspaces (both direct and group)
+- ✅ Workspace chat list view (filtered by workspaceId)
+- ✅ Workspace-scoped conversations (with workspaceId, workspaceName, isWorkspaceChat fields)
+- ✅ Workspace context banner in New Chat screen
+- ✅ Workspace badge indicator on conversation items (building icon)
+- ✅ Filter toggle: Show workspace chats OR non-workspace chats
+- ✅ Empty states for workspace/non-workspace views
+- ✅ Updated conversation creation functions (`createOrOpenConversation`, `createGroupConversation`)
+- ✅ Context persistence across tab navigation
+
+**Sub-Phase 6: AI Feature Gating**
+
+- ✅ Lock AI features for free users in non-workspace chats
+- ✅ Sparkle menu upgrade prompts for free users
+- ✅ Workspace chat AI access for free members (via `canAccessAIFeatures` in Cloud Functions)
+- ✅ Cloud Function AI access logic checks:
+  1. Pro subscriber → full access
+  2. Active trial → full access
+  3. Workspace member (for workspace chat) → AI access in that workspace
+  4. None of above → upgrade required
+- ✅ Comprehensive unit tests for AI access helpers (`functions/src/utils/__tests__/aiAccessHelpers.test.ts`)
+
+**Sub-Phase 6.5: Group Chat Member Management & Invitations**
+
+- ❌ Add member functionality (instant add by email)
+- ❌ Convert to invitation system (accept/decline/spam reporting)
+- ❌ Direct message spam reporting (5 reports/month threshold)
+- ❌ Unified invitations screen (workspace + group chat)
+
+**📄 Detailed Requirements:** See [PRD-SUPPLEMENT-SUB-PHASE-6.5-GROUP-CHAT-INVITES.md](./PRD-SUPPLEMENT-SUB-PHASE-6.5-GROUP-CHAT-INVITES.md)
+
+**UI/UX Improvements (Throughout Sub-Phases 1-6)**
+
+- ✅ Logout button moved to profile screen (with icon)
+- ✅ Tab title styling improvements (20px, bold)
+- ✅ Workspace create button centered and enlarged
+- ✅ Improved spacing on Chats and Workspaces screens
+- ✅ Bottom nav reordered: Chats | New Chat | Workspaces
+- ✅ Help modal with refresh button and support info
+- ✅ "Start Trial" button functionality (direct trial start, no modal)
+- ✅ All screens use `refreshUserProfile()` for consistent refresh pattern
+- ✅ Profile button in top-right navigation
+- ✅ Invitation notification badge with count
+- ✅ Workspace banner in conversations list
+
+### 🐛 Known Issues - RESOLVED
+
+**Critical: Trial Status Not Updating on App Reload ✅ RESOLVED**
+
+- ~~Symptom: Trial/subscription status doesn't persist correctly after app reload~~
+- ~~Root cause: Presence tracking writes interfered with `getUserProfile()` fetch~~
+- **Resolution (Oct 26):** Fixed loading flag timing to prevent race condition
+  - Keep `loading: true` during profile fetch in `restoreSession()`
+  - Presence tracking useEffect now waits for `loading: false` before starting
+  - This prevents presence writes from interfering with the initial profile fetch
+  - Changed `getUserProfile()` to use `getDocFromServer()` instead of `getDoc()` to bypass stale cache
+  - Merge strategy combines cached data with fresh server data
+  - Result: Trial/subscription status now correctly updates on reload
+  - See commits `a6ab4c2`, `fb179ce`, `8cdf204` for implementation details
+
+### ❌ Not Yet Implemented (Sub-Phases 6.5+)
+
+**Sub-Phase 6.5: Group Chat Member Management & Invitations** (See [detailed plan](./PRD-SUPPLEMENT-SUB-PHASE-6.5-GROUP-CHAT-INVITES.md))
+
+- ❌ Add member functionality for non-workspace group chats
+- ❌ Group chat invitation system (accept/decline/spam reporting)
+- ❌ Direct message spam reporting (5 reports/month threshold)
+- ❌ Unified invitations screen (workspace + group chat invitations)
+
+**Sub-Phase 7: Workspace Admin Features**
+
+- ✅ Edit/save AI-generated content (Pro users in personal chats, admins in workspace chats)
+- ✅ Manual urgency markers (admin override, 5 per conversation)
+- ✅ Pinned messages (5 per group chat, workspace chats only)
+- ✅ Capacity expansion flow for workspaces (pro-rated billing)
+
+**📄 Detailed Requirements:** See [PRD-SUPPLEMENT-SUB-PHASE-7-WORKSPACE-ADMIN.md](./PRD-SUPPLEMENT-SUB-PHASE-7-WORKSPACE-ADMIN.md)
+
+**Implementation Complete:** October 27, 2025. All features fully integrated and tested (347 tests passing).
+
+**Sub-Phase 8: Spam Prevention Extensions**
+
+- ✅ Enhanced spam reporting UI (warnings at 3, 4 strikes)
+- ⏭️ Spam strike decay notifications (skipped - user decision)
+- ⏭️ Spam appeal Cloud Function (skipped - user decision)
+
+**Note:** Core spam prevention (workspace invitations, group chat invitations, direct message spam reporting with dual ban logic) is fully implemented in Sub-Phases 4 and 6.5. See `PRD-SUPPLEMENT-SUB-PHASE-6.5-GROUP-CHAT-INVITES.md` for detailed discussion of the dual ban system (24h temp ban for 2 strikes in 24h, indefinite ban for 5 strikes in 30d), blocking functionality, conversation hiding, and spam reporting decisions (no abuse prevention, no appeal mechanism).
+
+**Sub-Phase 8 Implementation:**
+
+- `getUserSpamStatus` Cloud Function returns current spam strike count and status
+- `SpamWarningBanner` component displays color-coded warnings (warning/danger/temp_banned/permanently_banned)
+- Integrated into profile screen with auto-refresh on focus
+- Dismissible warnings with strike count and temp ban countdown
+- Warning messages at 3 strikes ("Warning") and 4 strikes ("FINAL WARNING")
+
+**Sub-Phase 9: Production Sign-In**
+
+- ❌ Phone number authentication
+- ❌ LinkedIn OAuth
+- ❌ Okta OAuth
+- ❌ Multi-auth support and account linking
+
+**Sub-Phase 10: Export Workspace**
+
+- ❌ Export workspace data to JSON
+- ❌ Export workspace data to Markdown
+- ❌ Admin-only export functionality
+- ❌ Email or download export file
+
+**Sub-Phase 11: Polish & Testing**
+
+- ❌ Loading states and animations
+- ❌ Edge case handling
+- ❌ Analytics tracking
+- ❌ Performance testing
+- ❌ E2E test suite
+- ✅ Improve 'New Chat' UX (auto-detect direct/group based on user count)
+
+**Implementation Complete (Oct 27, 2025):**
+
+- Removed confusing Direct/Group toggle
+- Auto-detects: 1 user = direct, 2+ = group (max 25)
+- Dynamic button text shows recipient name or member count
+- 20 new unit tests for validation logic (367 total tests passing)
+
+**Sub-Phase 12: Billing & Admin**
+
+- ❌ Real Stripe integration (currently MVP mode)
+- ❌ Capacity upgrade/downgrade flows
+- ❌ Payment failure handling
+- ❌ Subscription management screen (placeholder exists)
+
+**Sub-Phase 13: App Stores**
+
+- ❌ iPhone App Store submission
+- ❌ Android Play Store submission
+- ❌ App store assets and screenshots
+- ❌ App store optimization (ASO)
 
 ---
 
@@ -19,6 +225,8 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 ### Revenue Model
 
 - **Free Tier:** Basic messaging (direct + group chats) only; AI features only work in workspace chats
+  - **NEW: 5-Day Free Trial** - All new users get full Pro access for 5 days (all AI features everywhere)
+  - After trial: AI locked to workspace chats only (until they upgrade to Pro)
 - **Pro Tier ($3/month):** Unlock all AI features everywhere (personal + workspace chats)
 - **Workspace Tier ($0.50/user/month):** Create workspaces with admin controls and collaborative tools
   - Admin pre-selects max users (2-25) and pays for all seats
@@ -45,7 +253,8 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 **For Free Users:**
 
 - Basic messaging everywhere
-- AI features work ONLY in workspace chats (if invited)
+- **5-day free trial** with full Pro access (AI features everywhere)
+- After trial: AI features work ONLY in workspace chats (if invited)
 - Sparkle Menu (✨) shows upgrade prompt in non-workspace chats
 
 ---
@@ -58,12 +267,13 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 4. [AI Feature Access Control](#ai-feature-access-control)
 5. [Admin-Only Features](#admin-only-features)
 6. [Spam Prevention](#spam-prevention)
-7. [Data Model](#data-model)
-8. [User Flows](#user-flows)
-9. [UI/UX Specifications](#uiux-specifications)
-10. [Security & Permissions](#security--permissions)
-11. [Implementation Phases](#implementation-phases)
-12. [Future Enhancements](#future-enhancements)
+7. [User Profile & Status](#user-profile--status)
+8. [Data Model](#data-model)
+9. [User Flows](#user-flows)
+10. [UI/UX Specifications](#uiux-specifications)
+11. [Security & Permissions](#security--permissions)
+12. [Implementation Phases](#implementation-phases)
+13. [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -73,22 +283,23 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 
 **Capabilities:**
 
+- ✅ **5-day free trial** upon signup - full Pro access (all AI features everywhere)
 - ✅ Create unlimited direct chats
 - ✅ Create unlimited group chats (max 25 members each)
 - ✅ Join workspaces as member (if invited)
 - ✅ Send/receive messages normally
-- ✅ **AI features work in workspace chats** (if invited by admin)
-- ❌ AI features disabled in personal/non-workspace chats
-- ❌ Cannot create workspaces (upgrade prompt shown)
+- ✅ **After trial: AI features work in workspace chats** (if invited by admin)
+- ❌ After trial: AI features disabled in personal/non-workspace chats
+- ❌ **Cannot create workspaces** (during OR after trial - Pro subscription required)
 
-**Limitations:**
+**Limitations (After 5-Day Trial):**
 
 - AI features only accessible in workspace chats (critical sales funnel)
 - Sparkle menu (✨) visible everywhere but shows "Upgrade to Pro" in non-workspace chats
-- Cannot assign action items (anywhere)
-- Cannot edit/save AI content (anywhere)
+- Cannot assign action items (workspace admin-only feature)
+- Cannot edit/save AI content (workspace admin-only feature)
 - Workspace mode toggle visible but "Add Workspace" button grayed out
-- Subject to spam strike system (5 strikes = loss of group chat/workspace creation)
+- Subject to spam strike system (strikes decay after 1 month)
 
 ### 1.2 Pro User ($3/month)
 
@@ -148,9 +359,16 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 
 - **Pre-selected capacity model:** Admin chooses max users (2-25) upfront and pays for all seats
 - **Example Scenarios:**
-  - Admin creates workspace for 10 members → Pays $5/month
-  - Admin wants to expand to 15 members mid-month → Prompted to upgrade, pays pro-rated amount
+  - Admin creates workspace with 10-seat capacity → Pays $5/month (even if only 5 members join)
+  - Admin wants to expand to 15 seats mid-month → Prompted to upgrade, pays pro-rated amount
   - Billing: $5 (original) + ($2.50 × days_remaining / days_in_month)
+  - Admin wants to downgrade to 8 seats → Must first remove members to fit new capacity
+  
+**UI Guidance:**
+
+- During workspace creation: "You're selecting capacity for [10] members. You'll pay for all seats even if not filled. You can expand later if needed."
+- Expansion prompt: "Expand workspace from 10 to 15 members? Additional charge: $X.XX (pro-rated for this month)"
+- Downgrade flow: "You have 10 members but want 8 seats. Remove 2 members first, then downgrade capacity."
   
 **Pro-Rated Billing Examples:**
 
@@ -178,15 +396,30 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 - Track `maxUsersThisMonth` per workspace (admin's chosen capacity)
 - Reset on 1st of month
 - When admin expands: calculate pro-rated charge, process payment, then increment limit
+- When admin downgrades: verify actual members <= new capacity, downgrade takes effect NEXT billing cycle (no pro-rated refunds)
+
+**Billing Start Timing:**
+
+- Workspace created on 1st of month → No pro-rated charge, first bill on 1st of next month
+- Workspace created mid-month (e.g., Jan 15th) → Pro-rated charge for remainder of January (Jan 15-31), then full month bill on Feb 1st
+- Formula: `seatsAdded × $0.50 × (daysRemaining / daysInMonth)`
 
 ### 2.3 Payment Enforcement
 
 **MVP Upgrade Flow (No Real Payment):**
 
-- User clicks "Upgrade to Pro" → Instant upgrade
-- Firestore: Set `isPaidUser: true`
+- User clicks "Upgrade to Pro" → Instant upgrade (no payment required in MVP)
+- Firestore: Set `isPaidUser: true`, `trialEndsAt: null` (no longer in trial)
 - Success message: "✅ Upgrade successful! AI features unlocked. Note: After the MVP period, real payment will be required."
 - No payment capture, instant access
+
+**5-Day Free Trial Flow:**
+
+- New user signs up → Firestore: `trialStartedAt: serverTimestamp()`, `trialEndsAt: now + 5 days`
+- During trial: User has full Pro access (all AI features everywhere)
+- Trial expiring: Notification on Day 3, Day 4, Day 5 morning
+- Trial expired: AI features locked to workspace chats only, upgrade prompt shown
+- Check: `now > trialEndsAt && !isPaidUser` → Show trial expired UI
 
 **500 User MVP Limit:**
 
@@ -204,12 +437,13 @@ This PRD introduces a **two-tier paid subscription model** and **Workspaces** - 
 
 **Subscription Lapse:**
 
-- **Day 0 (payment fails):** Workspace becomes **read-only**
+- **Payment fails:** Workspace becomes **read-only immediately**
   - Members can view messages
   - Cannot send messages or create chats
   - AI features disabled (even for Pro members in that workspace)
-- **Day 30:** Workspace and all associated chats **permanently deleted**
-- **Notification:** Push + in-app notification on Day 0, Day 7, Day 14, Day 29
+- **No deletion:** Workspace remains read-only indefinitely (no 30-day deletion)
+- **Notification:** Push + in-app notification when payment fails
+- **Restoration:** Once payment succeeds, workspace becomes active again
 
 **Workspace Limit Enforcement:**
 
@@ -268,7 +502,9 @@ A **Workspace** is an isolated team environment with:
 
 **Deletion:**
 
-1. **Admin deletes workspace:**
+1. **Admin deletes workspace (immediate, no grace period):**
+   - Confirmation modal shows: "⚠️ This will permanently delete: X group chats (Y messages), Z direct chats (N messages), all action items and AI history. This CANNOT be undone."
+   - User confirms → Immediate deletion
    - All group chats deleted
    - All direct chats deleted
    - All members lose access
@@ -291,9 +527,9 @@ A **Workspace** is an isolated team environment with:
 - **Max 25 members** per workspace (at any given time, no historical tracking)
 - **Max 5 workspaces** per user (admin)
 - **One admin per workspace** (no co-admins, no ownership transfer)
-- **Workspace names** must be unique per user (can have duplicates across users)
+- **Workspace names** must be unique per user for better UX (prevents confusion in dropdowns)
 - **Validation:** If user tries to create workspace with existing name → Error: "Choose unique name (You already have a workspace with that name)"
-- Workspaces stored as subcollection under users: `/users/{uid}/workspaces/{workspaceId}`
+- Workspaces stored in top-level collection: `/workspaces/{workspaceId}` (user document tracks owned workspace IDs via `workspacesOwned` array)
 
 **Enterprise Inquiry:**
 
@@ -318,9 +554,10 @@ A **Workspace** is an isolated team environment with:
 - Only visible to the two participants
 - Tied to workspace (deleted when workspace deleted)
 - **Access rules when member leaves/removed/workspace deleted:**
-  - Member immediately loses access to ALL workspace direct chats
-  - Cannot view or send messages
-  - Other participant (if still in workspace) can still see chat
+  - Member immediately loses access to ALL workspace direct chats (hard delete from their conversation list)
+  - Cannot view or send messages (security rules prevent access)
+  - Chat remains in Firestore for other participant (if still in workspace)
+  - If accessed via cached deep link → "You no longer have access to this chat"
 
 **Non-Workspace Chats:**
 
@@ -361,7 +598,12 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
   // Pro users can access AI everywhere
   if (user.isPaidUser) return true;
   
-  // Free users can only access AI in workspace chats
+  // Users in 5-day trial get full Pro access
+  if (user.trialEndsAt && Date.now() < user.trialEndsAt.toMillis()) {
+    return true; // Trial active
+  }
+  
+  // Free users (after trial) can only access AI in workspace chats
   if (conversation.workspaceId) {
     return isUserInWorkspace(user.uid, conversation.workspaceId);
   }
@@ -373,8 +615,10 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
 
 **UI Behavior:**
 
-- **Free users in personal chats:** Sparkle menu (✨) visible but tapping shows "Upgrade to Pro" modal
-- **Free users in workspace chats:** All AI features work normally
+- **Users in 5-day trial:** All AI features work everywhere (like Pro users)
+- **Trial expiring:** Banner shown on Day 3-5: "Your trial ends in X days. Upgrade to keep AI in personal chats."
+- **Free users (post-trial) in personal chats:** Sparkle menu (✨) visible but tapping features shows "Upgrade to Pro" modal
+- **Free users (post-trial) in workspace chats:** All AI features work normally (view-only, no admin features)
 - **Pro users:** All AI features work everywhere
 
 **Cloud Function Validation:**
@@ -495,11 +739,16 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
 **Mechanics:**
 
 - Global counter: `spamStrikes` (stored in `/users/{uid}`)
-- Max strikes: **5** (permanent)
+- Max strikes: **5**
 - Strike triggers:
   1. User invited to workspace → marks as spam
   2. User added to group chat → marks as spam
-- No appeals, no expiration
+- **Decay system:** Strikes older than 1 month are automatically removed
+  - Tracked with timestamps in `spamReportsReceived` array
+  - Checked/cleaned during:
+    - Spam report submission
+    - User attempts to invite someone to workspace/group chat
+- No appeals process
 
 **Penalties:**
 
@@ -528,27 +777,199 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
 ```typescript
 // Firestore: /users/{uid}
 {
-  spamStrikes: 3,
+  spamStrikes: 3, // Computed field (count of non-expired strikes)
   spamReportsReceived: [
     { reportedBy: 'user123', reason: 'workspace', timestamp, workspaceId },
     { reportedBy: 'user456', reason: 'groupChat', timestamp, conversationId },
     { reportedBy: 'user789', reason: 'workspace', timestamp, workspaceId }
   ],
-  spamBanned: false // Set to true when strikes >= 5
+  spamBanned: false // Set to true when active strikes >= 5
 }
+```
+
+**Decay Logic:**
+
+```typescript
+// When checking strikes, filter out strikes older than 1 month
+function getActiveStrikes(user: User): number {
+  const oneMonthAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+  const activeReports = user.spamReportsReceived.filter(
+    report => report.timestamp.toMillis() > oneMonthAgo
+  );
+  return activeReports.length;
+}
+
+// Update spamStrikes and spamBanned based on active count
+// Clean old reports from array periodically
 ```
 
 ### 6.2 Prevention Measures
 
 - **Rate limiting:** Max 20 invitations per day per user
 - **Verification:** Email verification required to create workspaces
-- **Warning system:** Notification at 3 strikes, 4 strikes
+- **Warning system:**
+  - Notification at 3 active strikes: "⚠️ You have 3 spam reports. Be careful - 5 strikes will restrict workspace/group creation."
+  - Notification at 4 active strikes: "⚠️ You have 4 spam reports. One more will restrict your account."
+  - Notification at 5 strikes: "🚫 Your account is restricted from creating workspaces and group chats due to spam reports."
+- **Decay notification:** When a strike expires: "✅ A spam strike from 30+ days ago has been removed. You now have X active strikes."
 
 ---
 
-## 7. Data Model
+## 7. User Profile & Status
 
-### 7.1 New Firestore Collections
+### 7.1 Overview
+
+The User Profile screen provides users with a central location to:
+
+- View their account status (Free, Trial, or Pro)
+- See what Pro features they have access to
+- Manage their subscription
+- Access account actions (upgrade, start trial)
+
+The profile is accessible from **all tab screens** via a circular button in the top-right corner displaying the user's initials.
+
+### 7.2 Profile Button
+
+**Location:** Top-right corner of all tab screens (Chats, New Chat, Workspaces, Profile)
+
+**Appearance:**
+
+- Circular button (36x36px)
+- Displays user initials (1-2 characters)
+- Background color: `#007AFF` (primary blue)
+- Text color: white
+- Border: 2px white border for contrast
+
+**States:**
+
+- **Normal:** Blue background, white text, tap to navigate to profile
+- **Selected:** When on profile screen, show visual indicator (e.g., `#005BBF` darker blue or border highlight)
+
+**Initials Logic:** See [TASK-LIST-PHASE4.md, lines 1085-1106](./TASK-LIST-PHASE4.md#L1085-L1106)
+
+### 7.3 Profile Screen UI
+
+**Navigation:** Tab screen (hidden from tab bar), accessible only via profile button
+
+**UI Schematic:**
+
+```
+┌─────────────────────────────┐
+│  ← Profile            [AI]  │ (Header with back button, profile button selected)
+├─────────────────────────────┤
+│                             │
+│    [AI]  (large circle)     │ (Initials - 80x80px, clickable in future for profile pic)
+│                             │
+│    Adam Isom                │ (Display Name - 20px, bold)
+│    adam@hey.com             │ (Email - 14px, gray)
+│                             │
+│    🎉 Trial User            │ (Status badge - 16px, yellow bg)
+│    4 days remaining         │ (Status detail - 14px, gray)
+│                             │
+│    OR                       │
+│                             │
+│    💎 Pro User              │ (Status badge - 16px, blue bg)
+│    Expires: Oct 26, 2026    │ (Subscription expiry - 14px, gray)
+│                             │
+│    OR                       │
+│                             │
+│    🔓 Free User             │ (Status badge - 16px, gray bg)
+│                             │
+├─────────────────────────────┤
+│  Your Pro Features          │ (Section header - 18px, bold)
+│                             │
+│  AI Features:               │ (Subheader - 16px, bold)
+│  ✓ Track Action Items &     │
+│    Decisions                │ (14px, 8px spacing)
+│  ✓ AI Summaries & Semantic  │
+│    Search                   │
+│  ✓ Meeting Scheduler &      │
+│    Auto-Detection of        │
+│    Urgent Messages          │
+│                             │
+│  Workspace Features:        │ (Subheader - 16px, bold)
+│  ✓ Create up to 5 private   │
+│    workspaces               │ (14px, 8px spacing)
+│  ✓ Invite up to 25 members  │
+│    per workspace            │
+│  ✓ Assign action items to   │
+│    your team within chats   │
+│  ✓ Edit and save AI-        │
+│    generated text & high-   │
+│    priority markers on      │
+│    messages                 │
+│                             │
+│  50¢ per member per         │
+│  workspace                  │ (12px, italic, gray)
+│                             │
+│  [Upgrade to Pro]           │ (Free users after trial - blue button)
+│  [Start 5-Day Free Trial]   │ (Free users, trial eligible - blue outlined)
+│  [Manage Subscription]      │ (Pro users - blue button)
+│                             │
+└─────────────────────────────┘
+```
+
+### 7.4 Status Display Logic
+
+**Status Badge & Action Buttons:** See [TASK-LIST-PHASE4.md, lines 1174-1238](./TASK-LIST-PHASE4.md#L1174-L1238) for complete implementation logic.
+
+### 7.5 Feature List Display
+
+**Content:** Copy exact feature list from `UpgradeToProModal.tsx` (AI Features + Workspace Features). Display for all user types to remind Pro users of features and motivate free users.
+
+### 7.6 Subscription Management Screen (Future)
+
+**Route:** `/subscription` (modal presentation)
+
+**UI:**
+
+```
+┌─────────────────────────────┐
+│  ← Manage Subscription  [X] │
+├─────────────────────────────┤
+│                             │
+│  Subscription Details       │
+│                             │
+│  Plan: Pro                  │
+│  Price: $3/month            │
+│  Next billing: Oct 26, 2025 │
+│                             │
+│  [Change Payment Method]    │ (Disabled, gray)
+│  (Coming soon)              │
+│                             │
+│  [Cancel Subscription]      │ (Disabled, gray)
+│  (Coming soon)              │
+│                             │
+└─────────────────────────────┘
+```
+
+**Implementation:** Placeholder only - buttons disabled with "Coming soon" note
+
+**Future Implementation:**
+
+- Integrate with Stripe billing portal
+- Handle cancellation flow (immediate or end of period)
+- Update payment method
+- View billing history
+
+### 7.7 Implementation Sub-Phases
+
+The User Profile feature is broken down into **4 logical sub-phases** for sequential implementation:
+
+**See [TASK-LIST-PHASE4.md, Appendix A (lines 1067-1293)](./TASK-LIST-PHASE4.md#L1067-L1293) for:**
+
+- Sub-Phase 4.1: Profile Button Component (1-2 hours)
+- Sub-Phase 4.2: Profile Screen Structure (2-3 hours)
+- Sub-Phase 4.3: Feature List & Action Buttons (2-3 hours)
+- Sub-Phase 4.4: Subscription Management Screen (1-2 hours)
+
+**Total:** 6-10 hours | **Order:** Sequential (4.1 → 4.2 → 4.3 → 4.4)
+
+---
+
+## 8. Data Model
+
+### 8.1 New Firestore Collections
 
 #### `/users/{uid}` (Extended)
 
@@ -567,17 +988,22 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
   subscriptionEndsAt?: Timestamp,
   stripeCustomerId?: string,              // Future payment integration
   
+  // NEW: Free trial fields
+  trialStartedAt?: Timestamp,             // When 5-day trial began
+  trialEndsAt?: Timestamp,                // When trial expires
+  trialUsed: boolean,                     // True if user already used their trial
+  
   // NEW: Workspace fields
   workspacesOwned: string[],              // Array of workspace IDs (max 5)
   workspacesMemberOf: string[],           // Workspaces user is member of
   
   // NEW: Spam prevention
-  spamStrikes: number,                    // Global counter (max 5)
-  spamBanned: boolean,                    // True if strikes >= 5
+  spamStrikes: number,                    // Active strike count (auto-computed)
+  spamBanned: boolean,                    // True if active strikes >= 5
   spamReportsReceived: Array<{
     reportedBy: string,
     reason: 'workspace' | 'groupChat',
-    timestamp: Timestamp,
+    timestamp: Timestamp,                 // Used for 6-month decay
     workspaceId?: string,
     conversationId?: string
   }>
@@ -603,12 +1029,11 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
   createdAt: Timestamp,
   
   // Billing
-  maxUsersThisMonth: number,              // Reset monthly
+  maxUsersThisMonth: number,              // Admin's chosen capacity (pays for all seats)
   billingCycleStart: Timestamp,
-  currentMonthCharge: number,             // $1 × maxUsersThisMonth
+  currentMonthCharge: number,             // $0.50 × maxUsersThisMonth
   isActive: boolean,                      // False if payment lapsed
-  readOnlySince?: Timestamp,              // Set when payment fails
-  deletionScheduledFor?: Timestamp,       // 30 days after readOnlySince
+  readOnlySince?: Timestamp,              // Set when payment fails (no deletion)
   
   // Statistics
   groupChatCount: number,
@@ -716,7 +1141,7 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
 }
 ```
 
-### 7.2 Indexes Required
+### 8.2 Indexes Required
 
 ```javascript
 // firestore.indexes.json
@@ -752,9 +1177,9 @@ function canAccessAIFeatures(user: User, conversation: Conversation): boolean {
 
 ---
 
-## 8. User Flows
+## 9. User Flows
 
-### 8.1 Create Workspace (Admin)
+### 9.1 Create Workspace (Admin)
 
 ```
 [Pro User - Main Screen]
@@ -939,9 +1364,9 @@ Push notification: "Alice invited you to 'Marketing Team'"
 
 ---
 
-## 9. UI/UX Specifications
+## 10. UI/UX Specifications
 
-### 9.1 Navigation Structure
+### 10.1 Navigation Structure
 
 ```
 Main Screen (Tabs)
@@ -1104,9 +1529,9 @@ Tap to respond
 
 ---
 
-## 10. Security & Permissions
+## 11. Security & Permissions
 
-### 10.1 Firestore Security Rules
+### 11.1 Firestore Security Rules
 
 ```javascript
 rules_version = '2';
@@ -1270,9 +1695,9 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 
 ---
 
-## 11. Implementation Phases
+## 12. Implementation Phases
 
-### Phase 1: Foundation (Week 1)
+### Sub-Phase 1: Foundation (Week 1)
 
 **Goal:** Set up data model, authentication, basic workspace CRUD
 
@@ -1297,7 +1722,7 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 - Invite members
 - Accept/decline invitations
 
-### Phase 2: AI Feature Gating (Week 1-2)
+### Sub-Phase 2: AI Feature Gating (Week 1-2)
 
 **Goal:** Implement paid tier checks for AI features
 
@@ -1316,7 +1741,7 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 - Verify Pro users can access AI everywhere
 - Verify workspace membership doesn't grant AI access to free users
 
-### Phase 3: Workspace Chat Organization (Week 2)
+### Sub-Phase 3: Workspace Chat Organization (Week 2)
 
 **Goal:** Implement workspace mode toggle, chat filtering
 
@@ -1335,85 +1760,412 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 - Verify member limits
 - Delete workspace (verify cascading delete)
 
-### Phase 4: Admin Features - Assignment (Week 2-3)
+### Sub-Phase 4: User Profile & Status (Week 2)
 
-**Goal:** Enable action item assignment for admins
+**Goal:** Create user profile screen with status display and feature overview
+
+**UI Schematic:**
+
+```
+┌─────────────────────────────┐
+│  ← Profile            [AI]  │ (Header with back button, profile button selected)
+├─────────────────────────────┤
+│                             │
+│    [AI]  (large circle)     │ (Initials - clickable in future for profile pic)
+│                             │
+│    Adam Isom                │ (Display Name)
+│    adam@hey.com             │ (Email)
+│                             │
+│    🎉 Trial User            │ (Status badge)
+│    4 days remaining         │ (Trial countdown)
+│                             │
+│    OR                       │
+│                             │
+│    💎 Pro User              │ (Status badge)
+│    Expires: Oct 26, 2026    │ (Subscription expiry)
+│                             │
+│    OR                       │
+│                             │
+│    🔓 Free User             │ (Status badge)
+│                             │
+├─────────────────────────────┤
+│  Your Pro Features          │ (Section header)
+│                             │
+│  AI Features:               │
+│  ✓ Track Action Items &     │
+│    Decisions                │
+│  ✓ AI Summaries & Semantic  │
+│    Search                   │
+│  ✓ Meeting Scheduler &      │
+│    Auto-Detection of        │
+│    Urgent Messages          │
+│                             │
+│  Workspace Features:        │
+│  ✓ Create up to 5 private   │
+│    workspaces               │
+│  ✓ Invite up to 25 members  │
+│    per workspace            │
+│  ✓ Assign action items to   │
+│    your team within chats   │
+│  ✓ Edit and save AI-        │
+│    generated text & high-   │
+│    priority markers on      │
+│    messages                 │
+│                             │
+│  50¢ per member per         │
+│  workspace                  │
+│                             │
+│  [Upgrade to Pro]           │ (Free users after trial)
+│  [Start 5-Day Free Trial]   │ (Free users, trial eligible)
+│  [Manage Subscription]      │ (Pro users)
+│                             │
+└─────────────────────────────┘
+```
 
 **Tasks:**
 
-1. Update `assignActionItem` Cloud Function
-2. Add admin check before allowing assignment
-3. Update ActionItemsModal with assignment UI
-4. Add participant picker
-5. Implement optimistic updates
-6. Add "My Tasks" aggregation view (optional)
+1. **Profile Button Component**
+   - Create `components/ProfileButton.tsx`
+   - Circular button with user initials (max 2 chars, or 1 if no space in name)
+   - Position in top-right of tab screens via header config
+   - Selected state styling when on profile screen (highlighted/different color)
+   - Navigate to `/profile` on tap
+
+2. **Profile Screen**
+   - Create `app/(tabs)/profile.tsx`
+   - Hidden from tab bar (`href: null`)
+   - Accessible only via profile button
+
+3. **Profile Header Config**
+   - Update `app/(tabs)/_layout.tsx`
+   - Add `headerRight` option for all tabs (Chats, New Chat, Workspaces, Profile)
+   - Render `<ProfileButton />` with current route context
+
+4. **Profile Content**
+   - Large circle with initials at top (future: clickable for profile pic upload)
+   - Display name and email
+   - Status badge with appropriate icon:
+     - 💎 Pro User (blue badge) + expiry date
+     - 🎉 Trial User (yellow badge) + days remaining
+     - 🔓 Free User (gray badge)
+   - "Your Pro Features" section (copy from UpgradeToProModal)
+   - Action buttons based on status:
+     - **Free (no trial):** "Start 5-Day Free Trial" (if eligible) + "Upgrade to Pro"
+     - **Free (in trial):** No buttons (trial active)
+     - **Free (trial expired):** "Upgrade to Pro"
+     - **Pro:** "Manage Subscription"
+
+5. **Subscription Management Screen (Future)**
+   - Create `app/subscription.tsx` (modal presentation)
+   - Navigate from "Manage Subscription" button
+   - Show two placeholder buttons:
+     - "Change Payment Method" (disabled, coming soon)
+     - "Cancel Subscription" (disabled, coming soon)
+   - Note in UI: "Feature coming soon"
+
+**Status Display Logic:**
+
+```typescript
+// Pro User
+if (user.isPaidUser) {
+  badge = "💎 Pro User"
+  detail = `Expires: ${formatDate(user.subscriptionEndsAt)}`
+  action = "Manage Subscription"
+}
+
+// Trial User
+else if (user.trialEndsAt && now < user.trialEndsAt) {
+  badge = "🎉 Trial User"
+  detail = `${daysRemaining} days remaining`
+  action = null // No button during trial
+}
+
+// Free User (trial expired or never had trial)
+else {
+  badge = "🔓 Free User"
+  detail = null
+  action = user.trialUsed ? "Upgrade to Pro" : "Start 5-Day Free Trial"
+}
+```
+
+**Initials Logic:**
+
+```typescript
+function getInitials(displayName: string): string {
+  if (!displayName) return '?';
+  
+  const words = displayName.trim().split(' ');
+  
+  if (words.length > 1) {
+    // Multiple words: take first letter of first two words
+    return (words[0][0] + words[1][0]).toUpperCase();
+  } else {
+    // Single word: take first letter only
+    return words[0][0].toUpperCase();
+  }
+}
+
+// Examples:
+// "Adam Isom" → "AI"
+// "John" → "J"
+// "Bob Smith Jr" → "BS"
+```
+
+**Feature List Display:**
+
+- Show complete list from `UpgradeToProModal` (AI Features + Workspace Features)
+- Display identically for all user types (no graying out for free users)
+- Purpose: Remind Pro users of their features, motivate free users to upgrade
 
 **Testing:**
 
-- Admin assigns action items
-- Non-admin sees read-only items
-- Assignment persists across devices
+- Profile button appears on all tab screens
+- Profile button shows correct initials
+- Profile button has selected state on profile screen
+- Clicking profile button navigates to profile
+- Status badge shows correctly for Pro/Trial/Free
+- Trial countdown accurate
+- Pro expiry date displays correctly
+- Action buttons appear based on user status
+- "Manage Subscription" opens subscription modal
+- Feature list displays correctly
+- Subscription modal shows placeholder buttons
 
-### Phase 5: Admin Features - Edit & Save (Week 3)
+**Future Enhancements:**
 
-**Goal:** Enable editing AI content for admins
+- Profile picture upload (tap large circle to change)
+- Cancel subscription implementation
+- Change payment method implementation
+- Subscription history
+- Usage statistics (AI requests, workspace activity)
+- In-app notifications bell (replace or complement profile button)
+
+### Sub-Phase 7: Workspace Admin Features (Week 3-4)
+
+**Goal:** Enable workspace admins to customize AI content, manage message priorities, and expand capacity
+
+**📄 Full Requirements:** [PRD-SUPPLEMENT-SUB-PHASE-7-WORKSPACE-ADMIN.md](./PRD-SUPPLEMENT-SUB-PHASE-7-WORKSPACE-ADMIN.md)
+
+**Features:**
+
+1. **Edit & Save AI-Generated Content:**
+   - Pro users can edit in personal chats
+   - Workspace admins can edit in workspace chats
+   - Save custom versions of summaries, decisions, action items
+   - Toggle between saved and fresh AI analysis
+   - Original AI version preserved for reference
+
+2. **Manual Urgency Markers:**
+   - Admin can mark up to 5 messages as urgent per conversation
+   - Admin-marked urgency overrides AI priority detection
+   - Admin can disable auto-urgency workspace-wide
+   - Tap message → toolbar appears → "Mark Urgent" option
+
+3. **Pinned Messages:**
+   - Admin can pin up to 5 messages per group chat
+   - All members can view pinned messages
+   - Pin icon (top-left) opens modal with "Jump to Message" buttons
+   - Admin can un-pin or replace pins
+
+4. **Capacity Expansion Flow:**
+   - Admin tries to add member beyond capacity → expansion modal
+   - Pro-rated billing calculation (e.g., $0.25 for 15 days remaining)
+   - Payment failure → workspace becomes read-only
+   - Billing events logged for audit trail
+
+**Testing:**
+
+- Edit AI content and verify saved versions persist
+- Mark messages urgent and verify AI respects admin override
+- Pin messages and test jump-to-message navigation
+- Expand workspace capacity and verify pro-rated billing
+- Test payment failure scenarios (read-only mode)
+
+---
+
+**Goal:** Extend spam reporting beyond workspace invitations
+
+**Status:** ✅ Workspace invitation spam reporting **COMPLETE** in Sub-Phase 4
+
+**Already Implemented (Sub-Phase 4):**
+
+- ✅ Spam reporting for workspace invitations (`reportWorkspaceInvitationSpam`)
+- ✅ Strike tracking with 1-month decay (`spamReportsReceived` array)
+- ✅ Automatic ban on 5 strikes (`spamBanned` flag)
+- ✅ Banned users blocked from creating workspaces
+- ✅ Cloud Function validation and enforcement
+- ✅ UI for reporting spam in invitations screen
+
+**Remaining Work:**
+
+1. **Group Chat Invitations (Non-Workspace):**
+   - Add spam reporting for group chat invitations outside workspaces
+   - Create `reportGroupChatInvitationSpam` Cloud Function
+   - Reuse existing spam strike infrastructure
+
+2. **Message-Level Spam Reporting:**
+   - Add "Report Spam" option in message context menu
+   - Create `reportMessageSpam` Cloud Function
+   - Apply same strike logic as invitations
+
+3. **Spam Appeal (Future/Enterprise):**
+   - Cloud Function for users to appeal spam bans
+   - Admin review workflow
+   - Grace period considerations
+
+**Testing:**
+
+- Report spam for group chat invitations (outside workspace)
+- Report individual messages as spam
+- Verify existing workspace invitation spam reporting still works
+- Verify strike counter increments correctly for all spam types
+- Test 5-strike ban enforcement
+
+### Sub-Phase 9: Production Sign-In (Week 5)
+
+**Goal:** Support enterprise-grade authentication options
+
+**Rationale:** Not all companies/teams have sophisticated identity providers like Okta. Supporting multiple auth methods ensures broader adoption.
 
 **Tasks:**
 
-1. Create edit modals for summaries, decisions, action items
-2. Add "Edit & Save" buttons (admin only)
-3. Implement save logic (replace AI version)
-4. Update Firestore with edit tracking
-5. Display "edited by admin" badges
-6. Preserve original AI versions
+1. **Phone Number Authentication:**
+   - Integrate Firebase Phone Auth
+   - SMS verification flow
+   - Link phone number to existing accounts
+
+2. **OAuth Providers:**
+   - **LinkedIn OAuth:** For professional teams, easy onboarding
+   - **Okta OAuth:** For enterprise customers with existing SSO
+
+3. **Multi-Auth Support:**
+   - Allow users to link multiple auth methods
+   - Primary email for workspace invitations
+   - Unified user profile across auth methods
+
+4. **UI Updates:**
+   - Login screen with provider selection
+   - "Sign in with LinkedIn" button
+   - "Sign in with Okta" button
+   - "Sign in with Phone" option
+   - Email/password (existing)
+
+**Security Considerations:**
+
+- Account linking validation
+- Email verification for OAuth accounts
+- Prevent duplicate accounts
+- SSO session management
 
 **Testing:**
 
-- Admin edits summaries
-- Admin edits decisions
-- Admin edits action items
-- Members see edited versions
+- Test each auth provider independently
+- Test account linking flows
+- Test workspace invitations with different auth methods
+- Edge case: User signs up with email, later links LinkedIn
 
-### Phase 6: Spam Prevention (Week 3)
+---
 
-**Goal:** Implement strike system
+### Sub-Phase 10: Export Workspace (Week 4) ✅
+
+**Status:** Implementation Complete
+
+**Goal:** Enable workspace admins to export all workspace data
+
+**Implemented:**
+
+1. ✅ Cloud Function: `exportWorkspace`
+   - Generates comprehensive JSON export of all workspace data
+   - Includes members (emails, display names, roles, join dates)
+   - All conversations with full message history
+   - AI-generated content (summaries, decisions, action items)
+   - Pinned messages and manual urgency markers
+   - Timeout protection (50s buffer) for large workspaces
+   - 1000 message limit per conversation (scalability)
+
+2. ✅ Client Service: `workspaceExportService`
+   - Calls Cloud Function and downloads JSON
+   - Share API integration for cross-platform file sharing
+   - Filename sanitization for workspace names
+   - Success/error handling with metadata display
+
+3. ✅ UI Integration
+   - "Export Workspace (JSON)" button in workspace settings
+   - Admin-only with permission enforcement
+   - Loading state during export
+   - Success alert with export statistics
+   - Timeout warning if export incomplete
+
+4. ✅ Testing
+   - 17 comprehensive unit tests
+   - Data structure validation
+   - Edge cases (empty workspaces, large conversations, timeouts)
+   - Filename sanitization tests
+   - All 384 tests passing
+
+**Export Format:**
+
+Clean JSON with human-readable timestamps:
+
+- Workspace metadata (ID, name, export timestamp, admin)
+- Members array (email, displayName, role, joinedAt)
+- Conversations array with full message history
+- AI analysis (summaries, decisions, action items) when present
+- Pinned messages and urgency markers
+- Export metadata (counts, limits, warnings)
+
+**MVP Limitations:**
+
+- JSON only (Markdown export deferred)
+- 1000 messages per conversation limit (documented in export)
+- 50-second timeout protection (incomplete export warning shown)
+- Share API (simple sharing - no email delivery yet)
 
 **Tasks:**
 
-1. Add spam reporting to invitation flow
-2. Create Cloud Function to increment strikes
-3. Add strike limit enforcement (5 strikes)
-4. Add notification on ban
-5. Block workspace/group chat creation for banned users
+1. ✅ Create `exportWorkspace` Cloud Function
+2. ✅ Generate JSON export:
+   - All workspace members (emails + display names)
+   - All workspace chats with messages
+   - Timestamps and metadata
+3. ❌ Generate Markdown export (deferred - MVP simplification)
+4. ❌ Email export file to admin (deferred - uses Share API instead)
+5. ✅ Add "Export Workspace" button in workspace settings (admin only)
+
+**Export Format Examples:**
+
+```json
+{
+  "workspaceId": "ws_123",
+  "workspaceName": "Engineering Team",
+  "exportedAt": "2025-10-26T12:00:00Z",
+  "members": [
+    {"email": "alice@company.com", "displayName": "Alice Smith"},
+    {"email": "bob@company.com", "displayName": "Bob Jones"}
+  ],
+  "conversations": [
+    {
+      "id": "conv_456",
+      "type": "group",
+      "participants": ["alice@company.com", "bob@company.com"],
+      "messages": [
+        {"sender": "Alice Smith", "text": "Hello", "timestamp": "2025-10-26T10:00:00Z"}
+      ]
+    }
+  ]
+}
+```
 
 **Testing:**
 
-- Report spam invitations
-- Verify strike counter increments
-- Test 5-strike ban
-- Verify banned user can't create workspaces/groups
+- Export workspace with multiple chats
+- Verify JSON structure
+- Verify Markdown formatting
+- Test with large workspaces (edge cases)
 
-### Phase 7: Billing Logic (Week 4)
+---
 
-**Goal:** Implement max user tracking, billing calculations
-
-**Tasks:**
-
-1. Track `maxUsersThisMonth` per workspace
-2. Create Cloud Function for monthly billing
-3. Implement workspace read-only state (payment lapsed)
-4. Implement 30-day deletion countdown
-5. Add billing UI in settings
-6. Create admin dashboard for billing
-
-**Testing:**
-
-- Add/remove members (verify max tracking)
-- Simulate payment lapse (read-only state)
-- Verify 30-day deletion
-- Manual billing calculation test
-
-### Phase 8: Polish & Testing (Week 4)
+### Sub-Phase 11: Polish & Testing (Week 4)
 
 **Goal:** UI polish, edge cases, E2E testing
 
@@ -1425,6 +2177,7 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 4. Performance testing (50 members, multiple workspaces)
 5. E2E test suite
 6. Documentation updates
+7. **Improve 'New Chat' UX:** Remove direct/group mode toggle, auto-detect based on number of users added
 
 **Testing:**
 
@@ -1434,7 +2187,151 @@ export const extractActionItems = functions.https.onCall(async (data, context) =
 
 ---
 
-## 12. Future Enhancements
+### Sub-Phase 12: Billing & Admin (Week 5-6)
+
+**Goal:** Implement real Stripe integration and complete billing infrastructure
+
+**Tasks:**
+
+1. **Stripe Integration:**
+   - Integrate Stripe SDK (client + server)
+   - Create subscription management Cloud Functions
+   - Webhook handlers for Stripe events (payment success, failure, cancellation)
+   - Handle subscription lifecycle (trial → paid, paid → lapsed, reactivation)
+
+2. **Billing Logic:**
+   - Track `maxUsersThisMonth` per workspace (already in schema)
+   - Monthly billing reconciliation Cloud Function (runs on 1st of month)
+   - Pro-rated billing calculations for mid-month changes
+   - Workspace read-only state on payment lapse (30-day grace period)
+   - Auto-delete workspace after 30 days of non-payment
+
+3. **Admin UI:**
+   - Build subscription management screen (`app/subscription.tsx` - currently placeholder)
+   - Billing history display
+   - Payment method management
+   - Usage statistics (workspace members, AI requests, storage)
+
+4. **Capacity Downgrade:**
+   - Admin requests downgrade → takes effect NEXT billing cycle (no pro-rated refunds)
+   - Verify actual members <= new capacity before approving downgrade
+   - Notify admin if downgrade blocked due to member count
+
+**Testing:**
+
+- End-to-end Stripe payment flow (trial → paid)
+- Add/remove members (verify max tracking)
+- Simulate payment lapse (workspace becomes read-only)
+- Verify 30-day deletion countdown
+- Test capacity downgrade with member validation
+- Verify pro-rated billing for mid-month workspace expansion
+- Test Stripe webhook handlers
+
+---
+
+### Sub-Phase 13: App Stores (Week 6)
+
+**Goal:** Publish MessageAI to iPhone App Store and Android Play Store
+
+**Tasks:**
+
+1. **iPhone App Store:**
+   - Create App Store Connect account
+   - Prepare app metadata (description, keywords, screenshots)
+   - Generate app icons and promotional assets
+   - Configure app signing and provisioning profiles
+   - Submit for TestFlight beta testing
+   - Address App Review feedback
+   - Submit for production release
+
+2. **Android Play Store:**
+   - Create Google Play Console account
+   - Prepare store listing (description, graphics, screenshots)
+   - Generate signed APK/AAB bundle
+   - Configure release tracks (internal → closed beta → production)
+   - Submit for review
+   - Address Play Store review feedback
+   - Production release
+
+3. **App Store Assets:**
+   - App icon (multiple sizes for both platforms)
+   - Screenshots (various device sizes)
+   - Promotional text and descriptions
+   - Privacy policy URL
+   - Support URL
+   - App preview videos (optional but recommended)
+
+4. **App Store Optimization (ASO):**
+   - Keyword research for both stores
+   - Compelling app title and subtitle
+   - Feature graphics
+   - Localization (if applicable)
+
+**Testing:**
+
+- TestFlight beta testing (iOS)
+- Internal testing track (Android)
+- Verify in-app purchases work on production stores
+- Test deep linking from store pages
+- Verify analytics tracking
+
+**Estimated Timeline:**
+
+- iOS: 1-2 weeks (including review time)
+- Android: 3-7 days (typically faster review)
+
+---
+
+## 13. Future Enhancements
+
+> **Note:** This section documents features that are out of scope for the initial Phase 4 implementation but may be valuable in future iterations.
+
+### 13.1 Deferred Features from Phase 4
+
+**Direct Chat Export on Workspace Deletion:**
+
+- Currently: Workspace direct chats are deleted when workspace is deleted
+- Future: Allow members to request email export of their direct chat history before deletion
+- Implementation: Admin triggers deletion → System emails each member a PDF/JSON export of their direct chats → Wait 7 days → Delete workspace
+
+**AI Content Edit History:**
+
+- Currently: Admins can edit/save AI content, but only latest version is preserved (no history)
+- Future: Keep version history for transparency and undo capability
+- Implementation: Store edit history array with timestamps, editor UIDs, and previous versions
+- UI: "View History" button shows changelog, "Revert to Version X" option
+
+**Enhanced Enterprise Sales Funnel:**
+
+- Currently: 25-member limit shows link to Twitter DM
+- Future: Dedicated enterprise inquiry form with:
+  - Team size input
+  - Use case description
+  - Contact information
+  - Custom pricing calculator
+  - Auto-email to sales team
+  - CRM integration (HubSpot, Salesforce)
+
+**Trial Extensions:**
+
+- Currently: Hard 5-day trial, then AI locks to workspace chats only
+- Future: Allow one 3-day extension if user is "close to converting" (e.g., used AI 10+ times)
+- Future: Referral bonuses (invite 3 friends, get 1 month free Pro)
+
+**Workspace Capacity Recommendations:**
+
+- Currently: Basic UI guidance during workspace creation
+- Future: Smart capacity recommendations based on:
+  - User's email domain (fetch company size from Clearbit/LinkedIn)
+  - Average group chat size
+  - "Most teams your size choose 10-15 members"
+
+**Spam Strike Appeals:**
+
+- Currently: No appeals process, 1-month decay only
+- Future: "Request Review" button for users who feel unfairly flagged
+- Manual review by support team
+- Evidence submission (screenshots, context)
 
 ### 12.1 Payment Integration (Stripe)
 
@@ -1604,6 +2501,10 @@ export const handleWorkspaceBilling = functions.pubsub
 ✅ **Workspace names:** Must be unique per user  
 ✅ **Workspace notifications:** Push + in-app, deleted after 24h when read  
 ✅ **Billing cycle:** 1st of month for everyone
+✅ **Billing start timing:** Pro-rated from creation date (unless created on 1st)  
+✅ **Downgrades:** Take effect next billing cycle (no pro-rated refunds)  
+✅ **Direct chat removal:** Hard delete from conversation list (security rules prevent access)  
+✅ **Trial limitations:** Cannot create workspaces during trial (Pro subscription required)
 
 ### Open Questions
 
@@ -1809,17 +2710,18 @@ incrementSpamStrikes(userUid: string, reason: 'workspace' | 'groupChat')
 
 ### Scenario 5: Payment Lapse
 
-1. Admin's payment fails
-2. Workspace becomes read-only
+1. Admin's payment fails (simulated in MVP with dummy payment service)
+2. Workspace becomes read-only immediately
 3. Members can view messages
 4. Members cannot send messages
-5. Admin receives notification
-6. 30 days pass without payment
-7. Workspace deleted
-8. All chats deleted
-9. Members notified
+5. AI features disabled
+6. Admin receives notification
+7. Admin updates payment method
+8. Payment succeeds
+9. Workspace becomes active again
+10. Full functionality restored
 
-**Expected Result:** ✅ Workspace deleted after grace period
+**Expected Result:** ✅ Workspace read-only when payment fails, restored when payment succeeds (no deletion)
 
 ### Scenario 6: Workspace Member Limit
 

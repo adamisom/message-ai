@@ -9,13 +9,21 @@ import {
   signOut,
 } from 'firebase/auth';
 import {
+  collection,
   doc,
-  getDoc,
+  getDocFromServer,
+  getDocs,
+  query,
   serverTimestamp,
   setDoc,
+  Timestamp,
+  updateDoc,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase.config';
 import { setUserOffline, setUserOnline } from './presenceService';
+
+// Phase 4: 500 User MVP Limit
+const MAX_MVP_USERS = 500;
 
 /**
  * User profile data structure
@@ -24,22 +32,57 @@ export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
+  phoneNumber: string; // Required 10-digit phone number
   isOnline: boolean;
   lastSeenAt: any; // Firestore Timestamp
   createdAt: any; // Firestore Timestamp
   updatedAt: any; // Firestore Timestamp
+  // Phase 4: Paid tier fields
+  isPaidUser?: boolean;
+  subscriptionTier?: 'free' | 'pro';
+  subscriptionStartedAt?: any;
+  subscriptionEndsAt?: any;
+  // Phase 4: Trial fields
+  trialStartedAt?: any;
+  trialEndsAt?: any;
+  trialUsed?: boolean;
+  // Phase 4: Workspace fields
+  workspacesOwned?: string[];
+  workspacesMemberOf?: string[];
+  // Phase 4: Spam prevention
+  spamStrikes?: number;
+  spamBanned?: boolean;
+  spamReportsReceived?: {
+    reportedBy: string;
+    reason: 'workspace' | 'groupChat';
+    timestamp: any;
+    workspaceId?: string;
+    conversationId?: string;
+  }[];
+  // Sub-Phase 6.5: Direct message spam prevention (Phase C)
+  blockedUsers?: string[]; // Array of user IDs that this user has blocked
+  hiddenConversations?: string[]; // Array of conversation IDs hidden due to spam reports
+  dmPrivacySetting?: 'private' | 'public'; // Default: 'private' (requires invitation for DMs)
 }
 
 /**
  * Register a new user with email, password, and display name
  * Creates Firebase Auth account and Firestore user profile
+ * Phase 4: Checks 500 user MVP limit and initializes 5-day trial
  */
 export const registerUser = async (
   email: string,
   password: string,
-  displayName: string
+  displayName: string,
+  phoneNumber: string
 ): Promise<UserProfile> => {
   try {
+    // Phase 4: Check 500 user limit
+    const userCount = await getTotalUserCount();
+    if (userCount >= MAX_MVP_USERS) {
+      throw new Error('Sorry: in MVP mode, max users reached. Please check back later.');
+    }
+
     // Create Firebase Auth user
     const userCredential = await createUserWithEmailAndPassword(
       auth,
@@ -48,8 +91,8 @@ export const registerUser = async (
     );
     const user = userCredential.user;
 
-    // Create Firestore user profile
-    const userProfile = await createUserProfile(user.uid, email, displayName);
+    // Create Firestore user profile (includes trial initialization)
+    const userProfile = await createUserProfile(user.uid, email, displayName, phoneNumber);
 
     return userProfile;
   } catch (error: any) {
@@ -112,22 +155,68 @@ export const logoutUser = async (): Promise<void> => {
 };
 
 /**
+ * Update user profile fields
+ * Used for updating settings like dmPrivacySetting, phoneNumber, etc.
+ */
+export const updateUserProfile = async (
+  uid: string,
+  updates: Partial<UserProfile>
+): Promise<void> => {
+  try {
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    });
+    console.log('[authService] User profile updated:', Object.keys(updates));
+  } catch (error) {
+    console.error('[authService] Error updating user profile:', error);
+    throw error;
+  }
+};
+
+/**
  * Create user profile in Firestore
+ * Phase 4: Initializes 5-day free trial
  */
 export const createUserProfile = async (
   uid: string,
   email: string,
-  displayName: string
+  displayName: string,
+  phoneNumber: string
 ): Promise<UserProfile> => {
   try {
+    const now = new Date();
+    const fiveDaysFromNow = new Date(now.getTime() + (5 * 24 * 60 * 60 * 1000));
+
     const userProfile: UserProfile = {
       uid,
       email: email.toLowerCase().trim(),
       displayName: displayName.trim(),
+      phoneNumber: phoneNumber.replace(/\D/g, ''), // Store as 10 digits only
       isOnline: true,
       lastSeenAt: serverTimestamp(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      // Phase 4: Free tier fields
+      isPaidUser: false,
+      subscriptionTier: 'free',
+      // Phase 4: 5-day trial initialization
+      trialStartedAt: serverTimestamp(),
+      trialEndsAt: Timestamp.fromDate(fiveDaysFromNow),
+      trialUsed: true,
+      // Phase 4: Workspace fields
+      workspacesOwned: [],
+      workspacesMemberOf: [],
+      // Phase 4: Spam prevention
+      spamStrikes: 0,
+      spamBanned: false,
+      spamReportsReceived: [],
+      // Sub-Phase 6.5: User blocking & conversation hiding
+      blockedUsers: [],
+      hiddenConversations: [],
+      // Sub-Phase 11: DM Privacy (default: private)
+      dmPrivacySetting: 'private',
     };
 
     await setDoc(doc(db, 'users', uid), userProfile);
@@ -147,7 +236,9 @@ export const getUserProfile = async (
 ): Promise<UserProfile | null> => {
   try {
     const docRef = doc(db, 'users', uid);
-    const docSnap = await getDoc(docRef);
+    // Use getDocFromServer to bypass local cache and get fresh data from server
+    // This ensures we always get the latest subscription/trial status
+    const docSnap = await getDocFromServer(docRef);
 
     if (docSnap.exists()) {
       return docSnap.data() as UserProfile;
@@ -155,7 +246,7 @@ export const getUserProfile = async (
 
     return null;
   } catch (error: any) {
-    console.error('Get profile error:', error);
+    console.error('[getUserProfile] Error fetching profile:', error);
     throw new Error('Failed to fetch user profile');
   }
 };
@@ -190,3 +281,19 @@ const getAuthErrorMessage = (errorCode: string): string => {
   }
 };
 
+/**
+ * Phase 4: Get total user count (for 500 user MVP limit)
+ */
+async function getTotalUserCount(): Promise<number> {
+  try {
+    // Query all users and count them
+    // Note: In production, you'd use Cloud Function counter or aggregation
+    const usersQuery = query(collection(db, 'users'));
+    const snapshot = await getDocs(usersQuery);
+    return snapshot.size;
+  } catch (error) {
+    console.error('Error getting user count:', error);
+    // If error, allow signup (fail open)
+    return 0;
+  }
+}

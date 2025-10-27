@@ -6,19 +6,65 @@ admin.initializeApp();
 
 // Phase 0: Embeddings
 export {
-  batchEmbedMessages,
-  retryFailedEmbeddings,
-  monitorRetryQueue,
-  incrementMessageCounter,
+    batchEmbedMessages, incrementMessageCounter, monitorRetryQueue, retryFailedEmbeddings
 } from './ai/embeddings';
 
 // Phase 1: AI Features
-export {semanticSearch} from './ai/search';
-export {quickPriorityCheckTrigger, batchAnalyzePriority} from './ai/priority';
-export {generateSummary} from './ai/summarization';
-export {extractActionItems} from './ai/actionItems';
-export {trackDecisions} from './ai/decisions';
+export { extractActionItems } from './ai/actionItems';
+export { assignActionItem } from './ai/assignActionItem';
+export { trackDecisions } from './ai/decisions';
+export { batchAnalyzePriority, quickPriorityCheckTrigger } from './ai/priority';
+export { semanticSearch } from './ai/search';
+export { generateSummary } from './ai/summarization';
+
+// Sub-Phase 7: Edit & Save AI Content
+export { saveEditedActionItems } from './ai/saveEditedActionItems';
+export { saveEditedDecision } from './ai/saveEditedDecision';
+export { saveEditedSummary } from './ai/saveEditedSummary';
 
 // Phase 3: Advanced AI Capability
-export {analyzeMeetingScheduling} from './ai/proactiveMeeting';
+export { analyzeMeetingScheduling } from './ai/proactiveMeeting';
+
+// Phase 4: Workspaces & Paid Tier
+export {
+    acceptWorkspaceInvitation, createWorkspace,
+    declineWorkspaceInvitation,
+    deleteWorkspace, reportWorkspaceInvitationSpam
+} from './workspaces';
+
+// Phase 4: Billing (MVP dummy payment)
+export { downgradeToFree, startFreeTrial, upgradeToPro } from './billing';
+
+// Sub-Phase 6.5: Group Chat Management
+export { acceptGroupChatInvitation } from './groupChats/acceptGroupChatInvitation';
+export { addMemberToGroupChat } from './groupChats/addMemberToGroupChat';
+export { declineGroupChatInvitation } from './groupChats/declineGroupChatInvitation';
+export { reportDirectMessageSpam } from './groupChats/reportDirectMessageSpam';
+export { reportGroupChatInvitationSpam } from './groupChats/reportGroupChatInvitationSpam';
+
+// Sub-Phase 7: Workspace Admin Features
+export { expandWorkspaceCapacity } from './workspaces/capacityExpansion';
+export { pinMessage, unpinMessage } from './workspaces/pinnedMessages';
+export { markMessageUrgent, unmarkMessageUrgent } from './workspaces/urgencyMarkers';
+
+// Sub-Phase 8: Enhanced Spam Reporting
+export { getUserSpamStatus } from './spam/getUserSpamStatus';
+
+// Sub-Phase 10: Export Workspace
+export { exportWorkspace } from './workspaces/exportWorkspace';
+
+// Sub-Phase 11: Export User Conversations
+export { exportUserConversations } from './user/exportUserConversations';
+
+// Sub-Phase 11: Direct Message Invitations (Privacy)
+export { 
+  createDirectMessageInvitation,
+  acceptDirectMessageInvitation,
+  declineDirectMessageInvitation,
+  reportDirectMessageInvitationSpam,
+} from './dm/directMessageInvitations';
+
+// Sub-Phase 11: Message Editing/Deletion (Pro feature)
+export { editMessage, deleteMessage } from './messages/editDeleteMessages';
+
 
