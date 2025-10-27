@@ -105,8 +105,8 @@ export const validatePhoneNumber = (phoneNumber: string): boolean => {
   // Remove all non-digit characters
   const digits = phoneNumber.replace(/\D/g, '');
   
-  // Must be exactly 10 digits (US/Canada)
-  return digits.length === 10;
+  // Must be exactly 10 digits (US/Canada) or 11 digits starting with 1 (with country code)
+  return digits.length === 10 || (digits.length === 11 && digits.startsWith('1'));
 };
 
 /**
@@ -115,7 +115,7 @@ export const validatePhoneNumber = (phoneNumber: string): boolean => {
  * @returns Error message or null if valid
  */
 export const getPhoneNumberError = (phoneNumber: string): string | null => {
-  if (!phoneNumber) {
+  if (!phoneNumber || !phoneNumber.trim()) {
     return "Phone number is required because that's how friends find you";
   }
   if (!validatePhoneNumber(phoneNumber)) {

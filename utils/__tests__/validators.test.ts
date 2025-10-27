@@ -235,8 +235,9 @@ describe('validatePhoneNumber', () => {
     });
 
     it('should reject phone numbers with too many digits', () => {
-      expect(validatePhoneNumber('12345678901')).toBe(false);
-      expect(validatePhoneNumber('555123456789')).toBe(false);
+      expect(validatePhoneNumber('22345678901')).toBe(false); // 11 digits but doesn't start with 1
+      expect(validatePhoneNumber('555123456789')).toBe(false); // 12 digits
+      expect(validatePhoneNumber('123456789012')).toBe(false); // 12 digits starting with 1
     });
 
     it('should reject empty or invalid input', () => {
@@ -262,7 +263,7 @@ describe('getPhoneNumberError', () => {
   it('should return invalid format error for invalid phone', () => {
     expect(getPhoneNumberError('123')).toBe('Please enter a valid 10-digit phone number (US/Canada only)');
     expect(getPhoneNumberError('abcd1234567')).toBe('Please enter a valid 10-digit phone number (US/Canada only)');
-    expect(getPhoneNumberError('12345678901')).toBe('Please enter a valid 10-digit phone number (US/Canada only)');
+    expect(getPhoneNumberError('22345678901')).toBe('Please enter a valid 10-digit phone number (US/Canada only)');
   });
 
   it('should return null for valid phone', () => {
