@@ -105,6 +105,25 @@ service cloud.firestore {
       allow delete: if isUser(resource.data.invitedUserUid) || 
                        isUser(resource.data.invitedByUid);
     }
+
+    // Direct message invitations (Sub-Phase 11: DM Privacy)
+    match /dm_invitations/{invitationId} {
+      // Invitee and inviter can read
+      allow read: if isAuthenticated() && 
+                     (isUser(resource.data.inviteeId) || 
+                      isUser(resource.data.inviterId));
+      
+      // Authenticated users (non-banned) can create invitations
+      allow create: if isAuthenticated() &&
+                       !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.spamBanned;
+      
+      // Invitee can update (accept/decline/spam)
+      allow update: if isUser(resource.data.inviteeId);
+      
+      // Invitee or inviter can delete
+      allow delete: if isUser(resource.data.inviteeId) || 
+                       isUser(resource.data.inviterId);
+    }
     
     // ===== USERS COLLECTION =====
     

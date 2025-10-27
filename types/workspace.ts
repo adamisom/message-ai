@@ -57,6 +57,24 @@ export interface WorkspaceInvitation {
 }
 
 /**
+ * Direct Message Invitation - Sub-Phase 11 (Polish)
+ * Required when user has dmPrivacySetting: 'private'
+ */
+export interface DirectMessageInvitation {
+  id: string;
+  inviterId: string;
+  inviterEmail: string;
+  inviterName: string;
+  inviterPhoneNumber: string;
+  inviteeId: string;
+  inviteeEmail: string;
+  inviteeName: string;
+  status: 'pending' | 'accepted' | 'declined' | 'spam';
+  sentAt: Timestamp;
+  respondedAt?: Timestamp;
+}
+
+/**
  * Workspace Member Details
  */
 export interface WorkspaceMember {

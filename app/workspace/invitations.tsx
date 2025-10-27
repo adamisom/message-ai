@@ -22,6 +22,12 @@ import {
   declineGroupChatInvitation,
   reportGroupChatInvitationSpam,
 } from '../../services/groupChatService';
+import { 
+  getUserDirectMessageInvitations, 
+  acceptDirectMessageInvitation, 
+  declineDirectMessageInvitation, 
+  reportDirectMessageInvitationSpam 
+} from '../../services/dmInvitationService';
 import {
   getUserWorkspaceInvitations,
   acceptWorkspaceInvitation,
@@ -31,7 +37,7 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../utils/colors';
 
-type InvitationType = 'workspace' | 'group_chat';
+type InvitationType = 'workspace' | 'group_chat' | 'direct_message';
 
 interface UnifiedInvitation {
   id: string;
@@ -65,10 +71,11 @@ export default function InvitationsScreen() {
     if (!user?.uid) return;
 
     try {
-      // Load both workspace and group chat invitations
-      const [workspaceInvites, groupChatInvites] = await Promise.all([
+      // Load workspace, group chat, and DM invitations
+      const [workspaceInvites, groupChatInvites, dmInvites] = await Promise.all([
         getUserWorkspaceInvitations(user.uid),
         getUserGroupChatInvitations(user.uid),
+        getUserDirectMessageInvitations(user.uid),
       ]);
 
       // Combine and format invitations
@@ -86,10 +93,17 @@ export default function InvitationsScreen() {
           id: inv.id,
           type: 'group_chat' as InvitationType,
           name: inv.conversationName || 'Group Chat',
-          invitedByDisplayName: inv.invitedByDisplayName,
-          sentAt: inv.sentAt,
+          invitedByDisplayName: inv.inviterName,
+          sentAt: inv.invitedAt,
           conversationId: inv.conversationId,
-          conversationName: inv.conversationName || 'Group Chat',
+        })),
+        ...dmInvites.map((inv: any) => ({
+          id: inv.id,
+          type: 'direct_message' as InvitationType,
+          name: `${inv.inviterName}`,
+          invitedByDisplayName: inv.inviterName,
+          sentAt: inv.sentAt,
+          inviterPhone: inv.inviterPhoneNumber,
         })),
       ];
 
@@ -123,10 +137,17 @@ export default function InvitationsScreen() {
         Alert.alert('Success!', `You've joined ${invitation.name}`, [
           { text: 'OK', onPress: () => loadInvitations() },
         ]);
-      } else {
+      } else if (invitation.type === 'group_chat') {
         await acceptGroupChatInvitation(invitation.id);
         Alert.alert('Success!', `You've joined ${invitation.name}`, [
           { text: 'OK', onPress: () => loadInvitations() },
+        ]);
+      } else {
+        // DM invitation
+        const result = await acceptDirectMessageInvitation(invitation.id);
+        Alert.alert('Success!', `You can now message ${invitation.name}`, [
+          { text: 'Open Chat', onPress: () => router.push(`/chat/${result.conversationId}` as any) },
+          { text: 'Later', onPress: () => loadInvitations() },
         ]);
       }
     } catch (error: any) {
@@ -138,7 +159,7 @@ export default function InvitationsScreen() {
   };
 
   const handleDecline = async (invitation: UnifiedInvitation) => {
-    const typeLabel = invitation.type === 'workspace' ? 'workspace' : 'group chat';
+    const typeLabel = invitation.type === 'workspace' ? 'workspace' : invitation.type === 'group_chat' ? 'group chat' : 'direct message';
     Alert.alert(
       'Decline Invitation?',
       `Decline invitation to join ${invitation.name} (${typeLabel})?`,
@@ -152,8 +173,10 @@ export default function InvitationsScreen() {
             try {
               if (invitation.type === 'workspace') {
                 await declineWorkspaceInvitation(invitation.id);
-              } else {
+              } else if (invitation.type === 'group_chat') {
                 await declineGroupChatInvitation(invitation.id);
+              } else {
+                await declineDirectMessageInvitation(invitation.id);
               }
               await loadInvitations();
             } catch (error: any) {
@@ -182,8 +205,10 @@ export default function InvitationsScreen() {
             try {
               if (invitation.type === 'workspace') {
                 await reportWorkspaceInvitationAsSpam(invitation.id);
-              } else {
+              } else if (invitation.type === 'group_chat') {
                 await reportGroupChatInvitationSpam(invitation.id);
+              } else {
+                await reportDirectMessageInvitationSpam(invitation.id);
               }
 
               Alert.alert('Reported', 'Thank you for helping keep MessageAI safe.', [
@@ -231,7 +256,7 @@ export default function InvitationsScreen() {
             <Ionicons name="mail-open-outline" size={64} color={Colors.textLight} />
             <Text style={styles.emptyTitle}>No Invitations</Text>
             <Text style={styles.emptyDescription}>
-              You&apos;ll see workspace and group chat invitations here
+              You&apos;ll see workspace, group chat, and direct message invitations here
             </Text>
           </View>
         ) : (
@@ -285,21 +310,40 @@ function InvitationCard({
   };
 
   const isWorkspace = invitation.type === 'workspace';
-  const iconName = isWorkspace ? 'business' : 'people';
-  const iconColor = isWorkspace ? Colors.primary : '#10B981';
+  const isGroupChat = invitation.type === 'group_chat';
+  const isDM = invitation.type === 'direct_message';
+  
+  let iconName: any = 'business';
+  let iconColor: string = Colors.primary;
+  let bgColor: string = '#E3F2FD';
+  
+  if (isGroupChat) {
+    iconName = 'people';
+    iconColor = '#10B981';
+    bgColor = '#D1FAE5';
+  } else if (isDM) {
+    iconName = 'chatbubble';
+    iconColor = '#6B7280';
+    bgColor = '#F3F4F6';
+  }
 
   return (
     <View style={styles.card}>
       {/* Invitation Header */}
       <View style={styles.cardHeader}>
-        <View style={[styles.workspaceIcon, { backgroundColor: isWorkspace ? '#E3F2FD' : '#D1FAE5' }]}>
+        <View style={[styles.workspaceIcon, { backgroundColor: bgColor }]}>
           <Ionicons name={iconName} size={24} color={iconColor} />
         </View>
         <View style={styles.cardHeaderText}>
           <View style={styles.nameRow}>
             <Text style={styles.workspaceName}>{invitation.name}</Text>
-            <View style={[styles.typeBadge, isWorkspace ? styles.workspaceBadge : styles.groupChatBadge]}>
-              <Text style={styles.typeBadgeText}>{isWorkspace ? 'Workspace' : 'Group'}</Text>
+            <View style={[
+              styles.typeBadge,
+              isWorkspace ? styles.workspaceBadge : isGroupChat ? styles.groupChatBadge : styles.dmBadge
+            ]}>
+              <Text style={styles.typeBadgeText}>
+                {isWorkspace ? 'Workspace' : isGroupChat ? 'Group' : 'DM'}
+              </Text>
             </View>
           </View>
           <Text style={styles.inviterText}>Invited by {invitation.invitedByDisplayName}</Text>
@@ -444,6 +488,9 @@ const styles = StyleSheet.create({
   },
   groupChatBadge: {
     backgroundColor: '#D1FAE5',
+  },
+  dmBadge: {
+    backgroundColor: '#F3F4F6',
   },
   typeBadgeText: {
     fontSize: 10,

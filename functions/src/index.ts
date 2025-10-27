@@ -56,4 +56,12 @@ export { exportWorkspace } from './workspaces/exportWorkspace';
 // Sub-Phase 11: Export User Conversations
 export { exportUserConversations } from './user/exportUserConversations';
 
+// Sub-Phase 11: Direct Message Invitations (Privacy)
+export { 
+  createDirectMessageInvitation,
+  acceptDirectMessageInvitation,
+  declineDirectMessageInvitation,
+  reportDirectMessageInvitationSpam,
+} from './dm/directMessageInvitations';
+
 

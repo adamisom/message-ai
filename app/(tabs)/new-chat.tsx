@@ -16,6 +16,7 @@ import {
     createOrOpenConversation,
     findUserByPhoneNumber
 } from '../../services/firestoreService';
+import { createDirectMessageInvitation } from '../../services/dmInvitationService';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Colors } from '../../utils/colors';
@@ -128,9 +129,40 @@ export default function NewChat() {
         router.push(`/chat/${conversationId}` as any);
       } else {
         // Direct chat: 1 user
+        const recipient = validUsers[0];
         console.log('💬 [NewChat] Creating direct chat', currentWorkspace ? `in workspace: ${currentWorkspace.name}` : '(no workspace)');
+        
+        // Check if recipient has private DM settings (requires invitation)
+        if (!currentWorkspace && recipient.dmPrivacySetting === 'private') {
+          console.log('🔒 [NewChat] Recipient has private DM settings, creating invitation');
+          
+          try {
+            const result = await createDirectMessageInvitation(recipient.uid);
+            Alert.alert(
+              'Invitation Sent',
+              `Your message request has been sent to ${result.recipientName}. They can accept or decline it from their invitations.`,
+              [{ text: 'OK', onPress: () => router.back() }]
+            );
+            return;
+          } catch (inviteError: any) {
+            // Handle specific error cases
+            if (inviteError.message?.includes('already have a pending invitation')) {
+              Alert.alert('Already Sent', 'You already have a pending invitation to this user');
+              return;
+            } else if (inviteError.message?.includes('Conversation already exists')) {
+              Alert.alert('Already Connected', 'You can already message this user');
+              return;
+            } else if (inviteError.message?.includes('banned for spam')) {
+              Alert.alert('Cannot Send', 'You are temporarily unable to send invitations');
+              return;
+            }
+            throw inviteError; // Re-throw other errors
+          }
+        }
+        
+        // Either workspace chat or public DM setting - create conversation directly
         const conversationId = await createOrOpenConversation(
-          validUsers[0], 
+          recipient, 
           user,
           currentWorkspace?.id,
           currentWorkspace?.name
