@@ -5,6 +5,11 @@ export { DecisionsModal } from './DecisionsModal';
 export { SearchModal } from './SearchModal';
 export { SummaryModal } from './SummaryModal';
 
+// Sub-Phase 7: Edit AI Content Components
+export { default as EditActionItemsModal } from './EditActionItemsModal';
+export { default as EditDecisionModal } from './EditDecisionModal';
+export { default as EditSummaryModal } from './EditSummaryModal';
+
 // Phase 4: Paid Tier Components
 export { HelpModal } from './HelpModal';
 export { ProfileButton } from './ProfileButton';

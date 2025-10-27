@@ -17,6 +17,11 @@ export { batchAnalyzePriority, quickPriorityCheckTrigger } from './ai/priority';
 export { semanticSearch } from './ai/search';
 export { generateSummary } from './ai/summarization';
 
+// Sub-Phase 7: Edit & Save AI Content
+export { saveEditedActionItems } from './ai/saveEditedActionItems';
+export { saveEditedDecision } from './ai/saveEditedDecision';
+export { saveEditedSummary } from './ai/saveEditedSummary';
+
 // Phase 3: Advanced AI Capability
 export { analyzeMeetingScheduling } from './ai/proactiveMeeting';
 
@@ -31,9 +36,15 @@ export {
 export { downgradeToFree, startFreeTrial, upgradeToPro } from './billing';
 
 // Sub-Phase 6.5: Group Chat Management
-export { addMemberToGroupChat } from './groupChats/addMemberToGroupChat';
 export { acceptGroupChatInvitation } from './groupChats/acceptGroupChatInvitation';
+export { addMemberToGroupChat } from './groupChats/addMemberToGroupChat';
 export { declineGroupChatInvitation } from './groupChats/declineGroupChatInvitation';
-export { reportGroupChatInvitationSpam } from './groupChats/reportGroupChatInvitationSpam';
 export { reportDirectMessageSpam } from './groupChats/reportDirectMessageSpam';
+export { reportGroupChatInvitationSpam } from './groupChats/reportGroupChatInvitationSpam';
+
+// Sub-Phase 7: Workspace Admin Features
+export { markMessageUrgent, unmarkMessageUrgent } from './workspaces/urgencyMarkers';
+export { pinMessage, unpinMessage } from './workspaces/pinnedMessages';
+export { expandWorkspaceCapacity } from './workspaces/capacityExpansion';
+
 

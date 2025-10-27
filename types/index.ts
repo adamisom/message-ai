@@ -20,6 +20,11 @@ export interface Message {
   priorityQuick?: 'high' | 'low' | 'unknown';
   priorityAnalyzedAt?: any;
   priorityNeedsAnalysis?: boolean;
+  
+  // Sub-Phase 7: Manual urgency markers
+  manuallyMarkedUrgent?: boolean;     // Admin override
+  markedUrgentBy?: string;            // Admin UID
+  markedUrgentAt?: any;
 }
 
 // ===== CONVERSATION TYPES =====
@@ -41,6 +46,14 @@ export interface Conversation {
   workspaceId?: string;
   workspaceName?: string;
   isWorkspaceChat?: boolean;
+  
+  // Sub-Phase 7: Pinned messages
+  pinnedMessages?: {          // Max 5
+    messageId: string;              // Reference to message doc
+    pinnedBy: string;               // Admin UID
+    pinnedAt: any;
+    order: number;                  // 0-4, for display sequence
+  }[];
 }
 
 // ===== USER TYPES =====
@@ -71,13 +84,13 @@ export interface User {
   // Phase 4: Spam prevention
   spamStrikes?: number;
   spamBanned?: boolean;
-  spamReportsReceived?: Array<{
+  spamReportsReceived?: {
     reportedBy: string;
     reason: 'workspace' | 'groupChat';
     timestamp: any;
     workspaceId?: string;
     conversationId?: string;
-  }>;
+  }[];
   
   // Sub-Phase 6.5: Direct message spam prevention (Phase C)
   blockedUsers?: string[]; // Array of user IDs that this user has blocked
@@ -110,6 +123,17 @@ export interface Summary {
   messageCount: number;
   generatedAt: any;
   generatedBy: string;
+  model?: string;
+  
+  // Sub-Phase 7: Edit & Save AI Content
+  editedByAdmin?: boolean;        // Flag: admin saved custom version
+  savedByAdmin?: string;          // Admin UID who saved
+  savedAt?: any;                  // When saved
+  originalAiVersion?: {           // Keep original AI for reference
+    summary: string;
+    keyPoints: string[];
+    generatedAt: any;
+  };
 }
 
 export interface ActionItem {
@@ -126,6 +150,11 @@ export interface ActionItem {
   extractedAt: any;
   extractedBy: string;
   completedAt?: any;
+  
+  // Sub-Phase 7: Edit & Save AI Content
+  editedByAdmin?: boolean;        // Flag: admin saved custom version
+  savedByAdmin?: string;          // Admin UID who saved
+  savedAt?: any;                  // When saved
 }
 
 export interface Decision {
@@ -137,6 +166,16 @@ export interface Decision {
   confidence: number;
   decidedAt: any;
   extractedAt: any;
+  
+  // Sub-Phase 7: Edit & Save AI Content
+  editedByAdmin?: boolean;        // Flag: admin saved custom version
+  savedByAdmin?: string;          // Admin UID who saved
+  savedAt?: any;                  // When saved
+  originalAiVersion?: {           // Keep original AI for reference
+    decision: string;
+    context: string;
+    extractedAt: any;
+  };
 }
 
 export interface SearchResult {

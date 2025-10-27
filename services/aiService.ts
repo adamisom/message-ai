@@ -237,3 +237,78 @@ export async function assignActionItem(
   }
 }
 
+/**
+ * Save Edited Summary - Sub-Phase 7
+ * Save admin/Pro-edited version of AI summary
+ * @param conversationId - Conversation ID
+ * @param editedSummary - Edited summary text
+ * @param editedKeyPoints - Edited key points array
+ * @throws Error with user-friendly message
+ */
+export async function saveEditedSummary(
+  conversationId: string,
+  editedSummary: string,
+  editedKeyPoints: string[]
+) {
+  try {
+    return await callAIFeatureWithTimeout(
+      'saveEditedSummary',
+      {conversationId, editedSummary, editedKeyPoints},
+      10000
+    );
+  } catch (error: any) {
+    console.error('[aiService] saveEditedSummary error:', error);
+    throw new Error(getErrorMessage(error));
+  }
+}
+
+/**
+ * Save Edited Decision - Sub-Phase 7
+ * Save admin/Pro-edited version of AI decision
+ * @param conversationId - Conversation ID
+ * @param decisionId - Decision ID
+ * @param editedDecision - Edited decision text
+ * @param editedContext - Edited context text
+ * @throws Error with user-friendly message
+ */
+export async function saveEditedDecision(
+  conversationId: string,
+  decisionId: string,
+  editedDecision: string,
+  editedContext: string
+) {
+  try {
+    return await callAIFeatureWithTimeout(
+      'saveEditedDecision',
+      {conversationId, decisionId, editedDecision, editedContext},
+      10000
+    );
+  } catch (error: any) {
+    console.error('[aiService] saveEditedDecision error:', error);
+    throw new Error(getErrorMessage(error));
+  }
+}
+
+/**
+ * Save Edited Action Items - Sub-Phase 7
+ * Save admin/Pro-edited action items
+ * @param conversationId - Conversation ID
+ * @param editedActionItems - Array of edited action items
+ * @throws Error with user-friendly message
+ */
+export async function saveEditedActionItems(
+  conversationId: string,
+  editedActionItems: any[]
+) {
+  try {
+    return await callAIFeatureWithTimeout(
+      'saveEditedActionItems',
+      {conversationId, editedActionItems},
+      10000
+    );
+  } catch (error: any) {
+    console.error('[aiService] saveEditedActionItems error:', error);
+    throw new Error(getErrorMessage(error));
+  }
+}
+

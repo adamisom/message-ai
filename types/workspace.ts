@@ -30,6 +30,14 @@ export interface Workspace {
   groupChatCount: number;
   directChatCount: number;
   totalMessages: number;
+  
+  // Sub-Phase 7: Admin features
+  autoUrgencyEnabled?: boolean;         // Default: true (AI urgency detection)
+  pendingCapacityChange?: {             // For downgrades (future)
+    newMaxUsers: number;
+    requestedAt: Timestamp;
+    effectiveDate: Timestamp;           // 1st of next month
+  };
 }
 
 /**
@@ -74,5 +82,24 @@ export interface CreateWorkspaceRequest {
 export interface CreateWorkspaceResult {
   workspace: Workspace;
   invitationsSent: number;
+}
+
+/**
+ * Billing Event - Sub-Phase 7: Capacity expansion tracking
+ */
+export interface BillingEvent {
+  id: string;
+  type: 'expansion' | 'downgrade_requested' | 'downgrade_applied' | 'payment_failed' | 'payment_recovered';
+  timestamp: Timestamp;
+  triggeredBy: string;                 // Admin UID
+  
+  details: {
+    oldCapacity?: number;
+    newCapacity?: number;
+    proratedCharge?: number;
+    daysRemaining?: number;
+    paymentIntentId?: string;          // Stripe reference (production)
+    errorMessage?: string;             // If payment failed
+  };
 }
 
