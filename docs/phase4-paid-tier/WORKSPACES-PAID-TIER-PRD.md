@@ -2106,6 +2106,7 @@ function getInitials(displayName: string): string {
 **Export Format:**
 
 Clean JSON with human-readable timestamps:
+
 - Workspace metadata (ID, name, export timestamp, admin)
 - Members array (email, displayName, role, joinedAt)
 - Conversations array with full message history
@@ -2114,6 +2115,7 @@ Clean JSON with human-readable timestamps:
 - Export metadata (counts, limits, warnings)
 
 **MVP Limitations:**
+
 - JSON only (Markdown export deferred)
 - 1000 messages per conversation limit (documented in export)
 - 50-second timeout protection (incomplete export warning shown)

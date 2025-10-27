@@ -14,21 +14,22 @@ import { ErrorBoundary } from '../../components/ErrorBoundary';
 import {
     createGroupConversation,
     createOrOpenConversation,
-    findUserByEmail
+    findUserByPhoneNumber
 } from '../../services/firestoreService';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { Colors } from '../../utils/colors';
-import { validateEmail } from '../../utils/validators';
+import { validatePhoneNumber } from '../../utils/validators';
 
 interface User {
   uid: string;
   email: string;
   displayName: string;
+  phoneNumber: string;
 }
 
 export default function NewChat() {
-  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [validUsers, setValidUsers] = useState<User[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,22 +48,22 @@ export default function NewChat() {
     setError('');
     setLoading(true);
 
-    console.log('🔍 [NewChat] Adding user with email:', email);
+    console.log('🔍 [NewChat] Adding user with phone:', phoneNumber);
 
     try {
-      // Validate email format first
-      if (!validateEmail(email)) {
-        console.log('❌ [NewChat] Invalid email format');
-        setError('Invalid email format');
+      // Validate phone number format first
+      if (!validatePhoneNumber(phoneNumber)) {
+        console.log('❌ [NewChat] Invalid phone number format');
+        setError('Invalid phone number (must be 10 digits, US/Canada only)');
         return;
       }
 
-      // Find user in Firestore
-      const foundUser = await findUserByEmail(email);
+      // Find user in Firestore by phone number
+      const foundUser = await findUserByPhoneNumber(phoneNumber);
       
       if (!foundUser) {
         console.log('❌ [NewChat] User not found');
-        setError('No user found with that email');
+        setError('No user found with that phone number');
         return;
       }
 
@@ -90,7 +91,7 @@ export default function NewChat() {
       // Add to list
       console.log('✅ [NewChat] User added:', foundUser.displayName);
       setValidUsers([...validUsers, foundUser]);
-      setEmail('');
+      setPhoneNumber('');
       
     } catch (err: any) {
       console.error('❌ [NewChat] Error adding user:', err);
@@ -187,12 +188,10 @@ export default function NewChat() {
       <View style={styles.inputSection}>
         <TextInput
           style={styles.input}
-          placeholder="Enter email address"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
+          placeholder="Enter phone number (10 digits)"
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
+          keyboardType="phone-pad"
           editable={!loading}
           onSubmitEditing={handleAddUser}
           returnKeyType="done"
@@ -200,7 +199,7 @@ export default function NewChat() {
         <Button
           title="Add User"
           onPress={handleAddUser}
-          disabled={loading || !email.trim()}
+          disabled={loading || !phoneNumber.trim()}
         />
       </View>
 

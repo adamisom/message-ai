@@ -18,8 +18,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { HelpModal, SpamWarningBanner, UpgradeToProModal } from '../../components';
-import { logoutUser } from '../../services/authService';
+import { HelpModal, SpamWarningBanner, UpgradeToProModal, UserSettingsModal } from '../../components';
+import { logoutUser, updateUserProfile } from '../../services/authService';
 import { getUserGroupChatInvitations } from '../../services/groupChatService';
 import { getUserSpamStatus, SpamStatus } from '../../services/spamService';
 import { getUserWorkspaceInvitations } from '../../services/workspaceService';
@@ -56,11 +56,22 @@ function formatDate(timestamp: any): string {
   });
 }
 
+/**
+ * Format phone number for display
+ * Input: "1234567890" -> Output: "(123) 456-7890"
+ */
+function formatPhoneNumber(phoneNumber: string): string {
+  if (!phoneNumber || phoneNumber.length !== 10) return phoneNumber;
+  
+  return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6)}`;
+}
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout, refreshUserProfile } = useAuthStore();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isStartingTrial, setIsStartingTrial] = useState(false);
   const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
@@ -272,6 +283,18 @@ export default function ProfileScreen() {
     );
   };
   
+  // Save DM privacy setting
+  const handleSaveDmSetting = async (newSetting: 'private' | 'public') => {
+    if (!user?.uid) return;
+    
+    try {
+      await updateUserProfile(user.uid, { dmPrivacySetting: newSetting });
+      await refreshUserProfile();
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to update settings');
+    }
+  };
+  
   return (
     <ScrollView
       style={styles.container}
@@ -280,14 +303,24 @@ export default function ProfileScreen() {
     >
       {/* Top Button Row */}
       <View style={styles.topButtonRow}>
-        {/* Help Button (Left) */}
-        <TouchableOpacity
-          style={styles.helpButton}
-          onPress={() => setShowHelpModal(true)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="help-circle-outline" size={24} color="#007AFF" />
-        </TouchableOpacity>
+        {/* Help & Settings Buttons (Left) */}
+        <View style={styles.leftButtons}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => setShowHelpModal(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="help-circle-outline" size={24} color="#007AFF" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.iconButton, { marginLeft: 12 }]}
+            onPress={() => setShowSettingsModal(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="settings-outline" size={24} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
 
         {/* Logout Button (Right) */}
         <TouchableOpacity
@@ -362,6 +395,11 @@ export default function ProfileScreen() {
         
         {/* Display Name */}
         <Text style={styles.displayName}>{user.displayName}</Text>
+        
+        {/* Phone Number */}
+        <Text style={styles.phoneNumber}>
+          {user.phoneNumber ? formatPhoneNumber(user.phoneNumber) : 'No phone number'}
+        </Text>
         
         {/* Email */}
         <Text style={styles.email}>{user.email}</Text>
@@ -480,6 +518,14 @@ export default function ProfileScreen() {
         onRefresh={handleManualRefresh}
         isRefreshing={isRefreshing}
       />
+      
+      {/* Sub-Phase 11: User Settings Modal */}
+      <UserSettingsModal
+        visible={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        currentSetting={user?.dmPrivacySetting || 'private'}
+        onSave={handleSaveDmSetting}
+      />
     </ScrollView>
   );
 }
@@ -499,6 +545,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     marginBottom: 20,
+  },
+  leftButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconButton: {
+    padding: 8,
   },
   helpButton: {
     padding: 8,
@@ -618,6 +671,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: Colors.textDark,
     marginBottom: 4,
+  },
+  phoneNumber: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: Colors.primary,
+    marginBottom: 2,
+    letterSpacing: 0.3,
   },
   email: {
     fontSize: 14,

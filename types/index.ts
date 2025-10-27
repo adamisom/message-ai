@@ -62,6 +62,7 @@ export interface User {
   uid: string;
   email: string;
   displayName: string;
+  phoneNumber: string; // 10 digits, US/Canada only - REQUIRED for signup
   isOnline?: boolean;
   lastSeenAt?: any;
   
@@ -92,9 +93,12 @@ export interface User {
     conversationId?: string;
   }[];
   
-  // Sub-Phase 6.5: Direct message spam prevention (Phase C)
-  blockedUsers?: string[]; // Array of user IDs that this user has blocked
-  hiddenConversations?: string[]; // Array of conversation IDs hidden due to spam reports
+  // Sub-Phase 6.5: User blocking & conversation hiding
+  blockedUsers?: string[]; // UIDs of users this user has blocked (DM only)
+  hiddenConversations?: string[]; // Conversation IDs this user has hidden (spam reports)
+  
+  // Sub-Phase 11 (Polish): DM Privacy Settings
+  dmPrivacySetting?: 'private' | 'public'; // Default: 'private' (requires invitation)
 }
 
 export interface UserStatusInfo {

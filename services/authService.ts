@@ -16,7 +16,8 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  Timestamp
+  Timestamp,
+  updateDoc,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase.config';
 import { setUserOffline, setUserOnline } from './presenceService';
@@ -31,6 +32,7 @@ export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
+  phoneNumber: string; // Required 10-digit phone number
   isOnline: boolean;
   lastSeenAt: any; // Firestore Timestamp
   createdAt: any; // Firestore Timestamp
@@ -60,6 +62,7 @@ export interface UserProfile {
   // Sub-Phase 6.5: Direct message spam prevention (Phase C)
   blockedUsers?: string[]; // Array of user IDs that this user has blocked
   hiddenConversations?: string[]; // Array of conversation IDs hidden due to spam reports
+  dmPrivacySetting?: 'private' | 'public'; // Default: 'private' (requires invitation for DMs)
 }
 
 /**
@@ -70,7 +73,8 @@ export interface UserProfile {
 export const registerUser = async (
   email: string,
   password: string,
-  displayName: string
+  displayName: string,
+  phoneNumber: string
 ): Promise<UserProfile> => {
   try {
     // Phase 4: Check 500 user limit
@@ -88,7 +92,7 @@ export const registerUser = async (
     const user = userCredential.user;
 
     // Create Firestore user profile (includes trial initialization)
-    const userProfile = await createUserProfile(user.uid, email, displayName);
+    const userProfile = await createUserProfile(user.uid, email, displayName, phoneNumber);
 
     return userProfile;
   } catch (error: any) {
@@ -151,13 +155,35 @@ export const logoutUser = async (): Promise<void> => {
 };
 
 /**
+ * Update user profile fields
+ * Used for updating settings like dmPrivacySetting, phoneNumber, etc.
+ */
+export const updateUserProfile = async (
+  uid: string,
+  updates: Partial<UserProfile>
+): Promise<void> => {
+  try {
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    });
+    console.log('[authService] User profile updated:', Object.keys(updates));
+  } catch (error) {
+    console.error('[authService] Error updating user profile:', error);
+    throw error;
+  }
+};
+
+/**
  * Create user profile in Firestore
  * Phase 4: Initializes 5-day free trial
  */
 export const createUserProfile = async (
   uid: string,
   email: string,
-  displayName: string
+  displayName: string,
+  phoneNumber: string
 ): Promise<UserProfile> => {
   try {
     const now = new Date();
@@ -167,6 +193,7 @@ export const createUserProfile = async (
       uid,
       email: email.toLowerCase().trim(),
       displayName: displayName.trim(),
+      phoneNumber: phoneNumber.replace(/\D/g, ''), // Store as 10 digits only
       isOnline: true,
       lastSeenAt: serverTimestamp(),
       createdAt: serverTimestamp(),
@@ -185,6 +212,11 @@ export const createUserProfile = async (
       spamStrikes: 0,
       spamBanned: false,
       spamReportsReceived: [],
+      // Sub-Phase 6.5: User blocking & conversation hiding
+      blockedUsers: [],
+      hiddenConversations: [],
+      // Sub-Phase 11: DM Privacy (default: private)
+      dmPrivacySetting: 'private',
     };
 
     await setDoc(doc(db, 'users', uid), userProfile);

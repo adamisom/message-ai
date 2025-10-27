@@ -22,17 +22,20 @@ import {
   getDisplayNameError,
   getEmailError,
   getPasswordError,
+  getPhoneNumberError,
 } from '../../utils/validators';
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({
     email: '',
     password: '',
     displayName: '',
+    phoneNumber: '',
     general: '',
   });
 
@@ -40,18 +43,20 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     // Clear previous errors
-    setErrors({ email: '', password: '', displayName: '', general: '' });
+    setErrors({ email: '', password: '', displayName: '', phoneNumber: '', general: '' });
 
     // Validate inputs
     const emailError = getEmailError(email);
     const passwordError = getPasswordError(password);
     const displayNameError = getDisplayNameError(displayName);
+    const phoneNumberError = getPhoneNumberError(phoneNumber);
 
-    if (emailError || passwordError || displayNameError) {
+    if (emailError || passwordError || displayNameError || phoneNumberError) {
       setErrors({
         email: emailError || '',
         password: passwordError || '',
         displayName: displayNameError || '',
+        phoneNumber: phoneNumberError || '',
         general: '',
       });
       return;
@@ -60,7 +65,7 @@ export default function RegisterScreen() {
     setLoading(true);
 
     try {
-      const userProfile = await registerUser(email, password, displayName);
+      const userProfile = await registerUser(email, password, displayName, phoneNumber);
       await setUser(userProfile);
       
       // Navigate to main app (will be redirected by index.tsx)
@@ -70,6 +75,7 @@ export default function RegisterScreen() {
         email: '',
         password: '',
         displayName: '',
+        phoneNumber: '',
         general: error.message || 'Registration failed. Please try again.',
       });
     } finally {
@@ -110,6 +116,26 @@ export default function RegisterScreen() {
               {errors.displayName ? (
                 <Text style={styles.inputErrorText}>{errors.displayName}</Text>
               ) : null}
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Phone Number</Text>
+              <TextInput
+                style={[styles.input, errors.phoneNumber ? styles.inputError : null]}
+                placeholder="(123) 456-7890"
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                keyboardType="phone-pad"
+                autoComplete="tel"
+                editable={!loading}
+              />
+              {errors.phoneNumber ? (
+                <Text style={styles.inputErrorText}>{errors.phoneNumber}</Text>
+              ) : (
+                <Text style={styles.helperText}>
+                  Phone number is required because that's how friends find you
+                </Text>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -236,6 +262,12 @@ const styles = StyleSheet.create({
     color: '#f00',
     fontSize: 12,
     marginTop: 4,
+  },
+  helperText: {
+    color: '#666',
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   button: {
     backgroundColor: '#007AFF',

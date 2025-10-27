@@ -55,6 +55,39 @@ export const findUserByEmail = async (email: string): Promise<User | null> => {
   
   const userDoc = snapshot.docs[0];
   const user = { 
+    uid: userDoc.id,
+    ...userDoc.data(),
+  } as User;
+  
+  console.log('✅ [firestoreService] User found:', user.displayName);
+  return user;
+};
+
+/**
+ * Find a user by phone number
+ * Used in New Chat screen for phone-based user discovery
+ */
+export const findUserByPhoneNumber = async (phoneNumber: string): Promise<User | null> => {
+  // Normalize to 10 digits only
+  const normalizedPhone = phoneNumber.replace(/\D/g, '');
+  
+  console.log('🔍 [firestoreService] Finding user by phone:', normalizedPhone);
+  
+  const q = query(
+    collection(db, 'users'),
+    where('phoneNumber', '==', normalizedPhone),
+    limit(1)
+  );
+  
+  const snapshot = await getDocs(q);
+  
+  if (snapshot.empty) {
+    console.log('❌ [firestoreService] User not found');
+    return null;
+  }
+  
+  const userDoc = snapshot.docs[0];
+  const user = { 
     uid: userDoc.id, 
     ...userDoc.data() 
   } as User;

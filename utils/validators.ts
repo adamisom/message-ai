@@ -92,3 +92,35 @@ export const getDisplayNameError = (name: string): string | null => {
   return null;
 };
 
+/**
+ * Validate phone number (US/Canada - 10 digits only)
+ * @param phoneNumber - Phone number string to validate (can include formatting)
+ * @returns true if valid 10-digit phone number
+ */
+export const validatePhoneNumber = (phoneNumber: string): boolean => {
+  if (!phoneNumber || typeof phoneNumber !== 'string') {
+    return false;
+  }
+  
+  // Remove all non-digit characters
+  const digits = phoneNumber.replace(/\D/g, '');
+  
+  // Must be exactly 10 digits (US/Canada)
+  return digits.length === 10;
+};
+
+/**
+ * Get validation error message for phone number
+ * @param phoneNumber - Phone number to validate
+ * @returns Error message or null if valid
+ */
+export const getPhoneNumberError = (phoneNumber: string): string | null => {
+  if (!phoneNumber) {
+    return "Phone number is required because that's how friends find you";
+  }
+  if (!validatePhoneNumber(phoneNumber)) {
+    return 'Please enter a valid 10-digit phone number (US/Canada only)';
+  }
+  return null;
+};
+

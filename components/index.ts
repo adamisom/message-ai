@@ -19,6 +19,9 @@ export { default as ReadOnlyWorkspaceBanner } from './ReadOnlyWorkspaceBanner';
 // Sub-Phase 8: Spam Prevention UI
 export { default as SpamWarningBanner } from './SpamWarningBanner';
 
+// Sub-Phase 11: User Settings
+export { UserSettingsModal } from './UserSettingsModal';
+
 // Phase 4: Paid Tier Components
 export { HelpModal } from './HelpModal';
 export { ProfileButton } from './ProfileButton';
