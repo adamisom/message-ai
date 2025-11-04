@@ -28,11 +28,11 @@ export const getUserSpamStatus = functions.https.onCall(async (data, context) =>
   const twentyFourHoursAgo = admin.firestore.Timestamp.fromMillis(now.toMillis() - 24 * 60 * 60 * 1000);
 
   const activeStrikes = spamReports.filter(
-    (report: any) => report.reportedAt.toMillis() > thirtyDaysAgo.toMillis()
+    (report: any) => report.timestamp?.toMillis?.() > thirtyDaysAgo.toMillis()
   );
 
   const recentStrikes = spamReports.filter(
-    (report: any) => report.reportedAt.toMillis() > twentyFourHoursAgo.toMillis()
+    (report: any) => report.timestamp?.toMillis?.() > twentyFourHoursAgo.toMillis()
   );
 
   // Calculate ban status
@@ -52,8 +52,9 @@ export const getUserSpamStatus = functions.https.onCall(async (data, context) =>
   else if (recentStrikeCount >= 2) {
     status = 'temp_banned';
     const mostRecentStrike = recentStrikes[recentStrikes.length - 1];
+    const strikeTime = mostRecentStrike.timestamp?.toMillis?.() || Date.now();
     banEndsAt = admin.firestore.Timestamp.fromMillis(
-      mostRecentStrike.reportedAt.toMillis() + 24 * 60 * 60 * 1000
+      strikeTime + 24 * 60 * 60 * 1000
     );
     const hoursRemaining = Math.ceil((banEndsAt.toMillis() - now.toMillis()) / (60 * 60 * 1000));
     message = `Your account is temporarily banned for ${hoursRemaining} hours due to receiving 2 spam reports within 24 hours.`;
