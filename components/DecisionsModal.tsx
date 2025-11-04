@@ -41,6 +41,8 @@ export function DecisionsModal({
   const { user } = useAuthStore();
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingDecision, setEditingDecision] = useState<Decision | null>(null);
+  const [viewMode, setViewMode] = useState<'saved' | 'fresh'>('saved');
+  const [freshAiDecisions, setFreshAiDecisions] = useState<Decision[] | null>(null);
   
   const { data, loading, loadingSlowly, error, reload } = useAIFeature<any>({
     visible,
@@ -53,27 +55,21 @@ export function DecisionsModal({
   // Determine if user can edit
   const canEdit = isWorkspaceChat ? isAdminProp : user?.isPaidUser;
   
-  console.log('🔍 [DecisionsModal] canEdit check:', {
-    isWorkspaceChat,
-    isAdminProp,
-    isPaidUser: user?.isPaidUser,
-    canEdit,
-  });
+  // Check if decisions have been edited
+  const hasSavedVersion = decisions.some((d: Decision) => d.editedByAdmin === true);
+
+  // Display decisions based on view mode
+  const displayedDecisions = viewMode === 'fresh' && freshAiDecisions ? freshAiDecisions : decisions;
 
   const handleClose = () => {
     setShowEditModal(false);
     setEditingDecision(null);
+    setViewMode('saved');
+    setFreshAiDecisions(null);
     onClose();
   };
 
   const handleEditPress = (decision: Decision) => {
-    console.log('🖊️ [DecisionsModal] Edit pressed for decision:', {
-      id: decision.id,
-      decision: decision.decision,
-      hasId: !!decision.id,
-      fullObject: decision,
-    });
-    
     // Close the main modal first so edit modal can show on top
     onClose();
     
@@ -82,8 +78,6 @@ export function DecisionsModal({
       setEditingDecision(decision);
       setShowEditModal(true);
     }, 300);
-    
-    console.log('🖊️ [DecisionsModal] Main modal closing, edit modal will open');
   };
 
   const handleSaveEdit = async (editedDecision: string, editedContext: string) => {
@@ -102,6 +96,17 @@ export function DecisionsModal({
       reload(); // Reload to show saved version
     } catch (error: any) {
       throw error; // Let EditDecisionModal handle it
+    }
+  };
+
+  const handleGetFreshAI = async () => {
+    try {
+      const fresh = await trackDecisions(conversationId) as any;
+      const freshDecisions = fresh.decisions || [];
+      setFreshAiDecisions(freshDecisions);
+      setViewMode('fresh');
+    } catch (error: any) {
+      Alerts.error(error.message || 'Failed to generate fresh decisions');
     }
   };
 
@@ -131,8 +136,9 @@ export function DecisionsModal({
 
           {/* Decisions List */}
           {!loading && !error && (
+            <>
             <FlatList
-              data={decisions}
+              data={displayedDecisions}
               keyExtractor={(item, index) => item.id || `decision-${index}`}
               renderItem={({item}) => (
                 <View style={styles.decisionCard}>
@@ -145,7 +151,7 @@ export function DecisionsModal({
                   {/* Decision Content */}
                   <View style={styles.decisionContent}>
                     {/* Edited Badge */}
-                    {item.editedByAdmin && (
+                    {item.editedByAdmin && viewMode === 'saved' && (
                       <View style={styles.editedBadge}>
                         <Ionicons name="pencil" size={14} color={Colors.primary} />
                         <Text style={styles.editedBadgeText}>Edited by Admin</Text>
@@ -163,8 +169,8 @@ export function DecisionsModal({
                     {/* Context */}
                     <Text style={styles.contextText}>{item.context}</Text>
 
-                    {/* Edit Button */}
-                    {canEdit && (
+                    {/* Edit Button (only in saved view) */}
+                    {canEdit && viewMode === 'saved' && (
                       <TouchableOpacity
                         style={styles.editButton}
                         onPress={() => handleEditPress(item)}
@@ -215,9 +221,35 @@ export function DecisionsModal({
               }
               contentContainerStyle={[
                 styles.listContent,
-                decisions.length === 0 && styles.listContentEmpty,
+                displayedDecisions.length === 0 && styles.listContentEmpty,
               ]}
             />
+
+            {/* Toggle Buttons */}
+            {canEdit && displayedDecisions.length > 0 && (
+              <View style={styles.actionButtons}>
+                {hasSavedVersion && viewMode === 'saved' && (
+                  <TouchableOpacity
+                    style={styles.freshButton}
+                    onPress={handleGetFreshAI}
+                  >
+                    <Ionicons name="refresh-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.freshButtonText}>Get Fresh AI Analysis</Text>
+                  </TouchableOpacity>
+                )}
+
+                {viewMode === 'fresh' && (
+                  <TouchableOpacity
+                    style={styles.freshButton}
+                    onPress={() => setViewMode('saved')}
+                  >
+                    <Ionicons name="bookmark-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.freshButtonText}>View Your Saved Version</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+            </>
           )}
         </View>
       </Modal>
@@ -346,5 +378,31 @@ const styles = StyleSheet.create({
   participantsText: {
     fontSize: 12,
     color: Colors.textLight,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E8E8E8',
+    backgroundColor: '#fff',
+  },
+  freshButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    gap: 6,
+  },
+  freshButtonText: {
+    color: Colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

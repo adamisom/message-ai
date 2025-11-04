@@ -246,8 +246,8 @@ export function ActionItemsModal({
   // Determine if user can edit
   const canEdit = workspaceId ? isAdmin : user?.isPaidUser;
 
-  // Check if action items have been edited
-  const hasSavedVersion = data?.editedByAdmin === true;
+  // Check if action items have been edited (any item has editedByAdmin flag)
+  const hasSavedVersion = items.some((item: ActionItem) => item.editedByAdmin === true);
 
   // Display items based on view mode
   const displayedItems = viewMode === 'fresh' && freshAiItems ? freshAiItems : items;
