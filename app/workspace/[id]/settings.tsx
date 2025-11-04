@@ -97,8 +97,9 @@ export default function WorkspaceSettingsScreen() {
         }
         
         Alerts.success(message);
-      } else {
-        Alerts.error(result.error || 'Unknown error');
+      } else if (result.error && result.error !== 'Export cancelled') {
+        // Don't show error if user cancelled
+        Alerts.error(result.error);
       }
     } catch (error: any) {
       console.error('Export workspace error:', error);
