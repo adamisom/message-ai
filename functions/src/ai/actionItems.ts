@@ -64,6 +64,11 @@ export const extractActionItems = functions
 
     if (cache) {
       console.log('Cache hit for action items');
+      // If any items have been edited by admin, always use cache (ignore new messages)
+      const hasEditedItems = cache.items?.some((item: any) => item.editedByAdmin === true);
+      if (hasEditedItems) {
+        console.log('Cache has admin-edited items, using cached version');
+      }
       return {items: cache.items};
     }
 

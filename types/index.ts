@@ -28,8 +28,9 @@ export interface Message {
   deletedAt?: any;
   deletedBy?: string; // UID of user who deleted it
   
-  // Sub-Phase 7: Manual urgency markers
-  manuallyMarkedUrgent?: boolean;     // Admin override
+  // Sub-Phase 7: Manual urgency markers (two-field system)
+  hasManualUrgencyOverride?: boolean;  // true if admin has manually set urgency (overrides AI)
+  showUrgentBadge?: boolean;          // the actual value: true = show badge, false = don't show
   markedUrgentBy?: string;            // Admin UID
   markedUrgentAt?: any;
 }
@@ -53,6 +54,8 @@ export interface Conversation {
   workspaceId?: string;
   workspaceName?: string;
   isWorkspaceChat?: boolean;
+  // Phase 4: Soft delete
+  inactiveParticipants?: string[]; // UIDs of users who have "deleted" this chat
   
   // Sub-Phase 7: Pinned messages
   pinnedMessages?: {          // Max 5

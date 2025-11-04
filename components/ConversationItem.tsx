@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Conversation, UserStatusInfo } from '../types';
 import { Colors } from '../utils/colors';
 import { getConversationName } from '../utils/conversationHelpers';
@@ -11,13 +11,15 @@ interface ConversationItemProps {
   currentUserId: string;
   userStatuses?: Record<string, UserStatusInfo>;
   onPress: () => void;
+  onDelete?: () => void; // Optional delete handler
 }
 
 export default function ConversationItem({ 
   conversation, 
   currentUserId,
   userStatuses,
-  onPress 
+  onPress,
+  onDelete
 }: ConversationItemProps) {
   // Get online status for direct chats
   const getDirectChatStatus = () => {
@@ -31,6 +33,27 @@ export default function ConversationItem({
   };
 
   const directChatStatus = getDirectChatStatus();
+  
+  // Check if this is a workspace chat (don't allow deletion)
+  const isWorkspaceChat = !!conversation.workspaceId;
+  
+  // Handle long press for non-workspace chats
+  const handleLongPress = () => {
+    if (isWorkspaceChat || !onDelete) return;
+    
+    Alert.alert(
+      'Delete Chat',
+      'This will remove the chat from your list. The chat will still exist for other participants.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: onDelete
+        }
+      ]
+    );
+  };
 
   // Check if conversation has unread messages
   const hasUnread = () => {
@@ -93,7 +116,12 @@ export default function ConversationItem({
   const isUnread = hasUnread();
 
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress}>
+    <TouchableOpacity 
+      style={styles.container} 
+      onPress={onPress}
+      onLongPress={handleLongPress}
+      delayLongPress={500}
+    >
       <View style={styles.content}>
         <View style={styles.header}>
           <View style={styles.nameContainer}>

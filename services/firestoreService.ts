@@ -113,7 +113,8 @@ export const createOrOpenConversation = async (
   workspaceName?: string
 ): Promise<string> => {
   // Sort UIDs to ensure consistent conversation ID
-  const conversationId = generateConversationId(currentUser.uid, otherUser.uid);
+  // Include workspaceId to keep workspace DMs separate from general DMs
+  const conversationId = generateConversationId(currentUser.uid, otherUser.uid, workspaceId);
   const conversationRef = doc(db, 'conversations', conversationId);
   
   console.log('💬 [firestoreService] Creating/opening conversation:', conversationId, workspaceId ? `(workspace: ${workspaceName})` : '(no workspace)');
@@ -162,19 +163,26 @@ export const createOrOpenConversation = async (
  * @param currentUser - Current user's data
  * @param workspaceId - Optional workspace ID for workspace-scoped chats
  * @param workspaceName - Optional workspace name for workspace-scoped chats
+ * @param groupName - Optional custom group name
  * @returns conversationId
  */
 export const createGroupConversation = async (
   participants: User[], 
   currentUser: User,
   workspaceId?: string,
-  workspaceName?: string
+  workspaceName?: string,
+  groupName?: string
 ): Promise<string> => {
-  if (participants.length < 2) {
-    throw new Error('Group chat requires at least 2 other participants');
+  if (participants.length < 1) {
+    throw new Error('Group chat requires at least 1 other participant');
   }
 
-  const participantIds = [currentUser.uid, ...participants.map(p => p.uid)];
+  // Phase 4: For non-workspace groups, only add creator initially
+  // Invited users will be added when they accept invitations
+  const participantIds = workspaceId 
+    ? [currentUser.uid, ...participants.map(p => p.uid)] // Workspace: add all immediately
+    : [currentUser.uid]; // Non-workspace: only creator initially
+    
   const participantDetails: Record<string, ParticipantDetail> = {
     [currentUser.uid]: { 
       displayName: currentUser.displayName, 
@@ -182,6 +190,7 @@ export const createGroupConversation = async (
     },
   };
 
+  // Add all participant details (for display purposes)
   participants.forEach(p => {
     participantDetails[p.uid] = { 
       displayName: p.displayName, 
@@ -189,11 +198,14 @@ export const createGroupConversation = async (
     };
   });
 
-  console.log('👥 [firestoreService] Creating group conversation with', participantIds.length, 'members', workspaceId ? `(workspace: ${workspaceName})` : '(no workspace)');
+  console.log('👥 [firestoreService] Creating group conversation with', participants.length + 1, 'members', workspaceId ? `(workspace: ${workspaceName})` : '(invitations will be sent)');
+
+  // Determine group name
+  const displayName = groupName?.trim() || `Group with ${participants.length + 1} members`;
 
   const conversationRef = await addDoc(collection(db, 'conversations'), {
     type: 'group',
-    name: `Group with ${participantIds.length} members`,
+    name: displayName,
     participants: participantIds,
     participantDetails,
     creatorId: currentUser.uid,

@@ -38,6 +38,18 @@ export const FEATURE_FLAGS = {
    * Enables AI-powered decision detection in group conversations.
    */
   DECISION_TRACKING_ENABLED: true,
+
+  /**
+   * Presence Tracking (MVP Feature)
+   * Tracks user online/offline status and last seen timestamps.
+   * 
+   * NOTE: There's a suspected SDK bug where Firestore client reads only return
+   * fields that were written by the client. Disabling this helps isolate
+   * whether presence writes are interfering with user profile reads.
+   * 
+   * Status: Set to false for Phase 4 testing
+   */
+  PRESENCE_TRACKING_ENABLED: false,
 } as const;
 
 /**

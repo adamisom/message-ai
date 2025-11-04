@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     Modal,
     ScrollView,
@@ -65,14 +65,18 @@ export function SummaryModal({
   };
 
   const handleEditPress = () => {
+    onClose(); // Close main modal first
+    setTimeout(() => {
     setShowEditModal(true);
+    }, 300);
   };
 
   const handleSaveEdit = async (editedSummary: string, editedKeyPoints: string[]) => {
     try {
       await saveEditedSummary(conversationId, editedSummary, editedKeyPoints);
+      setShowEditModal(false);
       Alerts.success('Summary saved successfully');
-      reload(); // Reload to show saved version
+      // Don't reload here - user needs to reopen Summary modal to see it
     } catch (error: any) {
       throw error; // Let EditSummaryModal handle it
     }

@@ -86,7 +86,7 @@ export default function WorkspaceSettingsScreen() {
 
     setIsExporting(true);
     try {
-      const result = await exportWorkspaceData(id);
+      const result = await exportWorkspaceData(id, workspace.name);
       
       if (result.success && result.data) {
         const { metadata } = result.data;
@@ -97,8 +97,9 @@ export default function WorkspaceSettingsScreen() {
         }
         
         Alerts.success(message);
-      } else {
-        Alerts.error(result.error || 'Unknown error');
+      } else if (result.error && result.error !== 'Export cancelled') {
+        // Don't show error if user cancelled
+        Alerts.error(result.error);
       }
     } catch (error: any) {
       console.error('Export workspace error:', error);
@@ -321,6 +322,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingTop: 60,
     paddingBottom: 40,
   },
   loadingContainer: {

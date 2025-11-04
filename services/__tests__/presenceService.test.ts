@@ -24,6 +24,12 @@ jest.mock('../../firebase.config', () => ({
 describe('presenceService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Suppress console.log in tests to reduce noise
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('setUserOnline', () => {

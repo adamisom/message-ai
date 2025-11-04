@@ -57,7 +57,15 @@ export const generateSummary = functions
       5 // max 5 new messages
     );
 
-    if (cache && cache.messageCount === data.messageCount) {
+    // If admin edited, ALWAYS use the saved version (ignore message count changes)
+    if (cache && cache.editedByAdmin) {
+      console.log('Cache hit for admin-edited summary');
+      return cache;
+    }
+
+    // For non-edited summaries, check if cache is usable
+    // Use cache if requested count >= cached count (asking for more than what was summarized)
+    if (cache && data.messageCount >= cache.messageCount) {
       console.log('Cache hit for summary');
       return cache;
     }

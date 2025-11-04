@@ -85,52 +85,80 @@ export const saveEditedActionItems = functions.https.onCall(async (data, context
     }
   }
 
-  // 4. Update each action item in the ai_cache collection
-  const batch = db.batch();
-  const now = admin.firestore.FieldValue.serverTimestamp();
+  // 4. Get existing action items from ai_cache
+  const cacheRef = db.collection(`conversations/${conversationId}/ai_cache`).doc('action_items');
+  const cacheSnap = await cacheRef.get();
 
-  for (const item of editedActionItems) {
-    if (!item.id) {
+  if (!cacheSnap.exists) {
+    throw new functions.https.HttpsError(
+      'not-found',
+      'No action items found. Generate action items first.'
+    );
+  }
+
+  const cacheData = cacheSnap.data()!;
+  const items = cacheData.items || [];
+  
+  // Validate and update each edited action item in the array
+  const updatedItems = [...items];
+
+  for (const editedItem of editedActionItems) {
+    if (!editedItem.id) {
       throw new functions.https.HttpsError(
         'invalid-argument',
         'Each action item must have an id'
       );
     }
 
-    const actionItemRef = db
-      .collection(`conversations/${conversationId}/ai_cache`)
-      .doc(`action_item_${item.id}`);
+    // Find the item in the array
+    const itemIndex = updatedItems.findIndex((item: any) => item.id === editedItem.id);
 
-    // Get existing item to check if it exists
-    const existingItem = await actionItemRef.get();
-
-    if (!existingItem.exists) {
+    if (itemIndex === -1) {
       throw new functions.https.HttpsError(
         'not-found',
-        `Action item ${item.id} not found`
+        `Action item ${editedItem.id} not found`
       );
     }
+    
+    const existingItem = updatedItems[itemIndex];
 
-    // Update with edited data
-    batch.update(actionItemRef, {
-      text: item.text,
-      assigneeUid: item.assigneeUid || null,
-      assigneeDisplayName: item.assigneeDisplayName || null,
-      assigneeEmail: item.assigneeEmail || null,
-      dueDate: item.dueDate || null,
-      priority: item.priority || 'medium',
+    // Update the item with edited data, preserving original if first edit
+    updatedItems[itemIndex] = {
+      ...existingItem,
+      text: editedItem.text,
+      assigneeUid: editedItem.assigneeUid || null,
+      assigneeDisplayName: editedItem.assigneeDisplayName || null,
+      assigneeEmail: editedItem.assigneeEmail || null,
+      dueDate: editedItem.dueDate || null,
+      priority: editedItem.priority || 'medium',
       editedByAdmin: true,
       savedByAdmin: context.auth.uid,
-      savedAt: now,
-    });
+      savedAt: admin.firestore.Timestamp.now(), // Use Timestamp for array storage
+    };
+    
+    // Preserve original AI version if first edit
+    if (!existingItem.originalAiVersion) {
+      updatedItems[itemIndex].originalAiVersion = {
+        text: existingItem.text,
+        assigneeUid: existingItem.assigneeUid,
+        assigneeDisplayName: existingItem.assigneeDisplayName,
+        assigneeEmail: existingItem.assigneeEmail,
+        dueDate: existingItem.dueDate,
+        priority: existingItem.priority,
+        extractedAt: existingItem.extractedAt,
+      };
+    }
   }
-
-  await batch.commit();
+  
+  // Save back to cache
+  await cacheRef.update({
+    items: updatedItems,
+  });
 
   return {
     success: true,
     itemsUpdated: editedActionItems.length,
-    savedAt: now,
+    savedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 });
 

@@ -100,35 +100,51 @@ ${formattedMessages}
     // Anthropic already filters by confidence > 0.7 via schema
     const decisionsArray = result.decisions;
 
-    // Store in Firestore
-    const batch = db.batch();
-    decisionsArray.forEach((decision) => {
+    // Generate IDs for decisions before storing
+    const now = admin.firestore.Timestamp.now();
+    const decisionsWithIds = decisionsArray.map((decision) => {
       const decisionRef = db
         .collection(`conversations/${data.conversationId}/ai_decisions`)
         .doc();
-      batch.set(decisionRef, {
+      return {
+        id: decisionRef.id,
         decision: decision.decision,
         context: decision.context,
         participants: decision.participantIds || [],
         sourceMessageIds: decision.sourceMessageIds || [],
         confidence: decision.confidence,
-        decidedAt: admin.firestore.FieldValue.serverTimestamp(),
-        extractedAt: admin.firestore.FieldValue.serverTimestamp(),
+        extractedAt: now, // Include extractedAt for caching
+      };
+    });
+
+    // Store in Firestore
+    const batch = db.batch();
+    decisionsWithIds.forEach((decision) => {
+      const decisionRef = db
+        .collection(`conversations/${data.conversationId}/ai_decisions`)
+        .doc(decision.id);
+      batch.set(decisionRef, {
+        decision: decision.decision,
+        context: decision.context,
+        participants: decision.participants,
+        sourceMessageIds: decision.sourceMessageIds,
+        confidence: decision.confidence,
+        decidedAt: now, // Use Timestamp for consistency
+        extractedAt: now, // Use Timestamp for consistency
       });
     });
     await batch.commit();
 
-    // Cache (use actual timestamp instead of serverTimestamp for array storage)
-    const now = admin.firestore.Timestamp.now();
+    // Cache (decisions now include extractedAt)
     await db
       .doc(`conversations/${data.conversationId}/ai_cache/decisions`)
       .set({
-        decisions: decisionsArray,
+        decisions: decisionsWithIds,
         messageCountAtGeneration: messageCount,
         generatedAt: now,
       });
 
-    return {decisions: decisionsArray};
+    return {decisions: decisionsWithIds};
   }
 );
 

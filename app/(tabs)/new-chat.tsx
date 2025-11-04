@@ -1,8 +1,10 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
     Button,
     FlatList,
+    Keyboard,
     StyleSheet,
     Text,
     TextInput,
@@ -16,16 +18,19 @@ import {
     createOrOpenConversation,
     findUserByPhoneNumber
 } from '../../services/firestoreService';
+import { addMemberToGroupChat } from '../../services/groupChatService';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { User } from '../../types';
 import { Alerts } from '../../utils/alerts';
 import { Colors } from '../../utils/colors';
 import { validatePhoneNumber } from '../../utils/validators';
+import { extractDigits, formatPhoneNumber } from './new-chat-helpers';
 
 export default function NewChat() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [validUsers, setValidUsers] = useState<User[]>([]);
+  const [groupName, setGroupName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -43,18 +48,20 @@ export default function NewChat() {
     setError('');
     setLoading(true);
 
-    console.log('🔍 [NewChat] Adding user with phone:', phoneNumber);
+    // Extract raw digits for validation and search
+    const rawDigits = extractDigits(phoneNumber);
+    console.log('🔍 [NewChat] Adding user with phone:', rawDigits);
 
     try {
       // Validate phone number format first
-      if (!validatePhoneNumber(phoneNumber)) {
+      if (!validatePhoneNumber(rawDigits)) {
         console.log('❌ [NewChat] Invalid phone number format');
         setError('Invalid phone number (must be 10 digits, US/Canada only)');
         return;
       }
 
       // Find user in Firestore by phone number
-      const foundUser = await findUserByPhoneNumber(phoneNumber);
+      const foundUser = await findUserByPhoneNumber(rawDigits);
       
       if (!foundUser) {
         console.log('❌ [NewChat] User not found');
@@ -123,9 +130,43 @@ export default function NewChat() {
           validUsers, 
           user,
           currentWorkspace?.id,
-          currentWorkspace?.name
+          currentWorkspace?.name,
+          groupName // Pass the custom group name
         );
-        console.log('✅ [NewChat] Group chat created, navigating to:', conversationId);
+        
+        // For non-workspace groups, send invitations to all members
+        if (!currentWorkspace) {
+          console.log('📨 [NewChat] Sending invitations to', validUsers.length, 'members');
+          
+          // Send invitations to all members
+          const invitationPromises = validUsers.map(member =>
+            addMemberToGroupChat(conversationId, member.email)
+          );
+          
+          try {
+            await Promise.all(invitationPromises);
+            console.log('✅ [NewChat] All invitations sent successfully');
+            
+            setValidUsers([]); // Clear selected users
+            
+            Alerts.success(
+              `Group chat created! Invitations sent to ${validUsers.length} member${validUsers.length > 1 ? 's' : ''}. They can accept from their invitations.`,
+              () => router.replace(`/chat/${conversationId}` as any)
+            );
+            return;
+          } catch (inviteError: any) {
+            console.error('❌ [NewChat] Error sending invitations:', inviteError);
+            // Group was created but invitations failed - still navigate to chat
+            Alerts.error(
+              'Group chat created but some invitations failed to send. Please try adding members again.',
+              () => router.replace(`/chat/${conversationId}` as any)
+            );
+            return;
+          }
+        }
+        
+        // Workspace group: navigate directly (no invitations needed)
+        console.log('✅ [NewChat] Workspace group chat created, navigating to:', conversationId);
         router.push(`/chat/${conversationId}` as any);
       } else {
         // Direct chat: 1 user
@@ -138,6 +179,7 @@ export default function NewChat() {
           
           try {
             const result = await createDirectMessageInvitation(recipient.uid);
+            setValidUsers([]); // Clear selected users after successful invitation
             Alerts.success(
               `Your message request has been sent to ${result.recipientName}. They can accept or decline it from their invitations.`,
               () => router.back()
@@ -193,6 +235,16 @@ export default function NewChat() {
   return (
     <ErrorBoundary level="screen">
       <View style={styles.container}>
+      {/* Back button for workspace context */}
+      {currentWorkspace && (
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={Colors.textDark} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>New Chat</Text>
+        </View>
+      )}
+
       {/* Phase 5: Workspace context banner */}
       {currentWorkspace && (
         <View style={styles.workspaceBanner}>
@@ -209,13 +261,13 @@ export default function NewChat() {
         </Text>
       </View>
 
-      {/* Email input */}
+      {/* Phone number input */}
       <View style={styles.inputSection}>
         <TextInput
           style={styles.input}
-          placeholder="Enter phone number (10 digits)"
+          placeholder="Enter phone number"
           value={phoneNumber}
-          onChangeText={setPhoneNumber}
+          onChangeText={(text) => setPhoneNumber(formatPhoneNumber(text))}
           keyboardType="phone-pad"
           editable={!loading}
           onSubmitEditing={handleAddUser}
@@ -239,6 +291,31 @@ export default function NewChat() {
           <Text style={styles.usersListTitle}>
             {isGroupChat ? `Group Members (${validUsers.length + 1}):` : 'Selected User:'}
           </Text>
+
+          {/* Group Name Input (only for group chats) */}
+          {isGroupChat && (
+            <View style={styles.groupNameSection}>
+              <View style={styles.groupNameInputContainer}>
+                <TextInput
+                  style={styles.groupNameInput}
+                  placeholder="Group name (optional)"
+                  value={groupName}
+                  onChangeText={setGroupName}
+                  editable={!loading}
+                  maxLength={50}
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                />
+                <TouchableOpacity
+                  onPress={() => Keyboard.dismiss()}
+                  style={styles.doneButton}
+                >
+                  <Text style={styles.doneButtonText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           <FlatList
             data={validUsers}
             keyExtractor={(item) => item.uid}
@@ -280,6 +357,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     padding: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 12,
+    gap: 12,
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: Colors.textDark,
   },
   workspaceBanner: {
     backgroundColor: Colors.surfaceLight,
@@ -337,6 +428,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
+  },
+  groupNameSection: {
+    marginBottom: 12,
+  },
+  groupNameInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  groupNameInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  doneButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+  },
+  doneButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   userItem: {
     flexDirection: 'row',

@@ -62,7 +62,8 @@ export const markMessageUrgent = functions.https.onCall(async (data, context) =>
   // 4. Check limit (5 urgent messages per conversation)
   const urgentMessagesSnap = await db
     .collection(`conversations/${conversationId}/messages`)
-    .where('manuallyMarkedUrgent', '==', true)
+    .where('hasManualUrgencyOverride', '==', true)
+    .where('showUrgentBadge', '==', true)
     .get();
 
   if (urgentMessagesSnap.size >= 5) {
@@ -91,7 +92,8 @@ export const markMessageUrgent = functions.https.onCall(async (data, context) =>
   }
 
   await messageRef.update({
-    manuallyMarkedUrgent: true,
+    hasManualUrgencyOverride: true,
+    showUrgentBadge: true,
     markedUrgentBy: context.auth.uid,
     markedUrgentAt: admin.firestore.FieldValue.serverTimestamp(),
   });
@@ -158,10 +160,11 @@ export const unmarkMessageUrgent = functions.https.onCall(async (data, context) 
     );
   }
 
-  // 4. Remove urgent marker
+  // 4. Remove urgent marker (set override to hide badge)
   const messageRef = db.collection(`conversations/${conversationId}/messages`).doc(messageId);
   await messageRef.update({
-    manuallyMarkedUrgent: admin.firestore.FieldValue.delete(),
+    hasManualUrgencyOverride: true,
+    showUrgentBadge: false,
     markedUrgentBy: admin.firestore.FieldValue.delete(),
     markedUrgentAt: admin.firestore.FieldValue.delete(),
   });

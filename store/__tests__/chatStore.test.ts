@@ -16,6 +16,12 @@ const resetStore = () => {
 describe('chatStore', () => {
   beforeEach(() => {
     resetStore();
+    // Suppress console.log in tests to reduce noise
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('setConversations', () => {

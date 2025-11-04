@@ -270,8 +270,11 @@ export default function ChatScreen() {
           
           // Phase 5: Add status badge and info button for direct chats
           const status = userStatuses[otherUserId];
+          
+          // Sub-Phase 7: Add pin button for workspace DMs
+          const pinnedCount = conversation.pinnedMessages?.length || 0;
           headerRight = () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 0, gap: 12 }}>
               {status && (
                 <UserStatusBadge 
                   isOnline={status.isOnline} 
@@ -285,6 +288,11 @@ export default function ChatScreen() {
               <TouchableOpacity onPress={() => modals.open('participants')}>
                 <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
               </TouchableOpacity>
+              {conversation.workspaceId && (
+                <TouchableOpacity onPress={() => modals.open('pinned')}>
+                  <Ionicons name="pin" size={24} color="#CC6666" />
+                </TouchableOpacity>
+              )}
             </View>
           );
         }
@@ -296,33 +304,18 @@ export default function ChatScreen() {
         // Add info button for group participants + AI features + pins (Sub-Phase 7)
         const pinnedCount = conversation.pinnedMessages?.length || 0;
         headerRight = () => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 0, gap: 12 }}>
             <TouchableOpacity onPress={() => modals.open('aiMenu')}>
               <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
             </TouchableOpacity>
-            {conversation.workspaceId && pinnedCount > 0 && (
-              <TouchableOpacity onPress={() => modals.open('pinned')}>
-                <View style={{ position: 'relative' }}>
-                  <Ionicons name="pin" size={24} color="#007AFF" />
-                  <View style={{
-                    position: 'absolute',
-                    top: -6,
-                    right: -6,
-                    backgroundColor: '#FF3B30',
-                    borderRadius: 8,
-                    minWidth: 16,
-                    height: 16,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{pinnedCount}</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )}
             <TouchableOpacity onPress={() => modals.open('participants')}>
               <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
             </TouchableOpacity>
+            {conversation.workspaceId && (
+              <TouchableOpacity onPress={() => modals.open('pinned')}>
+                <Ionicons name="pin" size={24} color="#CC6666" />
+              </TouchableOpacity>
+            )}
           </View>
         );
       }
@@ -968,7 +961,8 @@ export default function ChatScreen() {
         }
       });
 
-      // Show ✓✓ only if ALL members have read
+      // Show ✓✓ only if there are other participants AND all have read
+      if (otherParticipants.length === 0) return '✓'; // No other active participants yet
       return readCount === otherParticipants.length ? '✓✓' : '✓';
     }
   };
@@ -1037,8 +1031,11 @@ export default function ChatScreen() {
     
     // Workspace admins can mark urgent and pin messages
     if (isWorkspaceChat && isAdmin) {
-      const isUrgent = message.manuallyMarkedUrgent || message.priority === 'high';
-      options.push(isUrgent ? 'Unmark Urgent' : 'Mark Urgent');
+      // Determine if badge is currently showing (manual override OR AI detection)
+      const showingBadge = message.hasManualUrgencyOverride 
+        ? message.showUrgentBadge 
+        : message.priority === 'high';
+      options.push(showingBadge ? 'Unmark Urgent' : 'Mark Urgent');
       
       const isPinned = (conversation.pinnedMessages || []).some(pm => pm.messageId === message.id);
       options.push(isPinned ? 'Unpin Message' : 'Pin Message');
@@ -1065,11 +1062,9 @@ export default function ChatScreen() {
           } else if (option === 'Delete Message') {
             handleDeleteMessage(message);
           } else if (option === 'Mark Urgent') {
-            setSelectedMessage(message);
-            handleMarkUrgent();
+            handleMarkUrgent(message);
           } else if (option === 'Unmark Urgent') {
-            setSelectedMessage(message);
-            handleUnmarkUrgent();
+            handleUnmarkUrgent(message);
           } else if (option === 'Pin Message') {
             setSelectedMessage(message);
             handlePinMessage();
@@ -1084,26 +1079,62 @@ export default function ChatScreen() {
     ]);
   };
 
-  const handleMarkUrgent = async () => {
-    if (!selectedMessage || !conversation?.workspaceId) return;
+  const handleMarkUrgent = async (messageToMark?: Message) => {
+    const msg = messageToMark || selectedMessage;
+    if (!msg || !conversation?.workspaceId) return;
     
     try {
-      await markMessageUrgent(conversationId as string, selectedMessage.id);
+      // Optimistic UI update
+      setMessages(prevMessages =>
+        prevMessages.map(m =>
+          m.id === msg.id
+            ? { ...m, hasManualUrgencyOverride: true, showUrgentBadge: true }
+            : m
+        )
+      );
+      
+      await markMessageUrgent(conversationId as string, msg.id);
       Alerts.success('Message marked as urgent');
       setSelectedMessage(null);
     } catch (error: any) {
+      // Revert optimistic update on error
+      setMessages(prevMessages =>
+        prevMessages.map(m =>
+          m.id === msg.id
+            ? { ...m, hasManualUrgencyOverride: false, showUrgentBadge: false }
+            : m
+        )
+      );
       Alerts.error(error.message || 'Failed to mark message as urgent');
     }
   };
 
-  const handleUnmarkUrgent = async () => {
-    if (!selectedMessage || !conversation?.workspaceId) return;
+  const handleUnmarkUrgent = async (messageToUnmark?: Message) => {
+    const msg = messageToUnmark || selectedMessage;
+    if (!msg || !conversation?.workspaceId) return;
     
     try {
-      await unmarkMessageUrgent(conversationId as string, selectedMessage.id);
+      // Optimistic UI update
+      setMessages(prevMessages =>
+        prevMessages.map(m =>
+          m.id === msg.id
+            ? { ...m, hasManualUrgencyOverride: true, showUrgentBadge: false }
+            : m
+        )
+      );
+      
+      await unmarkMessageUrgent(conversationId as string, msg.id);
       Alerts.success('Urgency marker removed');
       setSelectedMessage(null);
     } catch (error: any) {
+      // Revert optimistic update on error
+      setMessages(prevMessages =>
+        prevMessages.map(m =>
+          m.id === msg.id
+            ? { ...m, hasManualUrgencyOverride: true, showUrgentBadge: true }
+            : m
+        )
+      );
       Alerts.error(error.message || 'Failed to remove urgency marker');
     }
   };
@@ -1316,6 +1347,7 @@ export default function ChatScreen() {
         onOpenDecisions={() => modals.open('decisions')}
         onOpenMeetingScheduler={() => modals.open('meetingScheduler')}
         isGroupChat={conversation.type === 'group'}
+        isWorkspaceChat={!!conversation.workspaceId}
         canAccessAI={canAccessAI}
         onUpgradeRequired={() => modals.open('upgrade')}
       />
@@ -1355,6 +1387,8 @@ export default function ChatScreen() {
       <DecisionsModal
         visible={modals.isOpen('decisions')}
         conversationId={conversationId as string}
+        isWorkspaceChat={conversation?.isWorkspaceChat || false}
+        isAdmin={isAdmin}
         onClose={() => modals.close()}
       />
 

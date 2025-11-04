@@ -6,6 +6,7 @@ import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native
 import ConversationItem from '../../components/ConversationItem';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { db } from '../../firebase.config';
+import { hideConversation } from '../../services/conversationService';
 import { scheduleMessageNotification } from '../../services/notificationService';
 import { useAuthStore } from '../../store/authStore';
 import { useChatStore } from '../../store/chatStore';
@@ -32,12 +33,15 @@ export default function ConversationsList() {
 
   // Phase 5: Filter conversations by workspace
   // Phase C: Also filter out hidden conversations
+  // Phase 4: Filter out conversations where user is inactive
   const filteredConversations = currentWorkspace
     ? conversations.filter(conv => {
         // Filter by workspace
         if (conv.workspaceId !== currentWorkspace.id) return false;
         // Filter out hidden conversations
         if (user?.hiddenConversations?.includes(conv.id)) return false;
+        // Filter out conversations where user is inactive (soft-deleted)
+        if (conv.inactiveParticipants?.includes(user.uid)) return false;
         return true;
       })
     : conversations.filter(conv => {
@@ -45,10 +49,24 @@ export default function ConversationsList() {
         if (conv.workspaceId) return false;
         // Filter out hidden conversations
         if (user?.hiddenConversations?.includes(conv.id)) return false;
+        // Filter out conversations where user is inactive (soft-deleted)
+        if (conv.inactiveParticipants?.includes(user.uid)) return false;
         return true;
       });
 
   console.log('🔍 [ConversationsList] After filtering:', filteredConversations.length, 'conversations');
+
+  // Handle delete conversation (soft delete - hide from user's list)
+  const handleDeleteConversation = async (conversationId: string) => {
+    if (!user?.uid) return;
+    
+    try {
+      await hideConversation(conversationId, user.uid);
+      console.log('✅ [ConversationsList] Conversation hidden:', conversationId);
+    } catch (error) {
+      console.error('❌ [ConversationsList] Error hiding conversation:', error);
+    }
+  };
 
   // Real-time listener for conversations
   useEffect(() => {
@@ -191,20 +209,37 @@ export default function ConversationsList() {
       <View style={styles.container}>
         {/* Phase 5: Workspace mode toggle */}
         {currentWorkspace && (
-          <View style={styles.workspaceBanner}>
-            <View style={styles.workspaceBannerContent}>
-              <Ionicons name="business" size={20} color={Colors.primary} />
-              <Text style={styles.workspaceBannerText}>
-                {currentWorkspace.name}
+          <>
+            {/* Unobtrusive hint at top */}
+            <View style={styles.workspaceHint}>
+              <Text style={styles.workspaceHintText}>
+                Viewing Workspace Chats.{' '}
+                <Text
+                  style={styles.workspaceHintLink}
+                  onPress={() => setCurrentWorkspace(null)}
+                >
+                  Click here
+                </Text>
+                {' '}for General Chat.
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={() => setCurrentWorkspace(null)}
-              style={styles.clearWorkspaceButton}
-            >
-              <Text style={styles.clearWorkspaceButtonText}>View All</Text>
-            </TouchableOpacity>
-          </View>
+            
+            {/* Workspace banner with back button and name */}
+            <View style={styles.workspaceBanner}>
+              <TouchableOpacity
+                onPress={() => router.push(`/workspaces` as any)}
+                style={styles.backButton}
+              >
+                <Ionicons name="arrow-back" size={24} color={Colors.primary} />
+              </TouchableOpacity>
+              <View style={styles.workspaceBannerContent}>
+                <Ionicons name="business" size={20} color={Colors.primary} />
+                <Text style={styles.workspaceBannerText}>
+                  {currentWorkspace.name}
+                </Text>
+              </View>
+            </View>
+          </>
         )}
         
         {isLoading ? (
@@ -237,6 +272,7 @@ export default function ConversationsList() {
                   console.log('🔗 [ConversationsList] Navigating to chat:', item.id);
                   router.push(`/chat/${item.id}` as any);
                 }}
+                onDelete={() => handleDeleteConversation(item.id)}
               />
             )}
           />
@@ -251,36 +287,45 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  workspaceHint: {
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E8E8',
+  },
+  workspaceHintText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: '#666',
+    textAlign: 'center',
+  },
+  workspaceHintLink: {
+    color: '#5B8DBE',
+  },
   workspaceBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: Colors.surfaceLight,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    gap: 12,
+  },
+  backButton: {
+    padding: 4,
   },
   workspaceBannerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
   },
   workspaceBannerText: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.textDark,
-  },
-  clearWorkspaceButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: Colors.primary,
-    borderRadius: 6,
-  },
-  clearWorkspaceButtonText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
   },
   emptyState: {
     flex: 1,

@@ -35,13 +35,18 @@ export function getConversationName(conversation: Conversation, currentUserId: s
  * Generate a consistent conversation ID for direct chats
  * Uses sorted UIDs to ensure the same ID regardless of who initiates
  * 
- * Example: User A → User B and User B → User A both get "userA_userB"
+ * For workspace chats, includes workspace ID to keep them separate from general DMs
+ * 
+ * Example: User A → User B (general): "userA_userB"
+ * Example: User A → User B (workspace123): "workspace123_userA_userB"
  * 
  * @param uid1 - First user's UID
  * @param uid2 - Second user's UID
- * @returns Conversation ID in format "uid1_uid2" (alphabetically sorted)
+ * @param workspaceId - Optional workspace ID for workspace-scoped chats
+ * @returns Conversation ID
  */
-export function generateConversationId(uid1: string, uid2: string): string {
-  return [uid1, uid2].sort().join('_');
+export function generateConversationId(uid1: string, uid2: string, workspaceId?: string): string {
+  const sortedUids = [uid1, uid2].sort().join('_');
+  return workspaceId ? `${workspaceId}_${sortedUids}` : sortedUids;
 }
 

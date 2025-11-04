@@ -51,10 +51,25 @@ export default function MessageBubble({
       return null;
     }
     
-    // Only show high priority (red badge)
+    // Debug: Log message fields
+    console.log('🔴 [MessageBubble] Checking badge for message:', message.id, {
+      hasManualUrgencyOverride: message.hasManualUrgencyOverride,
+      showUrgentBadge: message.showUrgentBadge,
+      priority: message.priority,
+      manuallyMarkedUrgent: (message as any).manuallyMarkedUrgent, // Old field for debugging
+    });
+    
+    // Two-field system:
+    // - If hasManualUrgencyOverride === true, use showUrgentBadge value (ignore AI)
+    // - Otherwise, fall back to AI detection (message.priority)
+    
+    if (message.hasManualUrgencyOverride) {
+      return message.showUrgentBadge ? '🔴' : null;
+    }
+    
+    // No manual override, use AI detection
     if (message.priority === 'high') return '🔴';
     
-    // Don't show medium or low priority badges
     return null;
   };
 

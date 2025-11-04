@@ -98,3 +98,51 @@ export function calculateWorkspaceCharge(maxUsers: number): number {
   return maxUsers * 0.5;
 }
 
+/**
+ * Create a workspace invitation
+ * Shared helper used by createWorkspace and inviteWorkspaceMember
+ * Returns the invitation ID
+ */
+export async function createWorkspaceInvitation(
+  db: any,
+  adminModule: any,
+  params: {
+    workspaceId: string;
+    workspaceName: string;
+    invitedByUid: string;
+    invitedByDisplayName: string;
+    invitedUserUid: string;
+    invitedUserEmail: string;
+  }
+): Promise<string> {
+  const invitationRef = db.collection('workspace_invitations').doc();
+  const now = adminModule.firestore.FieldValue.serverTimestamp();
+
+  // Create invitation document
+  await invitationRef.set({
+    workspaceId: params.workspaceId,
+    workspaceName: params.workspaceName,
+    invitedByUid: params.invitedByUid,
+    invitedByDisplayName: params.invitedByDisplayName,
+    invitedUserUid: params.invitedUserUid,
+    invitedUserEmail: params.invitedUserEmail,
+    status: 'pending',
+    sentAt: now,
+  });
+
+  // Send notification to invited user
+  await db.collection('users').doc(params.invitedUserUid)
+    .collection('notifications').add({
+      type: 'workspace',
+      action: 'invitation',
+      workspaceId: params.workspaceId,
+      workspaceName: params.workspaceName,
+      invitedByDisplayName: params.invitedByDisplayName,
+      message: `${params.invitedByDisplayName} invited you to join ${params.workspaceName}`,
+      timestamp: now,
+      read: false,
+    });
+
+  return invitationRef.id;
+}
+

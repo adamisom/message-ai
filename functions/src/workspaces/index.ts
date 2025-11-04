@@ -5,8 +5,8 @@
 
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import { validateWorkspaceCreation, calculateWorkspaceCharge } from '../utils/workspaceHelpers';
 import { calculateActiveStrikes, shouldSendBanNotification } from '../utils/spamHelpers';
+import { calculateWorkspaceCharge, createWorkspaceInvitation, validateWorkspaceCreation } from '../utils/workspaceHelpers';
 
 const db = admin.firestore();
 
@@ -104,17 +104,15 @@ export const createWorkspace = functions.https.onCall(async (data, context) => {
 
       if (!memberQuery.empty) {
         const memberDoc = memberQuery.docs[0];
-        const invitationRef = db.collection('workspace_invitations').doc();
-
-        await invitationRef.set({
+        
+        // Use shared helper to create invitation
+        await createWorkspaceInvitation(db, admin, {
           workspaceId: workspaceRef.id,
           workspaceName: name.trim(),
           invitedByUid: context.auth.uid,
           invitedByDisplayName: user.displayName,
           invitedUserUid: memberDoc.id,
           invitedUserEmail: email.toLowerCase(),
-          status: 'pending',
-          sentAt: now,
         });
 
         invitationsSent++;
@@ -416,7 +414,9 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
 
   // 5. Calculate spam strikes using tested helper
   await db.runTransaction(async (transaction) => {
-    const now = admin.firestore.FieldValue.serverTimestamp();
+    const nowTimestamp = Date.now();
+    const nowForArray = admin.firestore.Timestamp.fromMillis(nowTimestamp); // Timestamp for array storage
+    const nowForTopLevel = admin.firestore.FieldValue.serverTimestamp(); // serverTimestamp for top-level fields
 
     // Get spam reports and add new report
     const spamReportsReceived = inviter.spamReportsReceived || [];
@@ -429,17 +429,25 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
       workspaceId: report.workspaceId,
     }));
 
-    // Add new report
-    const newReport = {
+    // Add new report with Date object for calculation
+    const newReportForCalculation = {
       reportedBy: reporterUid,
       reason: 'workspace',
-      timestamp: now,
+      timestamp: new Date(nowTimestamp),
       workspaceId: invitation.workspaceId,
     };
-    reportsForCalculation.push(newReport);
+    reportsForCalculation.push(newReportForCalculation);
 
     // Calculate active strikes using tested helper (with 1-month decay)
     const strikeResult = calculateActiveStrikes(reportsForCalculation);
+    
+    // Prepare report object for Firestore (cannot use serverTimestamp in arrays)
+    const newReport = {
+      reportedBy: reporterUid,
+      reason: 'workspace',
+      timestamp: nowForArray, // Use Timestamp (not serverTimestamp) for array storage
+      workspaceId: invitation.workspaceId,
+    };
 
     // Filter to keep only active reports (helper already validated these)
     const oneMonthAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
@@ -459,7 +467,7 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
     // Mark invitation as spam
     transaction.update(invitationRef, {
       status: 'spam',
-      respondedAt: now,
+      respondedAt: nowForTopLevel, // Use serverTimestamp for top-level field
     });
 
     // Send notifications based on strike result
@@ -470,7 +478,7 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
         action: 'banned',
         message: '🚫 Your account is restricted from creating workspaces and group chats due to spam reports.',
         strikes: strikeResult.activeStrikes,
-        timestamp: now,
+        timestamp: nowForTopLevel, // Use serverTimestamp for top-level field
         read: false,
       });
     } else if (strikeResult.shouldNotify && strikeResult.notificationType === 'warning') {
@@ -480,12 +488,107 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
         action: 'warning',
         message: `⚠️ You have ${strikeResult.activeStrikes} spam reports. Be careful - 5 strikes will restrict workspace/group creation.`,
         strikes: strikeResult.activeStrikes,
-        timestamp: now,
+        timestamp: nowForTopLevel, // Use serverTimestamp for top-level field
         read: false,
       });
     }
   });
 
   return { success: true };
+});
+
+/**
+ * Invite a member to an existing workspace
+ * Requires: Admin ownership
+ * Creates a workspace invitation for the invited user
+ */
+export const inviteWorkspaceMember = functions.https.onCall(async (data, context) => {
+  // 1. Authentication check
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const { workspaceId, invitedUserUid } = data;
+
+  if (!workspaceId || !invitedUserUid) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'workspaceId and invitedUserUid are required'
+    );
+  }
+
+  // 2. Get workspace
+  const workspaceRef = db.collection('workspaces').doc(workspaceId);
+  const workspaceDoc = await workspaceRef.get();
+
+  if (!workspaceDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Workspace not found');
+  }
+
+  const workspace = workspaceDoc.data()!;
+
+  // 3. Check admin ownership
+  if (workspace.adminUid !== context.auth.uid) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Only the workspace admin can invite members'
+    );
+  }
+
+  // 4. Check if user is already a member
+  if (workspace.members.includes(invitedUserUid)) {
+    throw new functions.https.HttpsError(
+      'already-exists',
+      'User is already a member of this workspace'
+    );
+  }
+
+  // 5. Check workspace capacity
+  if (workspace.members.length >= 25) {
+    throw new functions.https.HttpsError(
+      'resource-exhausted',
+      'Workspace is full (25 members max)'
+    );
+  }
+
+  // 6. Get invited user info
+  const invitedUserDoc = await db.collection('users').doc(invitedUserUid).get();
+
+  if (!invitedUserDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'User not found');
+  }
+
+  const invitedUser = invitedUserDoc.data()!;
+
+  // 7. Get admin user info
+  const adminUserDoc = await db.collection('users').doc(context.auth.uid).get();
+  const adminUser = adminUserDoc.data()!;
+
+  // 8. Check for existing pending invitation
+  const existingInvitations = await db.collection('workspace_invitations')
+    .where('workspaceId', '==', workspaceId)
+    .where('invitedUserUid', '==', invitedUserUid)
+    .where('status', '==', 'pending')
+    .limit(1)
+    .get();
+
+  if (!existingInvitations.empty) {
+    throw new functions.https.HttpsError(
+      'already-exists',
+      'User already has a pending invitation to this workspace'
+    );
+  }
+
+  // 9. Create invitation using shared helper
+  const invitationId = await createWorkspaceInvitation(db, admin, {
+    workspaceId,
+    workspaceName: workspace.name,
+    invitedByUid: context.auth.uid,
+    invitedByDisplayName: adminUser.displayName,
+    invitedUserUid,
+    invitedUserEmail: invitedUser.email,
+  });
+
+  return { success: true, invitationId };
 });
 

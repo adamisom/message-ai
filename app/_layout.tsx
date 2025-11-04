@@ -17,6 +17,7 @@ import {
 } from '../services/notificationService';
 import { setUserOffline, setUserOnline } from '../services/presenceService';
 import { useAuthStore } from '../store/authStore';
+import { FEATURE_FLAGS } from '../utils/featureFlags';
 
 export default function RootLayout() {
   const restoreSession = useAuthStore((state) => state.restoreSession);
@@ -90,6 +91,12 @@ export default function RootLayout() {
   // CRITICAL: Only start presence tracking AFTER restoreSession completes (loading: false)
   // This prevents presence writes from interfering with the initial profile fetch
   useEffect(() => {
+    // Feature flag check - can be disabled for debugging
+    if (!FEATURE_FLAGS.PRESENCE_TRACKING_ENABLED) {
+      console.log('👤 [RootLayout] Presence tracking disabled via feature flag');
+      return;
+    }
+
     if (!user || loading) return; // Wait for loading to be false
 
     console.log('👤 [RootLayout] Setting up presence tracking for user:', user.uid);

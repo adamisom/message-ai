@@ -85,38 +85,58 @@ export const saveEditedDecision = functions.https.onCall(async (data, context) =
     }
   }
 
-  // 4. Get existing decision from ai_cache
-  const cacheRef = db.collection(`conversations/${conversationId}/ai_cache`).doc(`decision_${decisionId}`);
+  // 4. Get existing decisions from ai_cache
+  const cacheRef = db.collection(`conversations/${conversationId}/ai_cache`).doc('decisions');
   const cacheSnap = await cacheRef.get();
 
   if (!cacheSnap.exists) {
+    throw new functions.https.HttpsError(
+      'not-found',
+      'No decisions found. Generate decisions first.'
+    );
+  }
+
+  const cacheData = cacheSnap.data()!;
+  const decisions = cacheData.decisions || [];
+  
+  // Find the specific decision by ID
+  const decisionIndex = decisions.findIndex((d: any) => d.id === decisionId);
+  
+  if (decisionIndex === -1) {
     throw new functions.https.HttpsError(
       'not-found',
       'Decision not found'
     );
   }
 
-  const existingDecision = cacheSnap.data()!;
+  const existingDecision = decisions[decisionIndex];
 
-  // 5. Save edited version, preserving original AI version if this is first edit
-  const updateData: any = {
+  // 5. Prepare edited version, preserving original AI version if this is first edit
+  const updatedDecision: any = {
+    ...existingDecision,
     decision: editedDecision,
     context: editedContext,
     editedByAdmin: true,
     savedByAdmin: context.auth.uid,
-    savedAt: admin.firestore.FieldValue.serverTimestamp(),
+    savedAt: admin.firestore.Timestamp.now(), // Use Timestamp for array storage
   };
 
   // Only set originalAiVersion if it doesn't already exist (first edit)
   if (!existingDecision.originalAiVersion) {
-    updateData.originalAiVersion = {
+    updatedDecision.originalAiVersion = {
       decision: existingDecision.decision,
       context: existingDecision.context,
-      extractedAt: existingDecision.extractedAt,
+      extractedAt: existingDecision.extractedAt || admin.firestore.Timestamp.now(), // Fallback if undefined
     };
   }
 
-  await cacheRef.update(updateData);
+  // Update the decisions array
+  decisions[decisionIndex] = updatedDecision;
+
+  // Save back to cache
+  await cacheRef.update({
+    decisions: decisions,
+  });
 
   return {
     success: true,

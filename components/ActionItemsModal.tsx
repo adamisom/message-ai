@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -10,8 +11,7 @@ import {
 } from 'react-native';
 import { db } from '../firebase.config';
 import { useAIFeature } from '../hooks/useAIFeature';
-import { invalidateActionItemsCache } from '../services/aiCacheService';
-import { assignActionItem, extractActionItems } from '../services/aiService';
+import { assignActionItem, extractActionItems, saveEditedActionItems } from '../services/aiService';
 import { useAuthStore } from '../store/authStore';
 import { commonModalStyles } from '../styles/commonModalStyles';
 import type { ActionItem } from '../types';
@@ -20,6 +20,7 @@ import { getPriorityColor } from '../utils/colorHelpers';
 import { Colors } from '../utils/colors';
 import { formatDateString } from '../utils/dateFormat';
 import { isWorkspaceAdmin } from '../utils/workspacePermissions';
+import EditActionItemsModal from './EditActionItemsModal';
 import { EmptyState } from './modals/EmptyState';
 import { ErrorState } from './modals/ErrorState';
 import { LoadingState } from './modals/LoadingState';
@@ -49,6 +50,9 @@ export function ActionItemsModal({
   const itemToAssignRef = useRef<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [viewMode, setViewMode] = useState<'saved' | 'fresh'>('saved');
+  const [freshAiItems, setFreshAiItems] = useState<ActionItem[] | null>(null);
   
   const { data, loading, loadingSlowly, error, reload } = useAIFeature<any>({
     visible,
@@ -142,21 +146,16 @@ export function ActionItemsModal({
 
   // PHASE 4: Action Item Assignment (now enabled for workspace admins)
   const handleAssignPress = (itemId: string) => {
-    console.log('[ActionItemsModal] handleAssignPress called with:', itemId);
     setItemToAssign(itemId);
     itemToAssignRef.current = itemId;
     setShowAssignPicker(true);
   };
 
   const handleAssignToParticipant = async (participant: Participant, itemId: string) => {
-    console.log('[ActionItemsModal] handleAssignToParticipant called:', participant.displayName, 'itemId:', itemId);
-    
     if (!itemId) {
       console.warn('[ActionItemsModal] No itemId provided');
       return;
     }
-
-    console.log('[ActionItemsModal] Starting optimistic update');
 
     // Optimistic update
     setItems((prev) =>
@@ -172,18 +171,12 @@ export function ActionItemsModal({
     setItemToAssign(null);
     itemToAssignRef.current = null;
 
-    console.log('[ActionItemsModal] Calling assignActionItem API');
-
     try {
-      // 1. Update Firestore document via Cloud Function
+      // 1. Update Firestore document via Cloud Function (also updates cache)
       await assignActionItem(conversationId, itemId, participant.uid, participant.displayName);
-      console.log('[ActionItemsModal] Assignment successful');
       
-      // 2. Invalidate cache so next open fetches fresh data
       // Note: Don't reload here - optimistic update already shows the change
-      // Reloading would trigger "Scanning for action items..." which is bad UX
-      await invalidateActionItemsCache(conversationId);
-      console.log('[ActionItemsModal] Cache invalidated - fresh data on next open');
+      // The Cloud Function updates the cache, so next open will fetch fresh data
     } catch (err: any) {
       console.error('[ActionItemsModal] Assign error:', err);
       Alerts.error(err.message || 'Failed to assign task. Please try again.');
@@ -206,8 +199,51 @@ export function ActionItemsModal({
     itemToAssignRef.current = null;
     setIsAdmin(false);
     setWorkspaceId(undefined);
+    setShowEditModal(false);
+    setViewMode('saved');
+    setFreshAiItems(null);
     onClose();
   };
+
+  const handleEditPress = () => {
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (editedItems: ActionItem[]) => {
+    try {
+      await saveEditedActionItems(conversationId, editedItems);
+      setShowEditModal(false);
+      Alerts.success('Action items saved successfully');
+      reload(); // Reload to show saved version in main modal
+    } catch (error: any) {
+      throw error; // Let EditActionItemsModal handle it
+    }
+  };
+
+  const handleGetFreshAI = async () => {
+    try {
+      const fresh = await extractActionItems(conversationId) as any;
+      const freshItems = fresh.items || [];
+      // Sort by priority
+      const priorityOrder: { [key: string]: number } = { high: 0, medium: 1, low: 2 };
+      const sortedItems = [...freshItems].sort((a: ActionItem, b: ActionItem) => {
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      });
+      setFreshAiItems(sortedItems);
+      setViewMode('fresh');
+    } catch (error: any) {
+      Alerts.error(error.message || 'Failed to generate fresh action items');
+    }
+  };
+
+  // Determine if user can edit
+  const canEdit = workspaceId ? isAdmin : user?.isPaidUser;
+
+  // Check if action items have been edited (any item has editedByAdmin flag)
+  const hasSavedVersion = items.some((item: ActionItem) => item.editedByAdmin === true);
+
+  // Display items based on view mode
+  const displayedItems = viewMode === 'fresh' && freshAiItems ? freshAiItems : items;
 
   return (
     <Modal
@@ -234,8 +270,19 @@ export function ActionItemsModal({
 
         {/* Action Items List */}
         {!loading && !error && (
+          <>
+            {/* Edited Badge */}
+            {hasSavedVersion && viewMode === 'saved' && displayedItems.length > 0 && (
+              <View style={styles.editedBadge}>
+                <Ionicons name="pencil" size={14} color={Colors.primary} />
+                <Text style={styles.editedBadgeText}>
+                  Edited by Admin
+                </Text>
+              </View>
+            )}
+
           <FlatList
-            data={items}
+              data={displayedItems}
             keyExtractor={(item, index) => item.id || `item-${index}`}
             renderItem={({item}) => (
               <View
@@ -309,6 +356,17 @@ export function ActionItemsModal({
                         {item.priority.toUpperCase()} PRIORITY
                       </Text>
                     </View>
+
+                    {/* Edit Button (only for saved items with editedByAdmin) */}
+                    {canEdit && viewMode === 'saved' && item.editedByAdmin && (
+                      <TouchableOpacity
+                        style={styles.itemEditButton}
+                        onPress={handleEditPress}
+                      >
+                        <Ionicons name="pencil" size={14} color={Colors.primary} />
+                        <Text style={styles.itemEditButtonText}>Re-edit</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               </View>
@@ -324,9 +382,45 @@ export function ActionItemsModal({
             }
             contentContainerStyle={[
               styles.listContent,
-              items.length === 0 && styles.listContentEmpty,
+              displayedItems.length === 0 && styles.listContentEmpty,
             ]}
           />
+
+          {/* Edit & Save Buttons */}
+          {canEdit && displayedItems.length > 0 && (
+            <View style={styles.actionButtons}>
+              {!hasSavedVersion && (
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={handleEditPress}
+                >
+                  <Ionicons name="pencil-outline" size={18} color="#fff" />
+                  <Text style={styles.editButtonText}>Edit & Save</Text>
+                </TouchableOpacity>
+              )}
+
+              {hasSavedVersion && viewMode === 'saved' && (
+                <TouchableOpacity
+                  style={styles.freshButton}
+                  onPress={handleGetFreshAI}
+                >
+                  <Ionicons name="refresh-outline" size={18} color={Colors.primary} />
+                  <Text style={styles.freshButtonText}>Get Fresh AI Analysis</Text>
+                </TouchableOpacity>
+              )}
+
+              {viewMode === 'fresh' && (
+                <TouchableOpacity
+                  style={styles.freshButton}
+                  onPress={() => setViewMode('saved')}
+                >
+                  <Ionicons name="bookmark-outline" size={18} color={Colors.primary} />
+                  <Text style={styles.freshButtonText}>View Your Saved Version</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          </>
         )}
 
         {/* Assignment Picker Modal */}
@@ -388,6 +482,14 @@ export function ActionItemsModal({
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
+
+        {/* Edit Action Items Modal */}
+        <EditActionItemsModal
+          visible={showEditModal}
+          actionItems={items}
+          onClose={() => setShowEditModal(false)}
+          onSave={handleSaveEdit}
+        />
       </View>
     </Modal>
   );
@@ -532,5 +634,80 @@ const styles = StyleSheet.create({
   pickerCancelText: {
     fontSize: 16,
     color: Colors.textLight,
+  },
+  editedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  editedBadgeText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E8E8E8',
+    backgroundColor: '#fff',
+  },
+  editButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  editButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  freshButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    gap: 6,
+  },
+  freshButtonText: {
+    color: Colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  itemEditButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    marginTop: 8,
+    gap: 4,
+  },
+  itemEditButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 });

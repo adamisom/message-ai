@@ -34,6 +34,7 @@ interface AIFeaturesMenuProps {
   onOpenMeetingScheduler: () => void;
   onUpgradeRequired: () => void; // Phase 4: Trigger upgrade modal
   isGroupChat: boolean;
+  isWorkspaceChat?: boolean; // Phase 4: Workspace chats also show Decisions
   canAccessAI: boolean; // Phase 4: Check if user has AI access
   trialDaysRemaining?: number; // Phase 4: Show trial info if applicable
 }
@@ -49,6 +50,7 @@ export function AIFeaturesMenu({
   onOpenMeetingScheduler,
   onUpgradeRequired,
   isGroupChat,
+  isWorkspaceChat = false,
   canAccessAI,
   trialDaysRemaining,
 }: AIFeaturesMenuProps) {
@@ -144,7 +146,7 @@ export function AIFeaturesMenu({
             </View>
           </TouchableOpacity>
 
-          {isGroupChat && (
+          {(isGroupChat || isWorkspaceChat) && (
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => handleFeature(onOpenDecisions)}
@@ -153,7 +155,7 @@ export function AIFeaturesMenu({
               <View style={styles.menuTextContainer}>
                 <Text style={styles.menuTitle}>Decisions</Text>
                 <Text style={styles.menuDescription}>
-                  Track group decisions
+                  Track {isWorkspaceChat ? 'workspace' : 'group'} decisions
                 </Text>
               </View>
             </TouchableOpacity>

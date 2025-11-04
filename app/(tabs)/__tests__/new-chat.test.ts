@@ -3,7 +3,7 @@
  * Sub-Phase 11: Polish & Testing - Improved UX
  */
 
-import { determineChatType, generateCreateButtonText, validateUserList } from '../new-chat-helpers';
+import { determineChatType, extractDigits, formatPhoneNumber, generateCreateButtonText, validateUserList } from '../new-chat-helpers';
 
 describe('New Chat Auto-Detection Logic', () => {
   describe('determineChatType', () => {
@@ -167,6 +167,147 @@ describe('New Chat Auto-Detection Logic', () => {
         { uid: 'user2', email: 'bob@test.com', displayName: 'Bob' },
       ];
       expect(determineChatType(users)).toBe('group');
+    });
+  });
+
+  describe('formatPhoneNumber', () => {
+    it('should not format when 3 or fewer digits', () => {
+      expect(formatPhoneNumber('')).toBe('');
+      expect(formatPhoneNumber('5')).toBe('5');
+      expect(formatPhoneNumber('55')).toBe('55');
+      expect(formatPhoneNumber('555')).toBe('555');
+    });
+
+    it('should add parentheses after 3 digits', () => {
+      expect(formatPhoneNumber('5551')).toBe('(555)1');
+      expect(formatPhoneNumber('55512')).toBe('(555)12');
+      expect(formatPhoneNumber('555123')).toBe('(555)123');
+    });
+
+    it('should add dash before last 4 digits', () => {
+      expect(formatPhoneNumber('5551234')).toBe('(555)123-4');
+      expect(formatPhoneNumber('55512345')).toBe('(555)123-45');
+      expect(formatPhoneNumber('555123456')).toBe('(555)123-456');
+      expect(formatPhoneNumber('5551234567')).toBe('(555)123-4567');
+    });
+
+    it('should limit to 10 digits', () => {
+      expect(formatPhoneNumber('55512345678')).toBe('(555)123-4567');
+      expect(formatPhoneNumber('555123456789')).toBe('(555)123-4567');
+    });
+
+    it('should strip existing formatting', () => {
+      expect(formatPhoneNumber('(555)123-4567')).toBe('(555)123-4567');
+      expect(formatPhoneNumber('555-123-4567')).toBe('(555)123-4567');
+      expect(formatPhoneNumber('555.123.4567')).toBe('(555)123-4567');
+      expect(formatPhoneNumber('(555) 123-4567')).toBe('(555)123-4567');
+    });
+
+    it('should handle mixed input with letters and symbols', () => {
+      expect(formatPhoneNumber('5a5b5c1d2e3f4g5h6i7j')).toBe('(555)123-4567');
+      expect(formatPhoneNumber('555ABC123DEF4567')).toBe('(555)123-4567');
+    });
+
+    it('should handle partial formatting during typing', () => {
+      // Simulating user typing "5551234567"
+      expect(formatPhoneNumber('5')).toBe('5');
+      expect(formatPhoneNumber('55')).toBe('55');
+      expect(formatPhoneNumber('555')).toBe('555');
+      expect(formatPhoneNumber('(555')).toBe('555'); // Strip incomplete format
+      expect(formatPhoneNumber('(555)')).toBe('555'); // Strip incomplete format
+      expect(formatPhoneNumber('(555)1')).toBe('(555)1');
+      expect(formatPhoneNumber('(555)12')).toBe('(555)12');
+      expect(formatPhoneNumber('(555)123')).toBe('(555)123');
+      expect(formatPhoneNumber('(555)123-')).toBe('(555)123'); // Strip incomplete format
+      expect(formatPhoneNumber('(555)123-4')).toBe('(555)123-4');
+      expect(formatPhoneNumber('(555)123-45')).toBe('(555)123-45');
+      expect(formatPhoneNumber('(555)123-456')).toBe('(555)123-456');
+      expect(formatPhoneNumber('(555)123-4567')).toBe('(555)123-4567');
+    });
+
+    it('should handle empty and whitespace input', () => {
+      expect(formatPhoneNumber('')).toBe('');
+      expect(formatPhoneNumber(' ')).toBe('');
+      expect(formatPhoneNumber('   ')).toBe('');
+    });
+
+    it('should handle special characters only', () => {
+      expect(formatPhoneNumber('()- ')).toBe('');
+      expect(formatPhoneNumber('...')).toBe('');
+      expect(formatPhoneNumber('---')).toBe('');
+    });
+  });
+
+  describe('extractDigits', () => {
+    it('should extract digits from formatted phone number', () => {
+      expect(extractDigits('(555)123-4567')).toBe('5551234567');
+    });
+
+    it('should extract digits from various formats', () => {
+      expect(extractDigits('555-123-4567')).toBe('5551234567');
+      expect(extractDigits('555.123.4567')).toBe('5551234567');
+      expect(extractDigits('5551234567')).toBe('5551234567');
+      expect(extractDigits('(555)1234567')).toBe('5551234567');
+      expect(extractDigits('(555) 123-4567')).toBe('5551234567');
+    });
+
+    it('should handle partial numbers', () => {
+      expect(extractDigits('555')).toBe('555');
+      expect(extractDigits('(555)123')).toBe('555123');
+      expect(extractDigits('(555)123-45')).toBe('55512345');
+    });
+
+    it('should remove all non-digit characters', () => {
+      expect(extractDigits('abc555def123ghi4567jkl')).toBe('5551234567');
+      expect(extractDigits('+1 (555) 123-4567')).toBe('15551234567');
+    });
+
+    it('should handle empty and whitespace input', () => {
+      expect(extractDigits('')).toBe('');
+      expect(extractDigits(' ')).toBe('');
+      expect(extractDigits('   ')).toBe('');
+    });
+
+    it('should handle no digits present', () => {
+      expect(extractDigits('abc')).toBe('');
+      expect(extractDigits('()- ')).toBe('');
+      expect(extractDigits('...')).toBe('');
+    });
+  });
+
+  describe('formatPhoneNumber + extractDigits (Round-trip)', () => {
+    it('should maintain digits through format and extract cycle', () => {
+      const testNumbers = [
+        '5551234567',
+        '1234567890',
+        '9998887777',
+      ];
+
+      testNumbers.forEach(number => {
+        const formatted = formatPhoneNumber(number);
+        const extracted = extractDigits(formatted);
+        expect(extracted).toBe(number);
+      });
+    });
+
+    it('should normalize different input formats to same output', () => {
+      const inputs = [
+        '5551234567',
+        '(555)123-4567',
+        '(555) 123-4567',
+        '555-123-4567',
+        '555.123.4567',
+        '555 123 4567',
+      ];
+
+      const expectedFormatted = '(555)123-4567';
+      const expectedDigits = '5551234567';
+
+      inputs.forEach(input => {
+        const formatted = formatPhoneNumber(input);
+        expect(formatted).toBe(expectedFormatted);
+        expect(extractDigits(formatted)).toBe(expectedDigits);
+      });
     });
   });
 });

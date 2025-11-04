@@ -164,6 +164,38 @@ describe('generateConversationId', () => {
     });
   });
 
+  describe('workspace context', () => {
+    it('should include workspace ID when provided', () => {
+      const id = generateConversationId('user1', 'user2', 'workspace123');
+      
+      expect(id).toBe('workspace123_user1_user2');
+    });
+
+    it('should generate different IDs for workspace vs general DMs', () => {
+      const generalId = generateConversationId('user1', 'user2');
+      const workspaceId = generateConversationId('user1', 'user2', 'workspace123');
+      
+      expect(generalId).toBe('user1_user2');
+      expect(workspaceId).toBe('workspace123_user1_user2');
+      expect(generalId).not.toBe(workspaceId);
+    });
+
+    it('should generate different IDs for different workspaces', () => {
+      const workspace1Id = generateConversationId('user1', 'user2', 'workspace1');
+      const workspace2Id = generateConversationId('user1', 'user2', 'workspace2');
+      
+      expect(workspace1Id).not.toBe(workspace2Id);
+    });
+
+    it('should still sort UIDs when workspace ID is present', () => {
+      const id1 = generateConversationId('zebra', 'apple', 'workspace123');
+      const id2 = generateConversationId('apple', 'zebra', 'workspace123');
+      
+      expect(id1).toBe(id2);
+      expect(id1).toBe('workspace123_apple_zebra');
+    });
+  });
+
   describe('different users', () => {
     it('should generate different IDs for different user pairs', () => {
       const id1 = generateConversationId('user1', 'user2');

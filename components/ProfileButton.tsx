@@ -10,6 +10,8 @@
 import { usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getUserDirectMessageInvitations } from '../services/dmInvitationService';
+import { getUserGroupChatInvitations } from '../services/groupChatService';
 import { getUserWorkspaceInvitations } from '../services/workspaceService';
 import { useAuthStore } from '../store/authStore';
 import { Colors } from '../utils/colors';
@@ -45,7 +47,7 @@ export const ProfileButton: React.FC = () => {
   
   const initials = getInitials(user?.displayName || '');
   
-  // Load invitation count
+  // Load invitation count (all types: workspace, group chat, DM)
   useEffect(() => {
     loadInvitationCount();
     
@@ -53,13 +55,19 @@ export const ProfileButton: React.FC = () => {
     const interval = setInterval(loadInvitationCount, 30000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid]);
+  }, [user?.uid, pathname]); // Refresh when pathname changes (e.g., returning from invitations screen)
   
   const loadInvitationCount = async () => {
     if (!user?.uid) return;
     try {
-      const invitations = await getUserWorkspaceInvitations(user.uid);
-      setInvitationCount(invitations.length);
+      const [workspaceInvites, groupChatInvites, dmInvites] = await Promise.all([
+        getUserWorkspaceInvitations(user.uid),
+        getUserGroupChatInvitations(user.uid),
+        getUserDirectMessageInvitations(user.uid),
+      ]);
+      // Count all pending invitations
+      const total = workspaceInvites.length + groupChatInvites.length + dmInvites.length;
+      setInvitationCount(total);
     } catch (error) {
       console.error('[ProfileButton] Error loading invitation count:', error);
     }
