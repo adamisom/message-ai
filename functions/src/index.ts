@@ -29,7 +29,7 @@ export { analyzeMeetingScheduling } from './ai/proactiveMeeting';
 export {
     acceptWorkspaceInvitation, createWorkspace,
     declineWorkspaceInvitation,
-    deleteWorkspace, reportWorkspaceInvitationSpam
+    deleteWorkspace, inviteWorkspaceMember, reportWorkspaceInvitationSpam
 } from './workspaces';
 
 // Phase 4: Billing (MVP dummy payment)
