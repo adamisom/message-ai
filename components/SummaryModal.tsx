@@ -65,21 +65,15 @@ export function SummaryModal({
   };
 
   const handleEditPress = () => {
-    // Close the main modal first so edit modal can show on top
-    onClose();
-    
-    // Delay setting state so the main modal closes first
-    setTimeout(() => {
-      setShowEditModal(true);
-    }, 300);
+    setShowEditModal(true);
   };
 
   const handleSaveEdit = async (editedSummary: string, editedKeyPoints: string[]) => {
     try {
       await saveEditedSummary(conversationId, editedSummary, editedKeyPoints);
-      Alerts.success('Summary saved successfully');
       setShowEditModal(false);
-      reload(); // Reload to show saved version
+      Alerts.success('Summary saved successfully');
+      reload(); // Reload to show saved version in main modal
     } catch (error: any) {
       throw error; // Let EditSummaryModal handle it
     }

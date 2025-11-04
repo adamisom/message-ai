@@ -220,8 +220,9 @@ export function ActionItemsModal({
   const handleSaveEdit = async (editedItems: ActionItem[]) => {
     try {
       await saveEditedActionItems(conversationId, editedItems);
+      setShowEditModal(false);
       Alerts.success('Action items saved successfully');
-      reload(); // Reload to show saved version
+      reload(); // Reload to show saved version in main modal
     } catch (error: any) {
       throw error; // Let EditActionItemsModal handle it
     }
