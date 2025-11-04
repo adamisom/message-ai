@@ -5,8 +5,8 @@
 
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import { validateWorkspaceCreation, calculateWorkspaceCharge, createWorkspaceInvitation } from '../utils/workspaceHelpers';
 import { calculateActiveStrikes, shouldSendBanNotification } from '../utils/spamHelpers';
+import { calculateWorkspaceCharge, createWorkspaceInvitation, validateWorkspaceCreation } from '../utils/workspaceHelpers';
 
 const db = admin.firestore();
 
