@@ -1120,19 +1120,14 @@ export default function ChatScreen() {
     if (!selectedMessage || !conversation?.workspaceId) return;
     
     try {
-      console.log('🔴 [handleUnmarkUrgent] Before update, message:', selectedMessage.id, 'manuallyMarkedUrgent:', selectedMessage.manuallyMarkedUrgent);
-      
       // Optimistic UI update
-      setMessages(prevMessages => {
-        const updated = prevMessages.map(msg =>
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
           msg.id === selectedMessage.id
             ? { ...msg, manuallyMarkedUrgent: false }
             : msg
-        );
-        const updatedMsg = updated.find(m => m.id === selectedMessage.id);
-        console.log('🔴 [handleUnmarkUrgent] After update, message:', updatedMsg?.id, 'manuallyMarkedUrgent:', updatedMsg?.manuallyMarkedUrgent);
-        return updated;
-      });
+        )
+      );
       
       await unmarkMessageUrgent(conversationId as string, selectedMessage.id);
       Alerts.success('Urgency marker removed');

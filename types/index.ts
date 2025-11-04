@@ -28,8 +28,8 @@ export interface Message {
   deletedAt?: any;
   deletedBy?: string; // UID of user who deleted it
   
-  // Sub-Phase 7: Manual urgency markers
-  manuallyMarkedUrgent?: boolean;     // Admin override
+  // Sub-Phase 7: Manual urgency markers (three-state system)
+  manuallyMarkedUrgent?: boolean;     // true = admin marked urgent, false = admin marked NOT urgent, undefined = use AI
   markedUrgentBy?: string;            // Admin UID
   markedUrgentAt?: any;
 }

@@ -158,10 +158,10 @@ export const unmarkMessageUrgent = functions.https.onCall(async (data, context) 
     );
   }
 
-  // 4. Remove urgent marker
+  // 4. Remove urgent marker (set to false to override AI detection)
   const messageRef = db.collection(`conversations/${conversationId}/messages`).doc(messageId);
   await messageRef.update({
-    manuallyMarkedUrgent: admin.firestore.FieldValue.delete(),
+    manuallyMarkedUrgent: false,
     markedUrgentBy: admin.firestore.FieldValue.delete(),
     markedUrgentAt: admin.firestore.FieldValue.delete(),
   });

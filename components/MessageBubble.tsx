@@ -51,9 +51,17 @@ export default function MessageBubble({
       return null;
     }
     
-    // ONLY show badge for manually marked urgent (admin action)
-    // AI-detected priority (message.priority) does NOT show a visual badge
+    // Three-state system:
+    // - manuallyMarkedUrgent === true → show badge (admin override)
+    // - manuallyMarkedUrgent === false → hide badge (admin override to NOT show)
+    // - manuallyMarkedUrgent === undefined → use AI detection (message.priority)
+    
+    // Manual override takes precedence
     if (message.manuallyMarkedUrgent === true) return '🔴';
+    if (message.manuallyMarkedUrgent === false) return null;
+    
+    // No manual override, use AI detection
+    if (message.priority === 'high') return '🔴';
     
     return null;
   };
