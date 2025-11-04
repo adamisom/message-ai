@@ -5,7 +5,7 @@
 
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
-import { validateWorkspaceCreation, calculateWorkspaceCharge } from '../utils/workspaceHelpers';
+import { validateWorkspaceCreation, calculateWorkspaceCharge, createWorkspaceInvitation } from '../utils/workspaceHelpers';
 import { calculateActiveStrikes, shouldSendBanNotification } from '../utils/spamHelpers';
 
 const db = admin.firestore();
@@ -104,17 +104,15 @@ export const createWorkspace = functions.https.onCall(async (data, context) => {
 
       if (!memberQuery.empty) {
         const memberDoc = memberQuery.docs[0];
-        const invitationRef = db.collection('workspace_invitations').doc();
-
-        await invitationRef.set({
+        
+        // Use shared helper to create invitation
+        await createWorkspaceInvitation(db, admin, {
           workspaceId: workspaceRef.id,
           workspaceName: name.trim(),
           invitedByUid: context.auth.uid,
           invitedByDisplayName: user.displayName,
           invitedUserUid: memberDoc.id,
           invitedUserEmail: email.toLowerCase(),
-          status: 'pending',
-          sentAt: now,
         });
 
         invitationsSent++;
@@ -571,34 +569,16 @@ export const inviteWorkspaceMember = functions.https.onCall(async (data, context
     );
   }
 
-  // 9. Create invitation
-  const invitationRef = db.collection('workspace_invitations').doc();
-  const now = admin.firestore.FieldValue.serverTimestamp();
-
-  await invitationRef.set({
+  // 9. Create invitation using shared helper
+  const invitationId = await createWorkspaceInvitation(db, admin, {
     workspaceId,
     workspaceName: workspace.name,
     invitedByUid: context.auth.uid,
     invitedByDisplayName: adminUser.displayName,
     invitedUserUid,
     invitedUserEmail: invitedUser.email,
-    status: 'pending',
-    sentAt: now,
   });
 
-  // 10. Send notification to invited user
-  await db.collection('users').doc(invitedUserUid)
-    .collection('notifications').add({
-      type: 'workspace',
-      action: 'invitation',
-      workspaceId,
-      workspaceName: workspace.name,
-      invitedByDisplayName: adminUser.displayName,
-      message: `${adminUser.displayName} invited you to join ${workspace.name}`,
-      timestamp: now,
-      read: false,
-    });
-
-  return { success: true, invitationId: invitationRef.id };
+  return { success: true, invitationId };
 });
 
