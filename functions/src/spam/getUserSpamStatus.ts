@@ -81,7 +81,7 @@ export const getUserSpamStatus = functions.https.onCall(async (data, context) =>
     banEndsAt: banEndsAt?.toMillis() || null,
     activeReports: activeStrikes.map((report: any) => ({
       reason: report.reason,
-      reportedAt: report.reportedAt.toMillis(),
+      reportedAt: report.timestamp?.toMillis?.() || report.reportedAt?.toMillis?.() || Date.now(),
     })),
   };
 });

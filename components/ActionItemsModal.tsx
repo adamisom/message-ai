@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -11,7 +12,7 @@ import {
 import { db } from '../firebase.config';
 import { useAIFeature } from '../hooks/useAIFeature';
 import { invalidateActionItemsCache } from '../services/aiCacheService';
-import { assignActionItem, extractActionItems } from '../services/aiService';
+import { assignActionItem, extractActionItems, saveEditedActionItems } from '../services/aiService';
 import { useAuthStore } from '../store/authStore';
 import { commonModalStyles } from '../styles/commonModalStyles';
 import type { ActionItem } from '../types';
@@ -20,6 +21,7 @@ import { getPriorityColor } from '../utils/colorHelpers';
 import { Colors } from '../utils/colors';
 import { formatDateString } from '../utils/dateFormat';
 import { isWorkspaceAdmin } from '../utils/workspacePermissions';
+import EditActionItemsModal from './EditActionItemsModal';
 import { EmptyState } from './modals/EmptyState';
 import { ErrorState } from './modals/ErrorState';
 import { LoadingState } from './modals/LoadingState';
@@ -49,6 +51,9 @@ export function ActionItemsModal({
   const itemToAssignRef = useRef<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [viewMode, setViewMode] = useState<'saved' | 'fresh'>('saved');
+  const [freshAiItems, setFreshAiItems] = useState<ActionItem[] | null>(null);
   
   const { data, loading, loadingSlowly, error, reload } = useAIFeature<any>({
     visible,
@@ -206,8 +211,50 @@ export function ActionItemsModal({
     itemToAssignRef.current = null;
     setIsAdmin(false);
     setWorkspaceId(undefined);
+    setShowEditModal(false);
+    setViewMode('saved');
+    setFreshAiItems(null);
     onClose();
   };
+
+  const handleEditPress = () => {
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (editedItems: ActionItem[]) => {
+    try {
+      await saveEditedActionItems(conversationId, editedItems);
+      Alerts.success('Action items saved successfully');
+      reload(); // Reload to show saved version
+    } catch (error: any) {
+      throw error; // Let EditActionItemsModal handle it
+    }
+  };
+
+  const handleGetFreshAI = async () => {
+    try {
+      const fresh = await extractActionItems(conversationId) as any;
+      const freshItems = fresh.items || [];
+      // Sort by priority
+      const priorityOrder: { [key: string]: number } = { high: 0, medium: 1, low: 2 };
+      const sortedItems = [...freshItems].sort((a: ActionItem, b: ActionItem) => {
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      });
+      setFreshAiItems(sortedItems);
+      setViewMode('fresh');
+    } catch (error: any) {
+      Alerts.error(error.message || 'Failed to generate fresh action items');
+    }
+  };
+
+  // Determine if user can edit
+  const canEdit = workspaceId ? isAdmin : user?.isPaidUser;
+
+  // Check if action items have been edited
+  const hasSavedVersion = data?.editedByAdmin === true;
+
+  // Display items based on view mode
+  const displayedItems = viewMode === 'fresh' && freshAiItems ? freshAiItems : items;
 
   return (
     <Modal
@@ -234,9 +281,20 @@ export function ActionItemsModal({
 
         {/* Action Items List */}
         {!loading && !error && (
-          <FlatList
-            data={items}
-            keyExtractor={(item, index) => item.id || `item-${index}`}
+          <>
+            {/* Edited Badge */}
+            {hasSavedVersion && viewMode === 'saved' && displayedItems.length > 0 && (
+              <View style={styles.editedBadge}>
+                <Ionicons name="pencil" size={14} color={Colors.primary} />
+                <Text style={styles.editedBadgeText}>
+                  Edited by Admin
+                </Text>
+              </View>
+            )}
+
+            <FlatList
+              data={displayedItems}
+              keyExtractor={(item, index) => item.id || `item-${index}`}
             renderItem={({item}) => (
               <View
                 style={[
@@ -324,9 +382,54 @@ export function ActionItemsModal({
             }
             contentContainerStyle={[
               styles.listContent,
-              items.length === 0 && styles.listContentEmpty,
+              displayedItems.length === 0 && styles.listContentEmpty,
             ]}
           />
+
+          {/* Edit & Save Buttons */}
+          {canEdit && displayedItems.length > 0 && (
+            <View style={styles.actionButtons}>
+              {!hasSavedVersion && (
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={handleEditPress}
+                >
+                  <Ionicons name="pencil-outline" size={18} color="#fff" />
+                  <Text style={styles.editButtonText}>Edit & Save</Text>
+                </TouchableOpacity>
+              )}
+
+              {hasSavedVersion && viewMode === 'saved' && (
+                <>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={handleEditPress}
+                  >
+                    <Ionicons name="pencil-outline" size={18} color="#fff" />
+                    <Text style={styles.editButtonText}>Re-edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.freshButton}
+                    onPress={handleGetFreshAI}
+                  >
+                    <Ionicons name="refresh-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.freshButtonText}>Get Fresh AI Analysis</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {viewMode === 'fresh' && (
+                <TouchableOpacity
+                  style={styles.freshButton}
+                  onPress={() => setViewMode('saved')}
+                >
+                  <Ionicons name="bookmark-outline" size={18} color={Colors.primary} />
+                  <Text style={styles.freshButtonText}>View Your Saved Version</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          </>
         )}
 
         {/* Assignment Picker Modal */}
@@ -388,6 +491,14 @@ export function ActionItemsModal({
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
+
+        {/* Edit Action Items Modal */}
+        <EditActionItemsModal
+          visible={showEditModal}
+          actionItems={items}
+          onClose={() => setShowEditModal(false)}
+          onSave={handleSaveEdit}
+        />
       </View>
     </Modal>
   );
@@ -532,5 +643,64 @@ const styles = StyleSheet.create({
   pickerCancelText: {
     fontSize: 16,
     color: Colors.textLight,
+  },
+  editedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  editedBadgeText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E8E8E8',
+    backgroundColor: '#fff',
+  },
+  editButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  editButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  freshButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    gap: 6,
+  },
+  freshButtonText: {
+    color: Colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
