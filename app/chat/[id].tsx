@@ -270,6 +270,9 @@ export default function ChatScreen() {
           
           // Phase 5: Add status badge and info button for direct chats
           const status = userStatuses[otherUserId];
+          
+          // Sub-Phase 7: Add pin button for workspace DMs
+          const pinnedCount = conversation.pinnedMessages?.length || 0;
           headerRight = () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, gap: 12 }}>
               {status && (
@@ -282,6 +285,28 @@ export default function ChatScreen() {
               <TouchableOpacity onPress={() => modals.open('aiMenu')}>
                 <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
               </TouchableOpacity>
+              {conversation.workspaceId && (
+                <TouchableOpacity onPress={() => modals.open('pinned')}>
+                  <View style={{ position: 'relative' }}>
+                    <Ionicons name="pin" size={24} color="#007AFF" />
+                    {pinnedCount > 0 && (
+                      <View style={{
+                        position: 'absolute',
+                        top: -6,
+                        right: -6,
+                        backgroundColor: '#FF3B30',
+                        borderRadius: 8,
+                        minWidth: 16,
+                        height: 16,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{pinnedCount}</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity onPress={() => modals.open('participants')}>
                 <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
               </TouchableOpacity>
