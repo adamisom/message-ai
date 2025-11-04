@@ -300,23 +300,25 @@ export default function ChatScreen() {
             <TouchableOpacity onPress={() => modals.open('aiMenu')}>
               <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
             </TouchableOpacity>
-            {conversation.workspaceId && pinnedCount > 0 && (
+            {conversation.workspaceId && (
               <TouchableOpacity onPress={() => modals.open('pinned')}>
                 <View style={{ position: 'relative' }}>
                   <Ionicons name="pin" size={24} color="#007AFF" />
-                  <View style={{
-                    position: 'absolute',
-                    top: -6,
-                    right: -6,
-                    backgroundColor: '#FF3B30',
-                    borderRadius: 8,
-                    minWidth: 16,
-                    height: 16,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{pinnedCount}</Text>
-                  </View>
+                  {pinnedCount > 0 && (
+                    <View style={{
+                      position: 'absolute',
+                      top: -6,
+                      right: -6,
+                      backgroundColor: '#FF3B30',
+                      borderRadius: 8,
+                      minWidth: 16,
+                      height: 16,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{pinnedCount}</Text>
+                    </View>
+                  )}
                 </View>
               </TouchableOpacity>
             )}
@@ -1089,10 +1091,27 @@ export default function ChatScreen() {
     if (!selectedMessage || !conversation?.workspaceId) return;
     
     try {
+      // Optimistic UI update
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          msg.id === selectedMessage.id
+            ? { ...msg, manuallyMarkedUrgent: true }
+            : msg
+        )
+      );
+      
       await markMessageUrgent(conversationId as string, selectedMessage.id);
       Alerts.success('Message marked as urgent');
       setSelectedMessage(null);
     } catch (error: any) {
+      // Revert optimistic update on error
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          msg.id === selectedMessage.id
+            ? { ...msg, manuallyMarkedUrgent: false }
+            : msg
+        )
+      );
       Alerts.error(error.message || 'Failed to mark message as urgent');
     }
   };
@@ -1101,10 +1120,27 @@ export default function ChatScreen() {
     if (!selectedMessage || !conversation?.workspaceId) return;
     
     try {
+      // Optimistic UI update
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          msg.id === selectedMessage.id
+            ? { ...msg, manuallyMarkedUrgent: false }
+            : msg
+        )
+      );
+      
       await unmarkMessageUrgent(conversationId as string, selectedMessage.id);
       Alerts.success('Urgency marker removed');
       setSelectedMessage(null);
     } catch (error: any) {
+      // Revert optimistic update on error
+      setMessages(prevMessages =>
+        prevMessages.map(msg =>
+          msg.id === selectedMessage.id
+            ? { ...msg, manuallyMarkedUrgent: true }
+            : msg
+        )
+      );
       Alerts.error(error.message || 'Failed to remove urgency marker');
     }
   };
