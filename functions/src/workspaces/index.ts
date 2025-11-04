@@ -415,6 +415,7 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
   // 5. Calculate spam strikes using tested helper
   await db.runTransaction(async (transaction) => {
     const now = admin.firestore.FieldValue.serverTimestamp();
+    const nowTimestamp = Date.now(); // Use actual timestamp for calculation
 
     // Get spam reports and add new report
     const spamReportsReceived = inviter.spamReportsReceived || [];
@@ -427,17 +428,25 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
       workspaceId: report.workspaceId,
     }));
 
-    // Add new report
-    const newReport = {
+    // Add new report with Date object for calculation
+    const newReportForCalculation = {
       reportedBy: reporterUid,
       reason: 'workspace',
-      timestamp: now,
+      timestamp: new Date(nowTimestamp),
       workspaceId: invitation.workspaceId,
     };
-    reportsForCalculation.push(newReport);
+    reportsForCalculation.push(newReportForCalculation);
 
     // Calculate active strikes using tested helper (with 1-month decay)
     const strikeResult = calculateActiveStrikes(reportsForCalculation);
+    
+    // Prepare report object for Firestore with serverTimestamp
+    const newReport = {
+      reportedBy: reporterUid,
+      reason: 'workspace',
+      timestamp: now, // Use serverTimestamp for Firestore write
+      workspaceId: invitation.workspaceId,
+    };
 
     // Filter to keep only active reports (helper already validated these)
     const oneMonthAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);

@@ -201,10 +201,12 @@ export default function InvitationsScreen() {
             await reportDirectMessageInvitationSpam(invitation.id);
           }
 
-          Alerts.success('Thank you for helping keep MessageAI safe.', () => loadInvitations());
+          await loadInvitations(); // Refresh immediately so invitation disappears
+          Alerts.success('Thank you for helping keep MessageAI safe.');
         } catch (error: any) {
           console.error('Report spam error:', error);
-          Alerts.error(error.message || 'Failed to report spam');
+          // More graceful error message
+          Alerts.error('Problem reporting spam. Please try again later.');
         } finally {
           setProcessingId(null);
         }
