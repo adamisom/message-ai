@@ -1040,8 +1040,11 @@ export default function ChatScreen() {
     
     // Workspace admins can mark urgent and pin messages
     if (isWorkspaceChat && isAdmin) {
-      const isUrgent = message.manuallyMarkedUrgent || message.priority === 'high';
-      options.push(isUrgent ? 'Unmark Urgent' : 'Mark Urgent');
+      // Determine if badge is currently showing (manual override OR AI detection)
+      const showingBadge = message.hasManualUrgencyOverride 
+        ? message.showUrgentBadge 
+        : message.priority === 'high';
+      options.push(showingBadge ? 'Unmark Urgent' : 'Mark Urgent');
       
       const isPinned = (conversation.pinnedMessages || []).some(pm => pm.messageId === message.id);
       options.push(isPinned ? 'Unpin Message' : 'Pin Message');
@@ -1095,7 +1098,7 @@ export default function ChatScreen() {
       setMessages(prevMessages =>
         prevMessages.map(msg =>
           msg.id === selectedMessage.id
-            ? { ...msg, manuallyMarkedUrgent: true }
+            ? { ...msg, hasManualUrgencyOverride: true, showUrgentBadge: true }
             : msg
         )
       );
@@ -1108,7 +1111,7 @@ export default function ChatScreen() {
       setMessages(prevMessages =>
         prevMessages.map(msg =>
           msg.id === selectedMessage.id
-            ? { ...msg, manuallyMarkedUrgent: false }
+            ? { ...msg, hasManualUrgencyOverride: false, showUrgentBadge: false }
             : msg
         )
       );
@@ -1124,7 +1127,7 @@ export default function ChatScreen() {
       setMessages(prevMessages =>
         prevMessages.map(msg =>
           msg.id === selectedMessage.id
-            ? { ...msg, manuallyMarkedUrgent: false }
+            ? { ...msg, hasManualUrgencyOverride: true, showUrgentBadge: false }
             : msg
         )
       );
@@ -1137,7 +1140,7 @@ export default function ChatScreen() {
       setMessages(prevMessages =>
         prevMessages.map(msg =>
           msg.id === selectedMessage.id
-            ? { ...msg, manuallyMarkedUrgent: true }
+            ? { ...msg, hasManualUrgencyOverride: true, showUrgentBadge: true }
             : msg
         )
       );

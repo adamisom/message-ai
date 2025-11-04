@@ -28,8 +28,9 @@ export interface Message {
   deletedAt?: any;
   deletedBy?: string; // UID of user who deleted it
   
-  // Sub-Phase 7: Manual urgency markers (three-state system)
-  manuallyMarkedUrgent?: boolean;     // true = admin marked urgent, false = admin marked NOT urgent, undefined = use AI
+  // Sub-Phase 7: Manual urgency markers (two-field system)
+  hasManualUrgencyOverride?: boolean;  // true if admin has manually set urgency (overrides AI)
+  showUrgentBadge?: boolean;          // the actual value: true = show badge, false = don't show
   markedUrgentBy?: string;            // Admin UID
   markedUrgentAt?: any;
 }

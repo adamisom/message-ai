@@ -51,14 +51,13 @@ export default function MessageBubble({
       return null;
     }
     
-    // Three-state system:
-    // - manuallyMarkedUrgent === true → show badge (admin override)
-    // - manuallyMarkedUrgent === false → hide badge (admin override to NOT show)
-    // - manuallyMarkedUrgent === undefined → use AI detection (message.priority)
+    // Two-field system:
+    // - If hasManualUrgencyOverride === true, use showUrgentBadge value (ignore AI)
+    // - Otherwise, fall back to AI detection (message.priority)
     
-    // Manual override takes precedence
-    if (message.manuallyMarkedUrgent === true) return '🔴';
-    if (message.manuallyMarkedUrgent === false) return null;
+    if (message.hasManualUrgencyOverride) {
+      return message.showUrgentBadge ? '🔴' : null;
+    }
     
     // No manual override, use AI detection
     if (message.priority === 'high') return '🔴';
