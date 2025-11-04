@@ -191,20 +191,37 @@ export default function ConversationsList() {
       <View style={styles.container}>
         {/* Phase 5: Workspace mode toggle */}
         {currentWorkspace && (
-          <View style={styles.workspaceBanner}>
-            <View style={styles.workspaceBannerContent}>
-              <Ionicons name="business" size={20} color={Colors.primary} />
-              <Text style={styles.workspaceBannerText}>
-                {currentWorkspace.name}
+          <>
+            {/* Unobtrusive hint at top */}
+            <View style={styles.workspaceHint}>
+              <Text style={styles.workspaceHintText}>
+                Viewing Workspace Chats.{' '}
+                <Text
+                  style={styles.workspaceHintLink}
+                  onPress={() => setCurrentWorkspace(null)}
+                >
+                  Click here
+                </Text>
+                {' '}for General Chat.
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={() => setCurrentWorkspace(null)}
-              style={styles.clearWorkspaceButton}
-            >
-              <Text style={styles.clearWorkspaceButtonText}>View All</Text>
-            </TouchableOpacity>
-          </View>
+            
+            {/* Workspace banner with back button and name */}
+            <View style={styles.workspaceBanner}>
+              <TouchableOpacity
+                onPress={() => router.push(`/workspaces` as any)}
+                style={styles.backButton}
+              >
+                <Ionicons name="arrow-back" size={24} color={Colors.primary} />
+              </TouchableOpacity>
+              <View style={styles.workspaceBannerContent}>
+                <Ionicons name="business" size={20} color={Colors.primary} />
+                <Text style={styles.workspaceBannerText}>
+                  {currentWorkspace.name}
+                </Text>
+              </View>
+            </View>
+          </>
         )}
         
         {isLoading ? (
@@ -251,36 +268,45 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  workspaceHint: {
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E8E8',
+  },
+  workspaceHintText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: '#666',
+    textAlign: 'center',
+  },
+  workspaceHintLink: {
+    color: '#5B8DBE',
+  },
   workspaceBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: Colors.surfaceLight,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    gap: 12,
+  },
+  backButton: {
+    padding: 4,
   },
   workspaceBannerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
   },
   workspaceBannerText: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.textDark,
-  },
-  clearWorkspaceButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: Colors.primary,
-    borderRadius: 6,
-  },
-  clearWorkspaceButtonText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
   },
   emptyState: {
     flex: 1,
