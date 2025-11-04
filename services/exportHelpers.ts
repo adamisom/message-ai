@@ -6,7 +6,7 @@
  */
 
 import { Share, Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { callCloudFunction } from './cloudFunctions';
 
@@ -42,10 +42,8 @@ export async function exportAndShare<T = any>(
     if (Platform.OS === 'ios') {
       const fileUri = `${FileSystem.cacheDirectory}${filename}`;
       
-      // Write JSON to file
-      await FileSystem.writeAsStringAsync(fileUri, jsonString, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
+      // Write JSON to file (utf8 is the default encoding)
+      await FileSystem.writeAsStringAsync(fileUri, jsonString);
       
       // Check if sharing is available
       const canShare = await Sharing.isAvailableAsync();
