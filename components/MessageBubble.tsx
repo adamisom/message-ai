@@ -51,6 +51,14 @@ export default function MessageBubble({
       return null;
     }
     
+    // Debug: Log message fields
+    console.log('🔴 [MessageBubble] Checking badge for message:', message.id, {
+      hasManualUrgencyOverride: message.hasManualUrgencyOverride,
+      showUrgentBadge: message.showUrgentBadge,
+      priority: message.priority,
+      manuallyMarkedUrgent: (message as any).manuallyMarkedUrgent, // Old field for debugging
+    });
+    
     // Two-field system:
     // - If hasManualUrgencyOverride === true, use showUrgentBadge value (ignore AI)
     // - Otherwise, fall back to AI detection (message.priority)

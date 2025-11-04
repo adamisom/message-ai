@@ -305,19 +305,19 @@ export default function ChatScreen() {
                 <View style={{ position: 'relative' }}>
                   <Ionicons name="pin" size={24} color="#007AFF" />
                   {pinnedCount > 0 && (
-                    <View style={{
-                      position: 'absolute',
-                      top: -6,
-                      right: -6,
-                      backgroundColor: '#FF3B30',
-                      borderRadius: 8,
-                      minWidth: 16,
-                      height: 16,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}>
-                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{pinnedCount}</Text>
-                    </View>
+                  <View style={{
+                    position: 'absolute',
+                    top: -6,
+                    right: -6,
+                    backgroundColor: '#FF3B30',
+                    borderRadius: 8,
+                    minWidth: 16,
+                    height: 16,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{pinnedCount}</Text>
+                  </View>
                   )}
                 </View>
               </TouchableOpacity>
@@ -1093,24 +1093,19 @@ export default function ChatScreen() {
     if (!msg || !conversation?.workspaceId) return;
     
     try {
-      console.log('🔴 [handleMarkUrgent] Marking message:', msg.id);
-      
       // Optimistic UI update
-      setMessages(prevMessages => {
-        const updated = prevMessages.map(m =>
+      setMessages(prevMessages =>
+        prevMessages.map(m =>
           m.id === msg.id
             ? { ...m, hasManualUrgencyOverride: true, showUrgentBadge: true }
             : m
-        );
-        console.log('🔴 [handleMarkUrgent] Updated messages state');
-        return updated;
-      });
+        )
+      );
       
       await markMessageUrgent(conversationId as string, msg.id);
       Alerts.success('Message marked as urgent');
       setSelectedMessage(null);
     } catch (error: any) {
-      console.error('🔴 [handleMarkUrgent] Error:', error);
       // Revert optimistic update on error
       setMessages(prevMessages =>
         prevMessages.map(m =>
@@ -1128,24 +1123,19 @@ export default function ChatScreen() {
     if (!msg || !conversation?.workspaceId) return;
     
     try {
-      console.log('🔴 [handleUnmarkUrgent] Unmarking message:', msg.id);
-      
       // Optimistic UI update
-      setMessages(prevMessages => {
-        const updated = prevMessages.map(m =>
+      setMessages(prevMessages =>
+        prevMessages.map(m =>
           m.id === msg.id
             ? { ...m, hasManualUrgencyOverride: true, showUrgentBadge: false }
             : m
-        );
-        console.log('🔴 [handleUnmarkUrgent] Updated messages state');
-        return updated;
-      });
+        )
+      );
       
       await unmarkMessageUrgent(conversationId as string, msg.id);
       Alerts.success('Urgency marker removed');
       setSelectedMessage(null);
     } catch (error: any) {
-      console.error('🔴 [handleUnmarkUrgent] Error:', error);
       // Revert optimistic update on error
       setMessages(prevMessages =>
         prevMessages.map(m =>

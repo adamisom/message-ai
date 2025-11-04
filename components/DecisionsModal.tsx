@@ -72,8 +72,8 @@ export function DecisionsModal({
   const handleEditPress = (decision: Decision) => {
     onClose(); // Close main modal first
     setTimeout(() => {
-      setEditingDecision(decision);
-      setShowEditModal(true);
+    setEditingDecision(decision);
+    setShowEditModal(true);
     }, 300);
   };
 

@@ -281,9 +281,9 @@ export function ActionItemsModal({
               </View>
             )}
 
-            <FlatList
+          <FlatList
               data={displayedItems}
-              keyExtractor={(item, index) => item.id || `item-${index}`}
+            keyExtractor={(item, index) => item.id || `item-${index}`}
             renderItem={({item}) => (
               <View
                 style={[

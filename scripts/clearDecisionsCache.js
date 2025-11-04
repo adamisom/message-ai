@@ -1,9 +1,9 @@
 const admin = require('firebase-admin');
 
 if (!admin.apps.length) {
-  admin.initializeApp({
+admin.initializeApp({
     projectId: 'message-ai-2a7cf',
-  });
+});
 }
 
 const db = admin.firestore();

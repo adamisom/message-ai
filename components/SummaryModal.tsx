@@ -67,7 +67,7 @@ export function SummaryModal({
   const handleEditPress = () => {
     onClose(); // Close main modal first
     setTimeout(() => {
-      setShowEditModal(true);
+    setShowEditModal(true);
     }, 300);
   };
 

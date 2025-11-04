@@ -101,7 +101,7 @@ export const saveEditedActionItems = functions.https.onCall(async (data, context
   
   // Validate and update each edited action item in the array
   const updatedItems = [...items];
-  
+
   for (const editedItem of editedActionItems) {
     if (!editedItem.id) {
       throw new functions.https.HttpsError(
@@ -109,10 +109,10 @@ export const saveEditedActionItems = functions.https.onCall(async (data, context
         'Each action item must have an id'
       );
     }
-    
+
     // Find the item in the array
     const itemIndex = updatedItems.findIndex((item: any) => item.id === editedItem.id);
-    
+
     if (itemIndex === -1) {
       throw new functions.https.HttpsError(
         'not-found',
@@ -121,7 +121,7 @@ export const saveEditedActionItems = functions.https.onCall(async (data, context
     }
     
     const existingItem = updatedItems[itemIndex];
-    
+
     // Update the item with edited data, preserving original if first edit
     updatedItems[itemIndex] = {
       ...existingItem,
