@@ -1357,6 +1357,8 @@ export default function ChatScreen() {
       <DecisionsModal
         visible={modals.isOpen('decisions')}
         conversationId={conversationId as string}
+        isWorkspaceChat={conversation?.isWorkspaceChat || false}
+        isAdmin={isAdmin}
         onClose={() => modals.close()}
       />
 

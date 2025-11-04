@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { doc, getDoc } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
     FlatList,
     Modal,
@@ -9,7 +8,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { db } from '../firebase.config';
 import { useAIFeature } from '../hooks/useAIFeature';
 import { saveEditedDecision, trackDecisions } from '../services/aiService';
 import { useAuthStore } from '../store/authStore';
@@ -19,7 +17,6 @@ import { Alerts } from '../utils/alerts';
 import { getConfidenceColor } from '../utils/colorHelpers';
 import { Colors } from '../utils/colors';
 import { formatDateDetailed } from '../utils/dateFormat';
-import { isWorkspaceAdmin } from '../utils/workspacePermissions';
 import EditDecisionModal from './EditDecisionModal';
 import { EmptyState } from './modals/EmptyState';
 import { ErrorState } from './modals/ErrorState';
@@ -29,17 +26,19 @@ import { ModalHeader } from './modals/ModalHeader';
 interface DecisionsModalProps {
   visible: boolean;
   conversationId: string;
+  isWorkspaceChat?: boolean;
+  isAdmin?: boolean;
   onClose: () => void;
 }
 
 export function DecisionsModal({
   visible,
   conversationId,
+  isWorkspaceChat = false,
+  isAdmin: isAdminProp = false,
   onClose,
 }: DecisionsModalProps) {
   const { user } = useAuthStore();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingDecision, setEditingDecision] = useState<Decision | null>(null);
   
@@ -51,40 +50,12 @@ export function DecisionsModal({
 
   const decisions = (data as any)?.decisions || [];
 
-  // Fetch workspace admin status
-  useEffect(() => {
-    if (!visible || !conversationId || !user) return;
-
-    const checkAdminStatus = async () => {
-      try {
-        const convRef = doc(db, 'conversations', conversationId);
-        const convSnap = await getDoc(convRef);
-        
-        if (convSnap.exists()) {
-          const convData = convSnap.data();
-          if (convData.workspaceId) {
-            setWorkspaceId(convData.workspaceId);
-            const adminStatus = await isWorkspaceAdmin(user.uid, convData.workspaceId);
-            setIsAdmin(adminStatus);
-          } else {
-            // Personal chat - check if Pro user
-            setIsAdmin(user.isPaidUser || false);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to check admin status:', error);
-        setIsAdmin(false);
-      }
-    };
-
-    checkAdminStatus();
-  }, [visible, conversationId, user]);
-
-  const canEdit = workspaceId ? isAdmin : user?.isPaidUser;
+  // Determine if user can edit
+  const canEdit = isWorkspaceChat ? isAdminProp : user?.isPaidUser;
   
   console.log('🔍 [DecisionsModal] canEdit check:', {
-    workspaceId,
-    isAdmin,
+    isWorkspaceChat,
+    isAdminProp,
     isPaidUser: user?.isPaidUser,
     canEdit,
   });
