@@ -116,9 +116,7 @@ export default function InviteMemberScreen() {
           onChangeText={(text) => setPhoneNumber(formatPhoneNumber(text))}
           keyboardType="phone-pad"
           editable={!loading}
-          onSubmitEditing={handleInviteMember}
-          returnKeyType="send"
-          autoFocus
+          returnKeyType="done"
         />
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>
@@ -143,7 +141,7 @@ export default function InviteMemberScreen() {
       <View style={styles.helpSection}>
         <Text style={styles.helpTitle}>💡 Note</Text>
         <Text style={styles.helpText}>
-          • The recipient will receive a notification
+          • The recipient will receive an in-app notification
         </Text>
         <Text style={styles.helpText}>
           • They can accept or decline from their profile
@@ -163,6 +161,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingTop: 60,
   },
   header: {
     flexDirection: 'row',
