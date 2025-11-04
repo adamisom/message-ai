@@ -1071,11 +1071,9 @@ export default function ChatScreen() {
           } else if (option === 'Delete Message') {
             handleDeleteMessage(message);
           } else if (option === 'Mark Urgent') {
-            setSelectedMessage(message);
-            handleMarkUrgent();
+            handleMarkUrgent(message);
           } else if (option === 'Unmark Urgent') {
-            setSelectedMessage(message);
-            handleUnmarkUrgent();
+            handleUnmarkUrgent(message);
           } else if (option === 'Pin Message') {
             setSelectedMessage(message);
             handlePinMessage();
@@ -1090,58 +1088,70 @@ export default function ChatScreen() {
     ]);
   };
 
-  const handleMarkUrgent = async () => {
-    if (!selectedMessage || !conversation?.workspaceId) return;
+  const handleMarkUrgent = async (messageToMark?: Message) => {
+    const msg = messageToMark || selectedMessage;
+    if (!msg || !conversation?.workspaceId) return;
     
     try {
-      // Optimistic UI update
-      setMessages(prevMessages =>
-        prevMessages.map(msg =>
-          msg.id === selectedMessage.id
-            ? { ...msg, hasManualUrgencyOverride: true, showUrgentBadge: true }
-            : msg
-        )
-      );
+      console.log('🔴 [handleMarkUrgent] Marking message:', msg.id);
       
-      await markMessageUrgent(conversationId as string, selectedMessage.id);
+      // Optimistic UI update
+      setMessages(prevMessages => {
+        const updated = prevMessages.map(m =>
+          m.id === msg.id
+            ? { ...m, hasManualUrgencyOverride: true, showUrgentBadge: true }
+            : m
+        );
+        console.log('🔴 [handleMarkUrgent] Updated messages state');
+        return updated;
+      });
+      
+      await markMessageUrgent(conversationId as string, msg.id);
       Alerts.success('Message marked as urgent');
       setSelectedMessage(null);
     } catch (error: any) {
+      console.error('🔴 [handleMarkUrgent] Error:', error);
       // Revert optimistic update on error
       setMessages(prevMessages =>
-        prevMessages.map(msg =>
-          msg.id === selectedMessage.id
-            ? { ...msg, hasManualUrgencyOverride: false, showUrgentBadge: false }
-            : msg
+        prevMessages.map(m =>
+          m.id === msg.id
+            ? { ...m, hasManualUrgencyOverride: false, showUrgentBadge: false }
+            : m
         )
       );
       Alerts.error(error.message || 'Failed to mark message as urgent');
     }
   };
 
-  const handleUnmarkUrgent = async () => {
-    if (!selectedMessage || !conversation?.workspaceId) return;
+  const handleUnmarkUrgent = async (messageToUnmark?: Message) => {
+    const msg = messageToUnmark || selectedMessage;
+    if (!msg || !conversation?.workspaceId) return;
     
     try {
-      // Optimistic UI update
-      setMessages(prevMessages =>
-        prevMessages.map(msg =>
-          msg.id === selectedMessage.id
-            ? { ...msg, hasManualUrgencyOverride: true, showUrgentBadge: false }
-            : msg
-        )
-      );
+      console.log('🔴 [handleUnmarkUrgent] Unmarking message:', msg.id);
       
-      await unmarkMessageUrgent(conversationId as string, selectedMessage.id);
+      // Optimistic UI update
+      setMessages(prevMessages => {
+        const updated = prevMessages.map(m =>
+          m.id === msg.id
+            ? { ...m, hasManualUrgencyOverride: true, showUrgentBadge: false }
+            : m
+        );
+        console.log('🔴 [handleUnmarkUrgent] Updated messages state');
+        return updated;
+      });
+      
+      await unmarkMessageUrgent(conversationId as string, msg.id);
       Alerts.success('Urgency marker removed');
       setSelectedMessage(null);
     } catch (error: any) {
+      console.error('🔴 [handleUnmarkUrgent] Error:', error);
       // Revert optimistic update on error
       setMessages(prevMessages =>
-        prevMessages.map(msg =>
-          msg.id === selectedMessage.id
-            ? { ...msg, hasManualUrgencyOverride: true, showUrgentBadge: true }
-            : msg
+        prevMessages.map(m =>
+          m.id === msg.id
+            ? { ...m, hasManualUrgencyOverride: true, showUrgentBadge: true }
+            : m
         )
       );
       Alerts.error(error.message || 'Failed to remove urgency marker');
