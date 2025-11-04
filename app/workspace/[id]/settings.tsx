@@ -86,7 +86,7 @@ export default function WorkspaceSettingsScreen() {
 
     setIsExporting(true);
     try {
-      const result = await exportWorkspaceData(id);
+      const result = await exportWorkspaceData(id, workspace.name);
       
       if (result.success && result.data) {
         const { metadata } = result.data;
