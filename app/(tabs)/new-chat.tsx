@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -234,6 +235,16 @@ export default function NewChat() {
   return (
     <ErrorBoundary level="screen">
       <View style={styles.container}>
+      {/* Back button for workspace context */}
+      {currentWorkspace && (
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={Colors.textDark} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>New Chat</Text>
+        </View>
+      )}
+
       {/* Phase 5: Workspace context banner */}
       {currentWorkspace && (
         <View style={styles.workspaceBanner}>
@@ -346,6 +357,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     padding: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 12,
+    gap: 12,
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: Colors.textDark,
   },
   workspaceBanner: {
     backgroundColor: Colors.surfaceLight,
