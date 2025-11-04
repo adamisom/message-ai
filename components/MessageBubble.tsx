@@ -51,10 +51,10 @@ export default function MessageBubble({
       return null;
     }
     
-    // Show badge for manually marked urgent OR AI-detected high priority
-    if (message.manuallyMarkedUrgent || message.priority === 'high') return '🔴';
+    // ONLY show badge for manually marked urgent (admin action)
+    // AI-detected priority (message.priority) does NOT show a visual badge
+    if (message.manuallyMarkedUrgent === true) return '🔴';
     
-    // Don't show medium or low priority badges
     return null;
   };
 
