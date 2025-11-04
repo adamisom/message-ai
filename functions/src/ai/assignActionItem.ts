@@ -101,18 +101,19 @@ export const assignActionItem = functions.https.onCall(async (data, context) => 
     }
 
     // Update the item with assignment
+    const now = admin.firestore.Timestamp.now();
     items[itemIndex] = {
       ...items[itemIndex],
       assigneeUid,
       assigneeDisplayName: assigneeDisplayName || 'Unknown',
-      assignedAt: admin.firestore.FieldValue.serverTimestamp(),
+      assignedAt: now, // Use Timestamp for array storage
       assignedBy: context.auth.uid,
     };
 
     // 10. Save updated items back to cache
     await cacheRef.update({
       items,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(), // Top-level field can use serverTimestamp
     });
 
     // 11. Send notification to assignee (optional for MVP)

@@ -101,6 +101,7 @@ ${formattedMessages}
     const decisionsArray = result.decisions;
 
     // Generate IDs for decisions before storing
+    const now = admin.firestore.Timestamp.now();
     const decisionsWithIds = decisionsArray.map((decision) => {
       const decisionRef = db
         .collection(`conversations/${data.conversationId}/ai_decisions`)
@@ -112,6 +113,7 @@ ${formattedMessages}
         participants: decision.participantIds || [],
         sourceMessageIds: decision.sourceMessageIds || [],
         confidence: decision.confidence,
+        extractedAt: now, // Include extractedAt for caching
       };
     });
 
@@ -127,14 +129,13 @@ ${formattedMessages}
         participants: decision.participants,
         sourceMessageIds: decision.sourceMessageIds,
         confidence: decision.confidence,
-        decidedAt: admin.firestore.FieldValue.serverTimestamp(),
-        extractedAt: admin.firestore.FieldValue.serverTimestamp(),
+        decidedAt: now, // Use Timestamp for consistency
+        extractedAt: now, // Use Timestamp for consistency
       });
     });
     await batch.commit();
 
-    // Cache (use actual timestamp instead of serverTimestamp for array storage)
-    const now = admin.firestore.Timestamp.now();
+    // Cache (decisions now include extractedAt)
     await db
       .doc(`conversations/${data.conversationId}/ai_cache/decisions`)
       .set({

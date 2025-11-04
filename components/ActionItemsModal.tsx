@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { db } from '../firebase.config';
 import { useAIFeature } from '../hooks/useAIFeature';
-import { invalidateActionItemsCache } from '../services/aiCacheService';
 import { assignActionItem, extractActionItems, saveEditedActionItems } from '../services/aiService';
 import { useAuthStore } from '../store/authStore';
 import { commonModalStyles } from '../styles/commonModalStyles';
@@ -180,15 +179,12 @@ export function ActionItemsModal({
     console.log('[ActionItemsModal] Calling assignActionItem API');
 
     try {
-      // 1. Update Firestore document via Cloud Function
+      // 1. Update Firestore document via Cloud Function (also updates cache)
       await assignActionItem(conversationId, itemId, participant.uid, participant.displayName);
       console.log('[ActionItemsModal] Assignment successful');
       
-      // 2. Invalidate cache so next open fetches fresh data
       // Note: Don't reload here - optimistic update already shows the change
-      // Reloading would trigger "Scanning for action items..." which is bad UX
-      await invalidateActionItemsCache(conversationId);
-      console.log('[ActionItemsModal] Cache invalidated - fresh data on next open');
+      // The Cloud Function updates the cache, so next open will fetch fresh data
     } catch (err: any) {
       console.error('[ActionItemsModal] Assign error:', err);
       Alerts.error(err.message || 'Failed to assign task. Please try again.');

@@ -126,7 +126,7 @@ export const saveEditedDecision = functions.https.onCall(async (data, context) =
     updatedDecision.originalAiVersion = {
       decision: existingDecision.decision,
       context: existingDecision.context,
-      extractedAt: existingDecision.extractedAt,
+      extractedAt: existingDecision.extractedAt || admin.firestore.Timestamp.now(), // Fallback if undefined
     };
   }
 
