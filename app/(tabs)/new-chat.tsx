@@ -16,6 +16,7 @@ import {
     createOrOpenConversation,
     findUserByPhoneNumber
 } from '../../services/firestoreService';
+import { addMemberToGroupChat } from '../../services/groupChatService';
 import { useAuthStore } from '../../store/authStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { User } from '../../types';
@@ -128,7 +129,40 @@ export default function NewChat() {
           currentWorkspace?.id,
           currentWorkspace?.name
         );
-        console.log('✅ [NewChat] Group chat created, navigating to:', conversationId);
+        
+        // For non-workspace groups, send invitations to all members
+        if (!currentWorkspace) {
+          console.log('📨 [NewChat] Sending invitations to', validUsers.length, 'members');
+          
+          // Send invitations to all members
+          const invitationPromises = validUsers.map(member =>
+            addMemberToGroupChat(conversationId, member.email)
+          );
+          
+          try {
+            await Promise.all(invitationPromises);
+            console.log('✅ [NewChat] All invitations sent successfully');
+            
+            setValidUsers([]); // Clear selected users
+            
+            Alerts.success(
+              `Group chat created! Invitations sent to ${validUsers.length} member${validUsers.length > 1 ? 's' : ''}. They can accept from their invitations.`,
+              () => router.push(`/chat/${conversationId}` as any)
+            );
+            return;
+          } catch (inviteError: any) {
+            console.error('❌ [NewChat] Error sending invitations:', inviteError);
+            // Group was created but invitations failed - still navigate to chat
+            Alerts.error(
+              'Group chat created but some invitations failed to send. Please try adding members again.',
+              () => router.push(`/chat/${conversationId}` as any)
+            );
+            return;
+          }
+        }
+        
+        // Workspace group: navigate directly (no invitations needed)
+        console.log('✅ [NewChat] Workspace group chat created, navigating to:', conversationId);
         router.push(`/chat/${conversationId}` as any);
       } else {
         // Direct chat: 1 user
