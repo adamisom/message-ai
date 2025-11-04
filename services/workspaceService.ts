@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase.config';
 import { CreateWorkspaceRequest, Workspace, WorkspaceInvitation } from '../types';
+import { callCloudFunction } from './cloudFunctions';
 
 /**
  * Create a new workspace (admin only, Pro subscription required)
@@ -252,13 +253,8 @@ export async function getUserWorkspaceInvitations(userId: string): Promise<Works
  * Accept workspace invitation
  */
 export async function acceptWorkspaceInvitation(invitationId: string): Promise<void> {
-  const invitationRef = doc(db, 'workspace_invitations', invitationId);
-  await updateDoc(invitationRef, {
-    status: 'accepted',
-    respondedAt: serverTimestamp(),
-  });
-  
-  // Cloud Function handles adding user to workspace
+  // Call Cloud Function to add user to workspace and update invitation
+  await callCloudFunction('acceptWorkspaceInvitation', { invitationId });
 }
 
 /**

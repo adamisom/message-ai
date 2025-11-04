@@ -134,21 +134,22 @@ export default function InvitationsScreen() {
     try {
       if (invitation.type === 'workspace') {
         await acceptWorkspaceInvitation(invitation.id);
-        Alerts.success(`You've joined ${invitation.name}`, () => loadInvitations());
+        await loadInvitations(); // Refresh immediately so invitation disappears
+        Alerts.success(`You've joined ${invitation.name}`);
       } else if (invitation.type === 'group_chat') {
         await acceptGroupChatInvitation(invitation.id);
-        Alerts.success(`You've joined ${invitation.name}`, () => loadInvitations());
+        await loadInvitations(); // Refresh immediately so invitation disappears
+        Alerts.success(`You've joined ${invitation.name}`);
       } else {
         // DM invitation
         const result = await acceptDirectMessageInvitation(invitation.id);
+        await loadInvitations(); // Refresh immediately so invitation disappears
         Alerts.confirm(
           'Success!',
           `You can now message ${invitation.name}`,
           () => router.push(`/chat/${result.conversationId}` as any),
           { confirmText: 'Open Chat', cancelText: 'Later' }
         );
-        // Reload after either action
-        await loadInvitations();
       }
     } catch (error: any) {
       console.error('Accept invitation error:', error);
@@ -388,6 +389,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
+    paddingTop: 60,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
     backgroundColor: '#FFF',
