@@ -141,6 +141,7 @@ export default function NewChat() {
           
           try {
             const result = await createDirectMessageInvitation(recipient.uid);
+            setValidUsers([]); // Clear selected users after successful invitation
             Alerts.success(
               `Your message request has been sent to ${result.recipientName}. They can accept or decline it from their invitations.`,
               () => router.back()
