@@ -26,6 +26,7 @@ export default function EditDecisionModal({
   onClose,
   onSave,
 }: EditDecisionModalProps) {
+  console.log('📝 [EditDecisionModal] Rendering with:', { visible, hasDecision: !!decision });
   const [editedDecision, setEditedDecision] = useState('');
   const [editedContext, setEditedContext] = useState('');
   const [isSaving, setIsSaving] = useState(false);

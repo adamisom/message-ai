@@ -67,9 +67,23 @@ export function DecisionsModal({
   };
 
   const handleEditPress = (decision: Decision) => {
-    console.log('🖊️ [DecisionsModal] Edit pressed for decision:', decision.id);
-    setEditingDecision(decision);
-    setShowEditModal(true);
+    console.log('🖊️ [DecisionsModal] Edit pressed for decision:', {
+      id: decision.id,
+      decision: decision.decision,
+      hasId: !!decision.id,
+      fullObject: decision,
+    });
+    
+    // Close the main modal first so edit modal can show on top
+    onClose();
+    
+    // Delay setting state so the main modal closes first
+    setTimeout(() => {
+      setEditingDecision(decision);
+      setShowEditModal(true);
+    }, 300);
+    
+    console.log('🖊️ [DecisionsModal] Main modal closing, edit modal will open');
   };
 
   const handleSaveEdit = async (editedDecision: string, editedContext: string) => {
@@ -215,6 +229,7 @@ export function DecisionsModal({
         onClose={() => {
           setShowEditModal(false);
           setEditingDecision(null);
+          // Don't re-open the main modal, just stay closed
         }}
         onSave={handleSaveEdit}
       />
