@@ -363,6 +363,17 @@ export function ActionItemsModal({
                         {item.priority.toUpperCase()} PRIORITY
                       </Text>
                     </View>
+
+                    {/* Edit Button (only for saved items with editedByAdmin) */}
+                    {canEdit && viewMode === 'saved' && item.editedByAdmin && (
+                      <TouchableOpacity
+                        style={styles.itemEditButton}
+                        onPress={handleEditPress}
+                      >
+                        <Ionicons name="pencil" size={14} color={Colors.primary} />
+                        <Text style={styles.itemEditButtonText}>Re-edit</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               </View>
@@ -396,22 +407,13 @@ export function ActionItemsModal({
               )}
 
               {hasSavedVersion && viewMode === 'saved' && (
-                <>
-                  <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={handleEditPress}
-                  >
-                    <Ionicons name="pencil-outline" size={18} color="#fff" />
-                    <Text style={styles.editButtonText}>Re-edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.freshButton}
-                    onPress={handleGetFreshAI}
-                  >
-                    <Ionicons name="refresh-outline" size={18} color={Colors.primary} />
-                    <Text style={styles.freshButtonText}>Get Fresh AI Analysis</Text>
-                  </TouchableOpacity>
-                </>
+                <TouchableOpacity
+                  style={styles.freshButton}
+                  onPress={handleGetFreshAI}
+                >
+                  <Ionicons name="refresh-outline" size={18} color={Colors.primary} />
+                  <Text style={styles.freshButtonText}>Get Fresh AI Analysis</Text>
+                </TouchableOpacity>
               )}
 
               {viewMode === 'fresh' && (
@@ -698,5 +700,21 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  itemEditButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    marginTop: 8,
+    gap: 4,
+  },
+  itemEditButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 });
