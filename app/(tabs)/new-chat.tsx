@@ -22,6 +22,7 @@ import type { User } from '../../types';
 import { Alerts } from '../../utils/alerts';
 import { Colors } from '../../utils/colors';
 import { validatePhoneNumber } from '../../utils/validators';
+import { extractDigits, formatPhoneNumber } from './new-chat-helpers';
 
 export default function NewChat() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -43,18 +44,20 @@ export default function NewChat() {
     setError('');
     setLoading(true);
 
-    console.log('🔍 [NewChat] Adding user with phone:', phoneNumber);
+    // Extract raw digits for validation and search
+    const rawDigits = extractDigits(phoneNumber);
+    console.log('🔍 [NewChat] Adding user with phone:', rawDigits);
 
     try {
       // Validate phone number format first
-      if (!validatePhoneNumber(phoneNumber)) {
+      if (!validatePhoneNumber(rawDigits)) {
         console.log('❌ [NewChat] Invalid phone number format');
         setError('Invalid phone number (must be 10 digits, US/Canada only)');
         return;
       }
 
       // Find user in Firestore by phone number
-      const foundUser = await findUserByPhoneNumber(phoneNumber);
+      const foundUser = await findUserByPhoneNumber(rawDigits);
       
       if (!foundUser) {
         console.log('❌ [NewChat] User not found');
@@ -209,13 +212,13 @@ export default function NewChat() {
         </Text>
       </View>
 
-      {/* Email input */}
+      {/* Phone number input */}
       <View style={styles.inputSection}>
         <TextInput
           style={styles.input}
-          placeholder="Enter phone number (10 digits)"
+          placeholder="Enter phone number"
           value={phoneNumber}
-          onChangeText={setPhoneNumber}
+          onChangeText={(text) => setPhoneNumber(formatPhoneNumber(text))}
           keyboardType="phone-pad"
           editable={!loading}
           onSubmitEditing={handleAddUser}

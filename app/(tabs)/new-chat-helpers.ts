@@ -111,3 +111,35 @@ export function getUserListTitle(users: User[]): string {
   return 'Selected Users:'; // Fallback
 }
 
+/**
+ * Format phone number with auto-formatting: (XXX)XXX-XXXX
+ * Handles progressive formatting as user types and unformatting on backspace
+ * @param input Raw or partially formatted phone number
+ * @returns Formatted phone number
+ */
+export function formatPhoneNumber(input: string): string {
+  // Remove all non-digit characters
+  const digits = input.replace(/\D/g, '');
+  
+  // Limit to 10 digits
+  const limitedDigits = digits.slice(0, 10);
+  
+  // Apply formatting based on length
+  if (limitedDigits.length <= 3) {
+    return limitedDigits;
+  } else if (limitedDigits.length <= 6) {
+    return `(${limitedDigits.slice(0, 3)})${limitedDigits.slice(3)}`;
+  } else {
+    return `(${limitedDigits.slice(0, 3)})${limitedDigits.slice(3, 6)}-${limitedDigits.slice(6)}`;
+  }
+}
+
+/**
+ * Extract raw digits from formatted phone number
+ * @param formattedPhone Formatted phone number (e.g., "(555)123-4567")
+ * @returns Raw digits only (e.g., "5551234567")
+ */
+export function extractDigits(formattedPhone: string): string {
+  return formattedPhone.replace(/\D/g, '');
+}
+
