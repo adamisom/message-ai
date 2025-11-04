@@ -81,6 +81,13 @@ export function DecisionsModal({
   }, [visible, conversationId, user]);
 
   const canEdit = workspaceId ? isAdmin : user?.isPaidUser;
+  
+  console.log('🔍 [DecisionsModal] canEdit check:', {
+    workspaceId,
+    isAdmin,
+    isPaidUser: user?.isPaidUser,
+    canEdit,
+  });
 
   const handleClose = () => {
     setShowEditModal(false);
@@ -89,6 +96,7 @@ export function DecisionsModal({
   };
 
   const handleEditPress = (decision: Decision) => {
+    console.log('🖊️ [DecisionsModal] Edit pressed for decision:', decision.id);
     setEditingDecision(decision);
     setShowEditModal(true);
   };
