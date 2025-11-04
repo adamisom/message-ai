@@ -147,7 +147,7 @@ export default function NewChat() {
             
             Alerts.success(
               `Group chat created! Invitations sent to ${validUsers.length} member${validUsers.length > 1 ? 's' : ''}. They can accept from their invitations.`,
-              () => router.push(`/chat/${conversationId}` as any)
+              () => router.replace(`/chat/${conversationId}` as any)
             );
             return;
           } catch (inviteError: any) {
@@ -155,7 +155,7 @@ export default function NewChat() {
             // Group was created but invitations failed - still navigate to chat
             Alerts.error(
               'Group chat created but some invitations failed to send. Please try adding members again.',
-              () => router.push(`/chat/${conversationId}` as any)
+              () => router.replace(`/chat/${conversationId}` as any)
             );
             return;
           }
