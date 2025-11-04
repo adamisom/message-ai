@@ -53,6 +53,8 @@ export interface Conversation {
   workspaceId?: string;
   workspaceName?: string;
   isWorkspaceChat?: boolean;
+  // Phase 4: Soft delete
+  inactiveParticipants?: string[]; // UIDs of users who have "deleted" this chat
   
   // Sub-Phase 7: Pinned messages
   pinnedMessages?: {          // Max 5

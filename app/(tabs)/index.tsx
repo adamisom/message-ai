@@ -6,6 +6,7 @@ import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native
 import ConversationItem from '../../components/ConversationItem';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { db } from '../../firebase.config';
+import { hideConversation } from '../../services/conversationService';
 import { scheduleMessageNotification } from '../../services/notificationService';
 import { useAuthStore } from '../../store/authStore';
 import { useChatStore } from '../../store/chatStore';
@@ -32,12 +33,15 @@ export default function ConversationsList() {
 
   // Phase 5: Filter conversations by workspace
   // Phase C: Also filter out hidden conversations
+  // Phase 4: Filter out conversations where user is inactive
   const filteredConversations = currentWorkspace
     ? conversations.filter(conv => {
         // Filter by workspace
         if (conv.workspaceId !== currentWorkspace.id) return false;
         // Filter out hidden conversations
         if (user?.hiddenConversations?.includes(conv.id)) return false;
+        // Filter out conversations where user is inactive (soft-deleted)
+        if (conv.inactiveParticipants?.includes(user.uid)) return false;
         return true;
       })
     : conversations.filter(conv => {
@@ -45,10 +49,24 @@ export default function ConversationsList() {
         if (conv.workspaceId) return false;
         // Filter out hidden conversations
         if (user?.hiddenConversations?.includes(conv.id)) return false;
+        // Filter out conversations where user is inactive (soft-deleted)
+        if (conv.inactiveParticipants?.includes(user.uid)) return false;
         return true;
       });
 
   console.log('🔍 [ConversationsList] After filtering:', filteredConversations.length, 'conversations');
+
+  // Handle delete conversation (soft delete - hide from user's list)
+  const handleDeleteConversation = async (conversationId: string) => {
+    if (!user?.uid) return;
+    
+    try {
+      await hideConversation(conversationId, user.uid);
+      console.log('✅ [ConversationsList] Conversation hidden:', conversationId);
+    } catch (error) {
+      console.error('❌ [ConversationsList] Error hiding conversation:', error);
+    }
+  };
 
   // Real-time listener for conversations
   useEffect(() => {
@@ -254,6 +272,7 @@ export default function ConversationsList() {
                   console.log('🔗 [ConversationsList] Navigating to chat:', item.id);
                   router.push(`/chat/${item.id}` as any);
                 }}
+                onDelete={() => handleDeleteConversation(item.id)}
               />
             )}
           />
