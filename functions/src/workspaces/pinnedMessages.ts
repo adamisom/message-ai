@@ -76,10 +76,11 @@ export const pinMessage = functions.https.onCall(async (data, context) => {
     updatedPins = updatedPins.filter(p => p.messageId !== replaceMessageId);
   }
 
+  const now = admin.firestore.Timestamp.now();
   updatedPins.push({
     messageId,
     pinnedBy: context.auth.uid,
-    pinnedAt: admin.firestore.FieldValue.serverTimestamp(),
+    pinnedAt: now, // Use Timestamp for array storage
     order: updatedPins.length,
   });
 

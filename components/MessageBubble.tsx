@@ -51,8 +51,8 @@ export default function MessageBubble({
       return null;
     }
     
-    // Only show high priority (red badge)
-    if (message.priority === 'high') return '🔴';
+    // Show badge for manually marked urgent OR AI-detected high priority
+    if (message.manuallyMarkedUrgent || message.priority === 'high') return '🔴';
     
     // Don't show medium or low priority badges
     return null;
