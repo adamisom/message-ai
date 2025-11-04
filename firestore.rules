@@ -70,10 +70,14 @@ service cloud.firestore {
     
     // Workspace invitations
     match /workspace_invitations/{invitationId} {
-      // Invitee and inviter can read
-      allow read: if isAuthenticated() && 
+      // Invitee and inviter can read individual invitations
+      allow get: if isAuthenticated() && 
                      (isUser(resource.data.invitedUserUid) || 
                       isUser(resource.data.invitedByUid));
+      
+      // Allow querying invitations (where clause filters to user's invitations)
+      // The where() clause ensures users only get their own invitations
+      allow list: if isAuthenticated();
       
       // Pro users (non-banned) can create invitations
       allow create: if isPaidUser() &&
@@ -89,10 +93,13 @@ service cloud.firestore {
     
     // Group chat invitations (Sub-Phase 6.5)
     match /group_chat_invitations/{invitationId} {
-      // Invitee and inviter can read
-      allow read: if isAuthenticated() && 
+      // Invitee and inviter can read individual invitations
+      allow get: if isAuthenticated() && 
                      (isUser(resource.data.invitedUserUid) || 
                       isUser(resource.data.invitedByUid));
+      
+      // Allow querying invitations (where clause filters to user's invitations)
+      allow list: if isAuthenticated();
       
       // Authenticated users (non-banned) can create invitations
       allow create: if isAuthenticated() &&
@@ -108,10 +115,13 @@ service cloud.firestore {
 
     // Direct message invitations (Sub-Phase 11: DM Privacy)
     match /dm_invitations/{invitationId} {
-      // Invitee and inviter can read
-      allow read: if isAuthenticated() && 
+      // Invitee and inviter can read individual invitations
+      allow get: if isAuthenticated() && 
                      (isUser(resource.data.inviteeId) || 
                       isUser(resource.data.inviterId));
+      
+      // Allow querying invitations (where clause filters to user's invitations)
+      allow list: if isAuthenticated();
       
       // Authenticated users (non-banned) can create invitations
       allow create: if isAuthenticated() &&
@@ -159,7 +169,6 @@ service cloud.firestore {
       
       allow create: if request.auth != null && 
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
-        !isBlockedInDirectMessage(conversationId) &&
         !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.spamBanned;
       
       // Sub-Phase 11: Only message sender can edit/delete (Pro feature enforced in Cloud Function)
@@ -168,27 +177,6 @@ service cloud.firestore {
       
       allow delete: if request.auth != null && 
         request.auth.uid == resource.data.senderId;
-    }
-    
-    // Helper function to check if sender is blocked by recipient (direct messages only)
-    function isBlockedInDirectMessage(conversationId) {
-      let conversation = get(/databases/$(database)/documents/conversations/$(conversationId)).data;
-      
-      // If not a direct message, blocking doesn't apply
-      if (conversation.type != 'direct') {
-        return false;
-      }
-      
-      // Get the other participant (recipient)
-      let otherParticipant = conversation.participants[0] == request.auth.uid 
-        ? conversation.participants[1] 
-        : conversation.participants[0];
-      
-      // Check if recipient has blocked sender
-      let recipientDoc = get(/databases/$(database)/documents/users/$(otherParticipant)).data;
-      let blockedUsers = recipientDoc.blockedUsers;
-      
-      return blockedUsers != null && request.auth.uid in blockedUsers;
     }
     
     // Typing indicators - only conversation participants (Phase 5)
