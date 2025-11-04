@@ -1317,6 +1317,7 @@ export default function ChatScreen() {
         onOpenDecisions={() => modals.open('decisions')}
         onOpenMeetingScheduler={() => modals.open('meetingScheduler')}
         isGroupChat={conversation.type === 'group'}
+        isWorkspaceChat={!!conversation.workspaceId}
         canAccessAI={canAccessAI}
         onUpgradeRequired={() => modals.open('upgrade')}
       />
