@@ -272,13 +272,8 @@ export async function declineWorkspaceInvitation(invitationId: string): Promise<
  * Report workspace invitation as spam
  */
 export async function reportWorkspaceInvitationAsSpam(invitationId: string): Promise<void> {
-  const invitationRef = doc(db, 'workspace_invitations', invitationId);
-  await updateDoc(invitationRef, {
-    status: 'spam',
-    respondedAt: serverTimestamp(),
-  });
-  
-  // Cloud Function handles incrementing spam strikes
+  // Call Cloud Function to update invitation status and increment spam strikes
+  await callCloudFunction('reportWorkspaceInvitationSpam', { invitationId });
 }
 
 /**
