@@ -968,7 +968,8 @@ export default function ChatScreen() {
         }
       });
 
-      // Show ✓✓ only if ALL members have read
+      // Show ✓✓ only if there are other participants AND all have read
+      if (otherParticipants.length === 0) return '✓'; // No other active participants yet
       return readCount === otherParticipants.length ? '✓✓' : '✓';
     }
   };
