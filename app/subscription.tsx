@@ -20,13 +20,12 @@ import { useAuthStore } from '../store/authStore';
 import { Colors } from '../utils/colors';
 
 /**
- * Format date for subscription expiry
+ * Format date for monthly billing (next month from now)
  */
-function formatDate(timestamp: any): string {
-  if (!timestamp) return '';
-  
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleDateString('en-US', {
+function formatNextMonthlyBilling(): string {
+  const nextBilling = new Date();
+  nextBilling.setMonth(nextBilling.getMonth() + 1);
+  return nextBilling.toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -55,9 +54,8 @@ export default function SubscriptionScreen() {
     );
   }
   
-  const nextBillingDate = user.subscriptionEndsAt 
-    ? formatDate(user.subscriptionEndsAt)
-    : 'N/A';
+  // Calculate next monthly billing date
+  const nextBillingDate = formatNextMonthlyBilling();
   
   return (
     <ScrollView
@@ -142,6 +140,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 20,
+    paddingTop: 60, // Extra padding to avoid iPhone status bar overlap
     paddingBottom: 40,
   },
   header: {

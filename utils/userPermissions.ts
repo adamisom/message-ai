@@ -68,8 +68,19 @@ export function getUserPermissions(user: UserProfile | null | undefined): UserPe
   
   const now = Date.now();
   
-  // Check Pro status
+  // Check Pro status AND if subscription has expired
   const isPro = user.isPaidUser === true;
+  let isProExpired = false;
+  
+  if (isPro && user.subscriptionEndsAt) {
+    const subscriptionEndsAt = typeof user.subscriptionEndsAt === 'number'
+      ? user.subscriptionEndsAt
+      : user.subscriptionEndsAt.toMillis?.() || 0;
+    isProExpired = now >= subscriptionEndsAt;
+  }
+  
+  // User is only considered Pro if not expired
+  const isActivePro = isPro && !isProExpired;
   
   // Check Trial status
   let isTrialActive = false;
@@ -89,26 +100,30 @@ export function getUserPermissions(user: UserProfile | null | undefined): UserPe
     }
   }
   
-  const isFree = !isPro && !isTrialActive;
+  const isFree = !isActivePro && !isTrialActive;
   const isSpamBanned = user.spamBanned === true;
   
   // Feature permissions
-  const canAccessAI = isPro || isTrialActive;
-  const canCreateWorkspace = isPro && !isSpamBanned && (user.workspacesOwned?.length || 0) < 5;
-  const canEditMessages = isPro || isTrialActive;
-  const canDeleteMessages = isPro || isTrialActive;
+  const canAccessAI = isActivePro || isTrialActive;
+  const canCreateWorkspace = isActivePro && !isSpamBanned && (user.workspacesOwned?.length || 0) < 5;
+  const canEditMessages = isActivePro || isTrialActive;
+  const canDeleteMessages = isActivePro || isTrialActive;
   
   // Display info
   let statusBadge = '🔓 Free User';
   let statusColor = '#8E8E93'; // Gray
   let statusDetail = '';
   
-  if (isPro) {
+  if (isActivePro) {
     statusBadge = '💎 Pro User';
     statusColor = Colors.primary;
     statusDetail = user.subscriptionEndsAt 
-      ? `Expires: ${formatSubscriptionDate(user.subscriptionEndsAt)}`
+      ? `Next billing: ${formatMonthlyBillingDate(user.subscriptionEndsAt)}`
       : '';
+  } else if (isProExpired) {
+    statusBadge = '🔓 Free User';
+    statusColor = '#8E8E93';
+    statusDetail = 'Subscription expired';
   } else if (isTrialActive) {
     statusBadge = '🎉 Trial User';
     statusColor = '#FFD700'; // Gold
@@ -120,9 +135,9 @@ export function getUserPermissions(user: UserProfile | null | undefined): UserPe
   }
   
   // UI button visibility
-  const showTrialButton = !isPro && !isTrialActive && !user.trialUsed;
-  const showUpgradeButton = !isPro; // Show upgrade for trial and free users
-  const showManageButton = isPro;
+  const showTrialButton = !isActivePro && !isTrialActive && !user.trialUsed;
+  const showUpgradeButton = !isActivePro; // Show upgrade for expired Pro, trial, and free users
+  const showManageButton = isActivePro;
   
   return {
     isPro,
@@ -153,6 +168,31 @@ function formatSubscriptionDate(date: any): string {
       ? new Date(date) 
       : date.toDate?.() || new Date(date);
     return d.toLocaleDateString();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Helper: Calculate next monthly billing date from subscription start/end
+ * Shows the upcoming monthly billing, not the far-future subscription end date
+ */
+function formatMonthlyBillingDate(subscriptionDate: any): string {
+  try {
+    const now = new Date();
+    const subDate = typeof subscriptionDate === 'number' 
+      ? new Date(subscriptionDate) 
+      : subscriptionDate.toDate?.() || new Date(subscriptionDate);
+    
+    // If subscription date is in the past, calculate next billing from now
+    if (subDate < now) {
+      const nextBilling = new Date(now);
+      nextBilling.setMonth(nextBilling.getMonth() + 1);
+      return nextBilling.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    
+    // Otherwise show the subscription date
+    return subDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   } catch {
     return '';
   }
