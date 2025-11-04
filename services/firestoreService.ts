@@ -113,7 +113,8 @@ export const createOrOpenConversation = async (
   workspaceName?: string
 ): Promise<string> => {
   // Sort UIDs to ensure consistent conversation ID
-  const conversationId = generateConversationId(currentUser.uid, otherUser.uid);
+  // Include workspaceId to keep workspace DMs separate from general DMs
+  const conversationId = generateConversationId(currentUser.uid, otherUser.uid, workspaceId);
   const conversationRef = doc(db, 'conversations', conversationId);
   
   console.log('💬 [firestoreService] Creating/opening conversation:', conversationId, workspaceId ? `(workspace: ${workspaceName})` : '(no workspace)');
