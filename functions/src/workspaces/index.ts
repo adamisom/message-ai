@@ -489,3 +489,116 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
   return { success: true };
 });
 
+/**
+ * Invite a member to an existing workspace
+ * Requires: Admin ownership
+ * Creates a workspace invitation for the invited user
+ */
+export const inviteWorkspaceMember = functions.https.onCall(async (data, context) => {
+  // 1. Authentication check
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const { workspaceId, invitedUserUid } = data;
+
+  if (!workspaceId || !invitedUserUid) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'workspaceId and invitedUserUid are required'
+    );
+  }
+
+  // 2. Get workspace
+  const workspaceRef = db.collection('workspaces').doc(workspaceId);
+  const workspaceDoc = await workspaceRef.get();
+
+  if (!workspaceDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Workspace not found');
+  }
+
+  const workspace = workspaceDoc.data()!;
+
+  // 3. Check admin ownership
+  if (workspace.adminUid !== context.auth.uid) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Only the workspace admin can invite members'
+    );
+  }
+
+  // 4. Check if user is already a member
+  if (workspace.members.includes(invitedUserUid)) {
+    throw new functions.https.HttpsError(
+      'already-exists',
+      'User is already a member of this workspace'
+    );
+  }
+
+  // 5. Check workspace capacity
+  if (workspace.members.length >= 25) {
+    throw new functions.https.HttpsError(
+      'resource-exhausted',
+      'Workspace is full (25 members max)'
+    );
+  }
+
+  // 6. Get invited user info
+  const invitedUserDoc = await db.collection('users').doc(invitedUserUid).get();
+
+  if (!invitedUserDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'User not found');
+  }
+
+  const invitedUser = invitedUserDoc.data()!;
+
+  // 7. Get admin user info
+  const adminUserDoc = await db.collection('users').doc(context.auth.uid).get();
+  const adminUser = adminUserDoc.data()!;
+
+  // 8. Check for existing pending invitation
+  const existingInvitations = await db.collection('workspace_invitations')
+    .where('workspaceId', '==', workspaceId)
+    .where('invitedUserUid', '==', invitedUserUid)
+    .where('status', '==', 'pending')
+    .limit(1)
+    .get();
+
+  if (!existingInvitations.empty) {
+    throw new functions.https.HttpsError(
+      'already-exists',
+      'User already has a pending invitation to this workspace'
+    );
+  }
+
+  // 9. Create invitation
+  const invitationRef = db.collection('workspace_invitations').doc();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  await invitationRef.set({
+    workspaceId,
+    workspaceName: workspace.name,
+    invitedByUid: context.auth.uid,
+    invitedByDisplayName: adminUser.displayName,
+    invitedUserUid,
+    invitedUserEmail: invitedUser.email,
+    status: 'pending',
+    sentAt: now,
+  });
+
+  // 10. Send notification to invited user
+  await db.collection('users').doc(invitedUserUid)
+    .collection('notifications').add({
+      type: 'workspace',
+      action: 'invitation',
+      workspaceId,
+      workspaceName: workspace.name,
+      invitedByDisplayName: adminUser.displayName,
+      message: `${adminUser.displayName} invited you to join ${workspace.name}`,
+      timestamp: now,
+      read: false,
+    });
+
+  return { success: true, invitationId: invitationRef.id };
+});
+
