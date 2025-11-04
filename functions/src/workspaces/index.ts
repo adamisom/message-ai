@@ -414,8 +414,9 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
 
   // 5. Calculate spam strikes using tested helper
   await db.runTransaction(async (transaction) => {
-    const now = admin.firestore.FieldValue.serverTimestamp();
-    const nowTimestamp = Date.now(); // Use actual timestamp for calculation
+    const nowTimestamp = Date.now();
+    const nowForArray = admin.firestore.Timestamp.fromMillis(nowTimestamp); // Timestamp for array storage
+    const nowForTopLevel = admin.firestore.FieldValue.serverTimestamp(); // serverTimestamp for top-level fields
 
     // Get spam reports and add new report
     const spamReportsReceived = inviter.spamReportsReceived || [];
@@ -440,11 +441,11 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
     // Calculate active strikes using tested helper (with 1-month decay)
     const strikeResult = calculateActiveStrikes(reportsForCalculation);
     
-    // Prepare report object for Firestore with serverTimestamp
+    // Prepare report object for Firestore (cannot use serverTimestamp in arrays)
     const newReport = {
       reportedBy: reporterUid,
       reason: 'workspace',
-      timestamp: now, // Use serverTimestamp for Firestore write
+      timestamp: nowForArray, // Use Timestamp (not serverTimestamp) for array storage
       workspaceId: invitation.workspaceId,
     };
 
@@ -466,7 +467,7 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
     // Mark invitation as spam
     transaction.update(invitationRef, {
       status: 'spam',
-      respondedAt: now,
+      respondedAt: nowForTopLevel, // Use serverTimestamp for top-level field
     });
 
     // Send notifications based on strike result
@@ -477,7 +478,7 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
         action: 'banned',
         message: '🚫 Your account is restricted from creating workspaces and group chats due to spam reports.',
         strikes: strikeResult.activeStrikes,
-        timestamp: now,
+        timestamp: nowForTopLevel, // Use serverTimestamp for top-level field
         read: false,
       });
     } else if (strikeResult.shouldNotify && strikeResult.notificationType === 'warning') {
@@ -487,7 +488,7 @@ export const reportWorkspaceInvitationSpam = functions.https.onCall(async (data,
         action: 'warning',
         message: `⚠️ You have ${strikeResult.activeStrikes} spam reports. Be careful - 5 strikes will restrict workspace/group creation.`,
         strikes: strikeResult.activeStrikes,
-        timestamp: now,
+        timestamp: nowForTopLevel, // Use serverTimestamp for top-level field
         read: false,
       });
     }
