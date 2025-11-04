@@ -3,6 +3,7 @@ import { useState } from 'react';
 import {
     Button,
     FlatList,
+    Keyboard,
     StyleSheet,
     Text,
     TextInput,
@@ -28,6 +29,7 @@ import { extractDigits, formatPhoneNumber } from './new-chat-helpers';
 export default function NewChat() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [validUsers, setValidUsers] = useState<User[]>([]);
+  const [groupName, setGroupName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -127,7 +129,8 @@ export default function NewChat() {
           validUsers, 
           user,
           currentWorkspace?.id,
-          currentWorkspace?.name
+          currentWorkspace?.name,
+          groupName // Pass the custom group name
         );
         
         // For non-workspace groups, send invitations to all members
@@ -277,6 +280,31 @@ export default function NewChat() {
           <Text style={styles.usersListTitle}>
             {isGroupChat ? `Group Members (${validUsers.length + 1}):` : 'Selected User:'}
           </Text>
+
+          {/* Group Name Input (only for group chats) */}
+          {isGroupChat && (
+            <View style={styles.groupNameSection}>
+              <View style={styles.groupNameInputContainer}>
+                <TextInput
+                  style={styles.groupNameInput}
+                  placeholder="Group name (optional)"
+                  value={groupName}
+                  onChangeText={setGroupName}
+                  editable={!loading}
+                  maxLength={50}
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                />
+                <TouchableOpacity
+                  onPress={() => Keyboard.dismiss()}
+                  style={styles.doneButton}
+                >
+                  <Text style={styles.doneButtonText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           <FlatList
             data={validUsers}
             keyExtractor={(item) => item.uid}
@@ -375,6 +403,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
+  },
+  groupNameSection: {
+    marginBottom: 12,
+  },
+  groupNameInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  groupNameInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  doneButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+  },
+  doneButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   userItem: {
     flexDirection: 'row',
