@@ -274,7 +274,7 @@ export default function ChatScreen() {
           // Sub-Phase 7: Add pin button for workspace DMs
           const pinnedCount = conversation.pinnedMessages?.length || 0;
           headerRight = () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 0, gap: 12 }}>
               {status && (
                 <UserStatusBadge 
                   isOnline={status.isOnline} 
@@ -285,31 +285,14 @@ export default function ChatScreen() {
               <TouchableOpacity onPress={() => modals.open('aiMenu')}>
                 <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
               </TouchableOpacity>
-              {conversation.workspaceId && (
-                <TouchableOpacity onPress={() => modals.open('pinned')}>
-                  <View style={{ position: 'relative' }}>
-                    <Ionicons name="pin" size={24} color="#007AFF" />
-                    {pinnedCount > 0 && (
-                      <View style={{
-                        position: 'absolute',
-                        top: -6,
-                        right: -6,
-                        backgroundColor: '#FF3B30',
-                        borderRadius: 8,
-                        minWidth: 16,
-                        height: 16,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}>
-                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{pinnedCount}</Text>
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              )}
               <TouchableOpacity onPress={() => modals.open('participants')}>
                 <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
               </TouchableOpacity>
+              {conversation.workspaceId && (
+                <TouchableOpacity onPress={() => modals.open('pinned')}>
+                  <Ionicons name="pin" size={24} color="#CC6666" />
+                </TouchableOpacity>
+              )}
             </View>
           );
         }
@@ -321,35 +304,18 @@ export default function ChatScreen() {
         // Add info button for group participants + AI features + pins (Sub-Phase 7)
         const pinnedCount = conversation.pinnedMessages?.length || 0;
         headerRight = () => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16, gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 0, gap: 12 }}>
             <TouchableOpacity onPress={() => modals.open('aiMenu')}>
               <Ionicons name="sparkles-outline" size={24} color="#007AFF" />
             </TouchableOpacity>
-            {conversation.workspaceId && (
-              <TouchableOpacity onPress={() => modals.open('pinned')}>
-                <View style={{ position: 'relative' }}>
-                  <Ionicons name="pin" size={24} color="#007AFF" />
-                  {pinnedCount > 0 && (
-                  <View style={{
-                    position: 'absolute',
-                    top: -6,
-                    right: -6,
-                    backgroundColor: '#FF3B30',
-                    borderRadius: 8,
-                    minWidth: 16,
-                    height: 16,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{pinnedCount}</Text>
-                  </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            )}
             <TouchableOpacity onPress={() => modals.open('participants')}>
               <Ionicons name="information-circle-outline" size={28} color="#007AFF" />
             </TouchableOpacity>
+            {conversation.workspaceId && (
+              <TouchableOpacity onPress={() => modals.open('pinned')}>
+                <Ionicons name="pin" size={24} color="#CC6666" />
+              </TouchableOpacity>
+            )}
           </View>
         );
       }
