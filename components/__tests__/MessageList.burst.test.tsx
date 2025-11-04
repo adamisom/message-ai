@@ -12,6 +12,15 @@
 import { Message } from '../../types';
 
 describe('MessageList - Burst Performance (Logic)', () => {
+  beforeAll(() => {
+    // Suppress console.log in tests to reduce noise
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterAll(() => {
+    jest.restoreAllMocks();
+  });
+
   const createMessage = (id: string, timestamp: Date): Message => ({
     id,
     text: `Burst message ${id}`,

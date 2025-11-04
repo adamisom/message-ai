@@ -1,6 +1,14 @@
 import {resolveAssignee} from '../actionItems';
 
 describe('resolveAssignee', () => {
+  beforeEach(() => {
+    // Suppress console.warn in tests since we're testing error cases
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
   const participantDetails = {
     uid1: {
       displayName: 'Alice Johnson',

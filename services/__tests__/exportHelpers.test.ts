@@ -24,6 +24,12 @@ const mockCallCloudFunction = cloudFunctions.callCloudFunction as jest.MockedFun
 describe('exportHelpers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Suppress console.log in tests to reduce noise
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('exportAndShare', () => {

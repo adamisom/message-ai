@@ -31,6 +31,12 @@ jest.mock('firebase/firestore', () => ({
 describe('dmInvitationService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Suppress console.error in tests since we're intentionally testing error cases
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('createDirectMessageInvitation', () => {

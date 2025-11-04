@@ -18,6 +18,12 @@ jest.mock('../../firebase.config', () => ({
 describe('cloudFunctions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Suppress console.error in tests since we're intentionally testing error cases
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('callCloudFunction', () => {
@@ -75,7 +81,13 @@ describe('cloudFunctions', () => {
   });
 
   describe('callCloudFunctionWithTimeout', () => {
-    jest.useFakeTimers();
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
 
     it('should return result before timeout', async () => {
       const mockResult: HttpsCallableResult = { data: { success: true } };
@@ -101,8 +113,6 @@ describe('cloudFunctions', () => {
 
       await expect(promise).rejects.toThrow('Request timeout');
     });
-
-    jest.useRealTimers();
   });
 
   describe('callCloudFunctionSafe', () => {
