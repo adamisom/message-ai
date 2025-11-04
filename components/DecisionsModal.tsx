@@ -70,8 +70,11 @@ export function DecisionsModal({
   };
 
   const handleEditPress = (decision: Decision) => {
-    setEditingDecision(decision);
-    setShowEditModal(true);
+    onClose(); // Close main modal first
+    setTimeout(() => {
+      setEditingDecision(decision);
+      setShowEditModal(true);
+    }, 300);
   };
 
   const handleSaveEdit = async (editedDecision: string, editedContext: string) => {
@@ -87,7 +90,7 @@ export function DecisionsModal({
       setShowEditModal(false);
       setEditingDecision(null);
       Alerts.success('Decision saved successfully');
-      reload(); // Reload to show saved version in main modal
+      // Don't reload here - user needs to reopen Decisions modal to see it
     } catch (error: any) {
       throw error; // Let EditDecisionModal handle it
     }

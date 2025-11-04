@@ -78,7 +78,12 @@ export default function EditSummaryModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal 
+      visible={visible} 
+      animationType="slide" 
+      presentationStyle="formSheet"
+      onRequestClose={onClose}
+    >
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>

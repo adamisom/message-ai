@@ -146,21 +146,16 @@ export function ActionItemsModal({
 
   // PHASE 4: Action Item Assignment (now enabled for workspace admins)
   const handleAssignPress = (itemId: string) => {
-    console.log('[ActionItemsModal] handleAssignPress called with:', itemId);
     setItemToAssign(itemId);
     itemToAssignRef.current = itemId;
     setShowAssignPicker(true);
   };
 
   const handleAssignToParticipant = async (participant: Participant, itemId: string) => {
-    console.log('[ActionItemsModal] handleAssignToParticipant called:', participant.displayName, 'itemId:', itemId);
-    
     if (!itemId) {
       console.warn('[ActionItemsModal] No itemId provided');
       return;
     }
-
-    console.log('[ActionItemsModal] Starting optimistic update');
 
     // Optimistic update
     setItems((prev) =>
@@ -176,12 +171,9 @@ export function ActionItemsModal({
     setItemToAssign(null);
     itemToAssignRef.current = null;
 
-    console.log('[ActionItemsModal] Calling assignActionItem API');
-
     try {
       // 1. Update Firestore document via Cloud Function (also updates cache)
       await assignActionItem(conversationId, itemId, participant.uid, participant.displayName);
-      console.log('[ActionItemsModal] Assignment successful');
       
       // Note: Don't reload here - optimistic update already shows the change
       // The Cloud Function updates the cache, so next open will fetch fresh data

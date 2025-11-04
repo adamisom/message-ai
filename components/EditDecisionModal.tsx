@@ -26,7 +26,6 @@ export default function EditDecisionModal({
   onClose,
   onSave,
 }: EditDecisionModalProps) {
-  console.log('📝 [EditDecisionModal] Rendering with:', { visible, hasDecision: !!decision });
   const [editedDecision, setEditedDecision] = useState('');
   const [editedContext, setEditedContext] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -63,7 +62,12 @@ export default function EditDecisionModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal 
+      visible={visible} 
+      animationType="slide" 
+      presentationStyle="formSheet"
+      onRequestClose={onClose}
+    >
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
