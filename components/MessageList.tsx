@@ -94,6 +94,11 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
   // NOTE: With inverted list, "top" and "bottom" are flipped!
   // Scrolling "down" in inverted list = scrolling up in visual UI (toward older messages)
   const handleScroll = (event: any) => {
+    // Skip all processing if already loading more (prevents infinite loop)
+    if (isLoadingMore) {
+      return;
+    }
+    
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     
     // In inverted list: scrolling DOWN (larger contentOffset.y) = loading older messages
@@ -101,7 +106,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
     const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
     
     // Trigger pagination when near bottom of inverted list (= top of visual UI = older messages)
-    if (distanceFromBottom < 100 && hasMoreMessages && !isLoadingMore && onLoadMore) {
+    if (distanceFromBottom < 100 && hasMoreMessages && onLoadMore) {
       console.log('📜 [MessageList] Near top of UI (bottom of inverted list), loading more messages...');
       onLoadMore();
     }
@@ -134,8 +139,8 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
           message={item}
           isOwnMessage={item.senderId === currentUserId}
           showSenderName={conversationType === 'group'}
-          readStatus={getReadStatus ? getReadStatus(item) : null}
-          readDetails={getReadDetails ? getReadDetails(item) : null}
+          readStatus={isLoadingMore ? null : (getReadStatus ? getReadStatus(item) : null)}
+          readDetails={isLoadingMore ? null : (getReadDetails ? getReadDetails(item) : null)}
           isHighlighted={highlightedMessageId === item.id}
           onRetry={onRetryMessage}
           onDelete={onDeleteMessage}

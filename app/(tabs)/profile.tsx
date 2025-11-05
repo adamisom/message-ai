@@ -157,7 +157,8 @@ export default function ProfileScreen() {
       };
       
       refreshUser();
-    }, [user?.uid, refreshUserProfile, loadInvitations, loadSpamStatus])
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.uid])
   );
   
   // Manual refresh handler
