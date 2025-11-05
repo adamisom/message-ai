@@ -18,16 +18,32 @@ import {
 } from 'react-native';
 import { HelpModal, SpamWarningBanner, UpgradeToProModal, UserSettingsModal } from '../../components';
 import { logoutUser, updateUserProfile } from '../../services/authService';
+import { getUserDirectMessageInvitations } from '../../services/dmInvitationService';
 import { getUserGroupChatInvitations } from '../../services/groupChatService';
 import { getUserSpamStatus, SpamStatus } from '../../services/spamService';
 import { startFreeTrial, showTrialStartedAlert, showTrialErrorAlert } from '../../services/subscriptionService';
 import { exportUserConversationsData } from '../../services/userExportService';
 import { getUserWorkspaceInvitations } from '../../services/workspaceService';
 import { useAuthStore } from '../../store/authStore';
-import type { WorkspaceInvitation } from '../../types';
 import { Alerts } from '../../utils/alerts';
 import { Colors } from '../../utils/colors';
 import { getUserPermissions } from '../../utils/userPermissions';
+
+// Unified invitation type for display (matches invitations.tsx)
+type InvitationType = 'workspace' | 'group_chat' | 'direct_message';
+
+interface UnifiedInvitation {
+  id: string;
+  type: InvitationType;
+  name: string;
+  invitedByDisplayName: string;
+  sentAt: any;
+  workspaceId?: string;
+  workspaceName?: string;
+  conversationId?: string;
+  conversationName?: string;
+  inviterPhone?: string;
+}
 
 /**
  * Get initials from display name (matches ProfileButton logic)
@@ -63,20 +79,50 @@ export default function ProfileScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isStartingTrial, setIsStartingTrial] = useState(false);
-  const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
+  const [invitations, setInvitations] = useState<UnifiedInvitation[]>([]);
   const [spamStatus, setSpamStatus] = useState<SpamStatus | null>(null);
   const [showSpamWarning, setShowSpamWarning] = useState(true);
   
-  // Load pending invitations (workspace + group chat)
+  // Load pending invitations (workspace + group chat + DM)
   const loadInvitations = useCallback(async () => {
     if (!user?.uid) return;
     try {
-      const [workspaceInvites, groupChatInvites] = await Promise.all([
+      const [workspaceInvites, groupChatInvites, dmInvites] = await Promise.all([
         getUserWorkspaceInvitations(user.uid),
         getUserGroupChatInvitations(user.uid),
+        getUserDirectMessageInvitations(user.uid),
       ]);
-      // Combine both types for display
-      setInvitations([...workspaceInvites, ...groupChatInvites]);
+      
+      // Combine and format all types (matches invitations.tsx)
+      const combined: UnifiedInvitation[] = [
+        ...workspaceInvites.map((inv: any) => ({
+          id: inv.id,
+          type: 'workspace' as InvitationType,
+          name: inv.workspaceName,
+          invitedByDisplayName: inv.invitedByDisplayName,
+          sentAt: inv.sentAt,
+          workspaceId: inv.workspaceId,
+          workspaceName: inv.workspaceName,
+        })),
+        ...groupChatInvites.map((inv: any) => ({
+          id: inv.id,
+          type: 'group_chat' as InvitationType,
+          name: inv.conversationName || 'Group Chat',
+          invitedByDisplayName: inv.inviterName,
+          sentAt: inv.invitedAt,
+          conversationId: inv.conversationId,
+        })),
+        ...dmInvites.map((inv: any) => ({
+          id: inv.id,
+          type: 'direct_message' as InvitationType,
+          name: `${inv.inviterName}`,
+          invitedByDisplayName: inv.inviterName,
+          sentAt: inv.sentAt,
+          inviterPhone: inv.inviterPhoneNumber,
+        })),
+      ];
+      
+      setInvitations(combined);
     } catch (error) {
       console.error('Failed to load invitations:', error);
     }
@@ -304,30 +350,53 @@ export default function ProfileScreen() {
         <View style={styles.notificationsSection}>
           <Text style={styles.notificationsSectionTitle}>Notifications</Text>
           
-          {invitations.map((invitation) => (
-            <TouchableOpacity
-              key={invitation.id}
-              style={styles.notificationCard}
-              onPress={() => router.push('/workspace/invitations' as any)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.notificationIcon}>
-                <Ionicons name="business" size={20} color={Colors.primary} />
-              </View>
-              
-              <View style={styles.notificationContent}>
-                <Text style={styles.notificationTitle}>
-                  Workspace Invitation
-                </Text>
-                <Text style={styles.notificationText}>
-                  {invitation.invitedByDisplayName} invited you to join{' '}
-                  <Text style={styles.notificationWorkspace}>{invitation.workspaceName}</Text>
-                </Text>
-              </View>
-              
-              <Ionicons name="chevron-forward" size={20} color={Colors.textMedium} />
-            </TouchableOpacity>
-          ))}
+          {invitations.map((invitation) => {
+            const isWorkspace = invitation.type === 'workspace';
+            const isGroupChat = invitation.type === 'group_chat';
+            const isDM = invitation.type === 'direct_message';
+            
+            let iconName: any = 'business';
+            let invitationType = 'Workspace';
+            
+            if (isGroupChat) {
+              iconName = 'people';
+              invitationType = 'Group Chat';
+            } else if (isDM) {
+              iconName = 'chatbubble';
+              invitationType = 'Direct Message';
+            }
+            
+            return (
+              <TouchableOpacity
+                key={invitation.id}
+                style={styles.notificationCard}
+                onPress={() => router.push('/workspace/invitations' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.notificationIcon}>
+                  <Ionicons name={iconName} size={20} color={Colors.primary} />
+                </View>
+                
+                <View style={styles.notificationContent}>
+                  <Text style={styles.notificationTitle}>
+                    {invitationType} Invitation
+                  </Text>
+                  <Text style={styles.notificationText}>
+                    {invitation.invitedByDisplayName} invited you{isWorkspace ? ' to join ' : ' to '}
+                    {isWorkspace && (
+                      <Text style={styles.notificationWorkspace}>{invitation.workspaceName}</Text>
+                    )}
+                    {isGroupChat && (
+                      <Text style={styles.notificationWorkspace}>{invitation.name}</Text>
+                    )}
+                    {isDM && 'chat'}
+                  </Text>
+                </View>
+                
+                <Ionicons name="chevron-forward" size={20} color={Colors.textMedium} />
+              </TouchableOpacity>
+            );
+          })}
           
           <TouchableOpacity
             style={styles.viewAllButton}
