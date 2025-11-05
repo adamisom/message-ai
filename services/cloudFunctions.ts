@@ -39,8 +39,13 @@ export async function callCloudFunction<T = any>(
     console.error(`[${functionName}] Error code:`, error.code);
     console.error(`[${functionName}] Error message:`, error.message);
     
-    // Extract user-friendly error message
-    const message = error.message || `Failed to call ${functionName}`;
+    // Provide more helpful error messages
+    let message = error.message || `Failed to call ${functionName}`;
+    
+    if (error.code === 'functions/unavailable') {
+      message = 'Service temporarily unavailable. Please check your internet connection and try again.';
+    }
+    
     throw new Error(message);
   }
 }
