@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import { Message } from '../types';
 import MessageBubble from './MessageBubble';
@@ -79,8 +79,43 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
     contentHeightRef.current = contentHeight;
   };
 
+  // Memoize the keyExtractor function
+  const keyExtractor = useCallback((item: Message) => item.id, []);
+
+  // Memoize the renderItem function
+  const renderItem = useCallback(
+    ({ item }: { item: Message }) => (
+      <MessageBubble
+        message={item}
+        isOwnMessage={item.senderId === currentUserId}
+        showSenderName={conversationType === 'group'}
+        readStatus={isLoadingMore ? null : (getReadStatus ? getReadStatus(item) : null)}
+        readDetails={isLoadingMore ? null : (getReadDetails ? getReadDetails(item) : null)}
+        isHighlighted={highlightedMessageId === item.id}
+        onRetry={onRetryMessage}
+        onDelete={onDeleteMessage}
+        onLongPress={onMessageLongPress}
+        conversationType={conversationType}
+      />
+    ),
+    [
+      currentUserId,
+      conversationType,
+      getReadStatus,
+      getReadDetails,
+      isLoadingMore,
+      highlightedMessageId,
+      onRetryMessage,
+      onDeleteMessage,
+      onMessageLongPress,
+    ]
+  );
+
+  // Memoize the footer component
+  const listFooterComponent = useMemo(() => <View style={{ height: 8 }} />, []);
+
   // Render loading indicator at the top when fetching older messages
-  const renderListHeader = () => {
+  const renderListHeader = useCallback(() => {
     if (!isLoadingMore && !hasMoreMessages) return null;
     
     return (
@@ -88,12 +123,12 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
         {isLoadingMore && <ActivityIndicator size="small" color="#007AFF" />}
       </View>
     );
-  };
+  }, [isLoadingMore, hasMoreMessages]);
 
   // Handle scroll events to detect when user is near the top OR bottom
   // NOTE: With inverted list, "top" and "bottom" are flipped!
   // Scrolling "down" in inverted list = scrolling up in visual UI (toward older messages)
-  const handleScroll = (event: any) => {
+  const handleScroll = useCallback((event: any) => {
     // Skip all processing if already loading more (prevents infinite loop)
     if (isLoadingMore) {
       return;
@@ -126,31 +161,18 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>(({
         onScrollAwayFromBottom();
       }
     }
-  };
+  }, [isLoadingMore, hasMoreMessages, onLoadMore, onScrollToBottom, onScrollAwayFromBottom]);
 
   return (
     <FlatList
       ref={flatListRef}
       data={messages}
       inverted={true}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <MessageBubble
-          message={item}
-          isOwnMessage={item.senderId === currentUserId}
-          showSenderName={conversationType === 'group'}
-          readStatus={isLoadingMore ? null : (getReadStatus ? getReadStatus(item) : null)}
-          readDetails={isLoadingMore ? null : (getReadDetails ? getReadDetails(item) : null)}
-          isHighlighted={highlightedMessageId === item.id}
-          onRetry={onRetryMessage}
-          onDelete={onDeleteMessage}
-          onLongPress={onMessageLongPress}
-          conversationType={conversationType}
-        />
-      )}
+      keyExtractor={keyExtractor}
+      renderItem={renderItem}
       contentContainerStyle={styles.container}
       ListHeaderComponent={renderListHeader}
-      ListFooterComponent={() => <View style={{ height: 8 }} />}
+      ListFooterComponent={listFooterComponent}
       onScroll={handleScroll}
       scrollEventThrottle={400}
       onContentSizeChange={handleContentSizeChange}
