@@ -8,7 +8,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Button,
   ScrollView,
   StyleSheet,
   Text,
@@ -147,7 +146,7 @@ export default function InviteMemberScreen() {
           • They can accept or decline from their profile
         </Text>
         <Text style={styles.helpText}>
-          • They'll gain access to all workspace chats once they accept
+          • They&apos;ll gain access to all workspace chats once they accept
         </Text>
       </View>
     </ScrollView>

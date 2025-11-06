@@ -272,7 +272,6 @@ export default function ChatScreen() {
           const status = userStatuses[otherUserId];
           
           // Sub-Phase 7: Add pin button for workspace DMs
-          const pinnedCount = conversation.pinnedMessages?.length || 0;
           headerRight = () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 0, gap: 12 }}>
               {status && (
@@ -302,7 +301,6 @@ export default function ChatScreen() {
         title = conversation.name || `Group (${participantCount} members)`;
         
         // Add info button for group participants + AI features + pins (Sub-Phase 7)
-        const pinnedCount = conversation.pinnedMessages?.length || 0;
         headerRight = () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 0, gap: 12 }}>
             <TouchableOpacity onPress={() => modals.open('aiMenu')}>

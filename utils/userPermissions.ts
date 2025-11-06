@@ -162,7 +162,7 @@ export function getUserPermissions(user: UserProfile | null | undefined): UserPe
 /**
  * Helper: Format subscription date for display
  */
-function formatSubscriptionDate(date: any): string {
+export function formatSubscriptionDate(date: any): string {
   try {
     const d = typeof date === 'number' 
       ? new Date(date) 
