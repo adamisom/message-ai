@@ -1,27 +1,7 @@
 import { getUserWorkspaceInvitations } from './workspaceService';
 import { getUserGroupChatInvitations } from './groupChatService';
 import { getUserDirectMessageInvitations } from './dmInvitationService';
-
-/**
- * Unified invitation type for display
- */
-export type InvitationType = 'workspace' | 'group_chat' | 'direct_message';
-
-export interface UnifiedInvitation {
-  id: string;
-  type: InvitationType;
-  name: string; // workspace name, conversation name, or inviter name for DMs
-  invitedByDisplayName: string;
-  sentAt: any;
-  // Workspace-specific
-  workspaceId?: string;
-  workspaceName?: string;
-  // Group chat-specific
-  conversationId?: string;
-  conversationName?: string;
-  // DM-specific
-  inviterPhone?: string;
-}
+import { UnifiedInvitation, InvitationType } from '../types';
 
 /**
  * Load all invitation types for a user and return them in a unified format.

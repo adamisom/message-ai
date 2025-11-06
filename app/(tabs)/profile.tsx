@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { HelpModal, SpamWarningBanner, UpgradeToProModal, UserSettingsModal } from '../../components';
 import { logoutUser, updateUserProfile } from '../../services/authService';
-import { getAllUserInvitations, UnifiedInvitation } from '../../services/invitationService';
+import { getAllUserInvitations } from '../../services/invitationService';
 import { getUserSpamStatus, SpamStatus } from '../../services/spamService';
 import { startFreeTrial, showTrialStartedAlert, showTrialErrorAlert } from '../../services/subscriptionService';
 import { exportUserConversationsData } from '../../services/userExportService';
@@ -26,8 +26,9 @@ import { useAuthStore } from '../../store/authStore';
 import { Alerts } from '../../utils/alerts';
 import { Colors } from '../../utils/colors';
 import { getUserPermissions } from '../../utils/userPermissions';
+import { UnifiedInvitation } from '../../types';
 
-// UnifiedInvitation type is now imported from invitationService
+// UnifiedInvitation type is now in types/index.ts
 
 /**
  * Get initials from display name (matches ProfileButton logic)

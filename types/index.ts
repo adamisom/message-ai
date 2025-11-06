@@ -203,6 +203,26 @@ export interface SearchResult {
   source?: 'vector' | 'local';
 }
 
+// ===== INVITATION TYPES =====
+
+export type InvitationType = 'workspace' | 'group_chat' | 'direct_message';
+
+export interface UnifiedInvitation {
+  id: string;
+  type: InvitationType;
+  name: string; // workspace name, conversation name, or inviter name for DMs
+  invitedByDisplayName: string;
+  sentAt: any;
+  // Workspace-specific
+  workspaceId?: string;
+  workspaceName?: string;
+  // Group chat-specific
+  conversationId?: string;
+  conversationName?: string;
+  // DM-specific
+  inviterPhone?: string;
+}
+
 // ===== PHASE 4: WORKSPACE TYPES =====
 
 export * from './workspace';

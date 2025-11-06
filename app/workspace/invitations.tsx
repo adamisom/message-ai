@@ -30,12 +30,13 @@ import {
   declineWorkspaceInvitation,
   reportWorkspaceInvitationAsSpam,
 } from '../../services/workspaceService';
-import { getAllUserInvitations, UnifiedInvitation } from '../../services/invitationService';
+import { getAllUserInvitations } from '../../services/invitationService';
 import { useAuthStore } from '../../store/authStore';
 import { Alerts } from '../../utils/alerts';
 import { Colors } from '../../utils/colors';
+import { UnifiedInvitation } from '../../types';
 
-// UnifiedInvitation type is now imported from invitationService
+// UnifiedInvitation type is now in types/index.ts
 
 export default function InvitationsScreen() {
   const router = useRouter();
