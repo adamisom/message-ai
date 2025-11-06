@@ -16,42 +16,26 @@ import {
   View,
 } from 'react-native';
 import { 
-  getUserDirectMessageInvitations, 
   acceptDirectMessageInvitation, 
   declineDirectMessageInvitation, 
   reportDirectMessageInvitationSpam 
 } from '../../services/dmInvitationService';
 import {
-  getUserGroupChatInvitations,
   acceptGroupChatInvitation,
   declineGroupChatInvitation,
   reportGroupChatInvitationSpam,
 } from '../../services/groupChatService';
 import {
-  getUserWorkspaceInvitations,
   acceptWorkspaceInvitation,
   declineWorkspaceInvitation,
   reportWorkspaceInvitationAsSpam,
 } from '../../services/workspaceService';
+import { getAllUserInvitations, UnifiedInvitation } from '../../services/invitationService';
 import { useAuthStore } from '../../store/authStore';
 import { Alerts } from '../../utils/alerts';
 import { Colors } from '../../utils/colors';
 
-type InvitationType = 'workspace' | 'group_chat' | 'direct_message';
-
-interface UnifiedInvitation {
-  id: string;
-  type: InvitationType;
-  name: string; // workspace name or conversation name
-  invitedByDisplayName: string;
-  sentAt: any;
-  // Workspace-specific
-  workspaceId?: string;
-  workspaceName?: string;
-  // Group chat-specific
-  conversationId?: string;
-  conversationName?: string;
-}
+// UnifiedInvitation type is now imported from invitationService
 
 export default function InvitationsScreen() {
   const router = useRouter();
@@ -71,50 +55,8 @@ export default function InvitationsScreen() {
     if (!user?.uid) return;
 
     try {
-      // Load workspace, group chat, and DM invitations
-      const [workspaceInvites, groupChatInvites, dmInvites] = await Promise.all([
-        getUserWorkspaceInvitations(user.uid),
-        getUserGroupChatInvitations(user.uid),
-        getUserDirectMessageInvitations(user.uid),
-      ]);
-
-      // Combine and format invitations
-      const combined: UnifiedInvitation[] = [
-        ...workspaceInvites.map((inv: any) => ({
-          id: inv.id,
-          type: 'workspace' as InvitationType,
-          name: inv.workspaceName,
-          invitedByDisplayName: inv.invitedByDisplayName,
-          sentAt: inv.sentAt,
-          workspaceId: inv.workspaceId,
-          workspaceName: inv.workspaceName,
-        })),
-        ...groupChatInvites.map((inv: any) => ({
-          id: inv.id,
-          type: 'group_chat' as InvitationType,
-          name: inv.conversationName || 'Group Chat',
-          invitedByDisplayName: inv.inviterName,
-          sentAt: inv.invitedAt,
-          conversationId: inv.conversationId,
-        })),
-        ...dmInvites.map((inv: any) => ({
-          id: inv.id,
-          type: 'direct_message' as InvitationType,
-          name: `${inv.inviterName}`,
-          invitedByDisplayName: inv.inviterName,
-          sentAt: inv.sentAt,
-          inviterPhone: inv.inviterPhoneNumber,
-        })),
-      ];
-
-      // Sort by sentAt (newest first)
-      combined.sort((a, b) => {
-        const aTime = a.sentAt?.toMillis?.() || 0;
-        const bTime = b.sentAt?.toMillis?.() || 0;
-        return bTime - aTime;
-      });
-
-      setInvitations(combined);
+      const invites = await getAllUserInvitations(user.uid);
+      setInvitations(invites);
     } catch (error) {
       console.error('Error loading invitations:', error);
       Alerts.error('Failed to load invitations');

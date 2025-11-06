@@ -41,7 +41,7 @@ export default function ConversationsList() {
         // Filter out hidden conversations
         if (user?.hiddenConversations?.includes(conv.id)) return false;
         // Filter out conversations where user is inactive (soft-deleted)
-        if (conv.inactiveParticipants?.includes(user.uid)) return false;
+        if (conv.inactiveParticipants?.includes(user?.uid ?? '')) return false;
         return true;
       })
     : conversations.filter(conv => {
@@ -50,7 +50,7 @@ export default function ConversationsList() {
         // Filter out hidden conversations
         if (user?.hiddenConversations?.includes(conv.id)) return false;
         // Filter out conversations where user is inactive (soft-deleted)
-        if (conv.inactiveParticipants?.includes(user.uid)) return false;
+        if (conv.inactiveParticipants?.includes(user?.uid ?? '')) return false;
         return true;
       });
 

@@ -10,9 +10,7 @@
 import { usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getUserDirectMessageInvitations } from '../services/dmInvitationService';
-import { getUserGroupChatInvitations } from '../services/groupChatService';
-import { getUserWorkspaceInvitations } from '../services/workspaceService';
+import { getUserInvitationCount } from '../services/invitationService';
 import { useAuthStore } from '../store/authStore';
 import { Colors } from '../utils/colors';
 
@@ -60,14 +58,8 @@ export const ProfileButton: React.FC = () => {
   const loadInvitationCount = async () => {
     if (!user?.uid) return;
     try {
-      const [workspaceInvites, groupChatInvites, dmInvites] = await Promise.all([
-        getUserWorkspaceInvitations(user.uid),
-        getUserGroupChatInvitations(user.uid),
-        getUserDirectMessageInvitations(user.uid),
-      ]);
-      // Count all pending invitations
-      const total = workspaceInvites.length + groupChatInvites.length + dmInvites.length;
-      setInvitationCount(total);
+      const count = await getUserInvitationCount(user.uid);
+      setInvitationCount(count);
     } catch (error) {
       console.error('[ProfileButton] Error loading invitation count:', error);
     }

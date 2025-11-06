@@ -18,32 +18,16 @@ import {
 } from 'react-native';
 import { HelpModal, SpamWarningBanner, UpgradeToProModal, UserSettingsModal } from '../../components';
 import { logoutUser, updateUserProfile } from '../../services/authService';
-import { getUserDirectMessageInvitations } from '../../services/dmInvitationService';
-import { getUserGroupChatInvitations } from '../../services/groupChatService';
+import { getAllUserInvitations, UnifiedInvitation } from '../../services/invitationService';
 import { getUserSpamStatus, SpamStatus } from '../../services/spamService';
 import { startFreeTrial, showTrialStartedAlert, showTrialErrorAlert } from '../../services/subscriptionService';
 import { exportUserConversationsData } from '../../services/userExportService';
-import { getUserWorkspaceInvitations } from '../../services/workspaceService';
 import { useAuthStore } from '../../store/authStore';
 import { Alerts } from '../../utils/alerts';
 import { Colors } from '../../utils/colors';
 import { getUserPermissions } from '../../utils/userPermissions';
 
-// Unified invitation type for display (matches invitations.tsx)
-type InvitationType = 'workspace' | 'group_chat' | 'direct_message';
-
-interface UnifiedInvitation {
-  id: string;
-  type: InvitationType;
-  name: string;
-  invitedByDisplayName: string;
-  sentAt: any;
-  workspaceId?: string;
-  workspaceName?: string;
-  conversationId?: string;
-  conversationName?: string;
-  inviterPhone?: string;
-}
+// UnifiedInvitation type is now imported from invitationService
 
 /**
  * Get initials from display name (matches ProfileButton logic)
@@ -87,42 +71,8 @@ export default function ProfileScreen() {
   const loadInvitations = useCallback(async () => {
     if (!user?.uid) return;
     try {
-      const [workspaceInvites, groupChatInvites, dmInvites] = await Promise.all([
-        getUserWorkspaceInvitations(user.uid),
-        getUserGroupChatInvitations(user.uid),
-        getUserDirectMessageInvitations(user.uid),
-      ]);
-      
-      // Combine and format all types (matches invitations.tsx)
-      const combined: UnifiedInvitation[] = [
-        ...workspaceInvites.map((inv: any) => ({
-          id: inv.id,
-          type: 'workspace' as InvitationType,
-          name: inv.workspaceName,
-          invitedByDisplayName: inv.invitedByDisplayName,
-          sentAt: inv.sentAt,
-          workspaceId: inv.workspaceId,
-          workspaceName: inv.workspaceName,
-        })),
-        ...groupChatInvites.map((inv: any) => ({
-          id: inv.id,
-          type: 'group_chat' as InvitationType,
-          name: inv.conversationName || 'Group Chat',
-          invitedByDisplayName: inv.inviterName,
-          sentAt: inv.invitedAt,
-          conversationId: inv.conversationId,
-        })),
-        ...dmInvites.map((inv: any) => ({
-          id: inv.id,
-          type: 'direct_message' as InvitationType,
-          name: `${inv.inviterName}`,
-          invitedByDisplayName: inv.inviterName,
-          sentAt: inv.sentAt,
-          inviterPhone: inv.inviterPhoneNumber,
-        })),
-      ];
-      
-      setInvitations(combined);
+      const invites = await getAllUserInvitations(user.uid);
+      setInvitations(invites);
     } catch (error) {
       console.error('Failed to load invitations:', error);
     }
