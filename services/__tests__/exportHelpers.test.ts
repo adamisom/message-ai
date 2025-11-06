@@ -2,7 +2,8 @@
  * Unit tests for Export Helpers
  */
 
-import { Share } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { exportAndShare } from '../exportHelpers';
 import * as cloudFunctions from '../cloudFunctions';
 
@@ -11,11 +12,26 @@ jest.mock('../../firebase.config', () => ({
   functions: {},
 }));
 
+// Mock Expo modules
+jest.mock('expo-file-system/legacy', () => ({
+  writeAsStringAsync: jest.fn().mockResolvedValue(undefined),
+  deleteAsync: jest.fn().mockResolvedValue(undefined),
+  cacheDirectory: '/mock/cache/',
+}));
+
+jest.mock('expo-sharing', () => ({
+  shareAsync: jest.fn().mockResolvedValue(undefined),
+  isAvailableAsync: jest.fn().mockResolvedValue(true),
+}));
+
 // Mock dependencies
 jest.mock('../cloudFunctions');
 jest.mock('react-native', () => ({
   Share: {
     share: jest.fn(),
+  },
+  Platform: {
+    OS: 'ios', // Test iOS path
   },
 }));
 
@@ -26,6 +42,8 @@ describe('exportHelpers', () => {
     jest.clearAllMocks();
     // Suppress console.log in tests to reduce noise
     jest.spyOn(console, 'log').mockImplementation(() => {});
+    // Ensure sharing is available by default
+    (Sharing.isAvailableAsync as jest.Mock).mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -33,7 +51,7 @@ describe('exportHelpers', () => {
   });
 
   describe('exportAndShare', () => {
-    it('should call Cloud Function and share data', async () => {
+    it('should call Cloud Function and share data via expo-sharing on iOS', async () => {
       const mockExportData = {
         workspaceId: 'ws-123',
         workspaceName: 'Test Workspace',
@@ -43,15 +61,13 @@ describe('exportHelpers', () => {
       };
 
       (mockCallCloudFunction as jest.Mock).mockResolvedValue(mockExportData);
-      (Share.share as jest.Mock).mockResolvedValue({ action: 'sharedAction' });
 
       const result = await exportAndShare('exportWorkspace', 'test.json', { workspaceId: 'ws-123' });
 
       expect(mockCallCloudFunction).toHaveBeenCalledWith('exportWorkspace', { workspaceId: 'ws-123' });
-      expect(Share.share).toHaveBeenCalledWith({
-        message: expect.stringContaining('"workspaceId": "ws-123"'),
-        title: 'test.json',
-      });
+      expect(FileSystem.writeAsStringAsync).toHaveBeenCalled();
+      expect(Sharing.shareAsync).toHaveBeenCalled();
+      expect(FileSystem.deleteAsync).toHaveBeenCalled();
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockExportData);
     });
@@ -69,17 +85,17 @@ describe('exportHelpers', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should handle Share.share errors', async () => {
+    it('should handle sharing errors', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
       const mockData = { some: 'data' };
       
       (mockCallCloudFunction as jest.Mock).mockResolvedValue(mockData);
-      (Share.share as jest.Mock).mockRejectedValue(new Error('Share cancelled'));
+      (Sharing.shareAsync as jest.Mock).mockRejectedValue(new Error('Share failed'));
 
       const result = await exportAndShare('exportFunction', 'file.json');
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Share cancelled');
+      expect(result.error).toBe('Share failed');
 
       consoleSpy.mockRestore();
     });
@@ -88,20 +104,20 @@ describe('exportHelpers', () => {
       const mockData = { key: 'value', nested: { data: 123 } };
       
       (mockCallCloudFunction as jest.Mock).mockResolvedValue(mockData);
-      (Share.share as jest.Mock).mockResolvedValue({});
 
       await exportAndShare('test', 'file.json');
 
-      const shareCall = (Share.share as jest.Mock).mock.calls[0][0];
-      expect(shareCall.message).toContain('  "key": "value"'); // 2-space indent
-      expect(shareCall.message).toContain('  "nested": {');
+      const writeCall = (FileSystem.writeAsStringAsync as jest.Mock).mock.calls[0][1];
+      expect(writeCall).toContain('  "key": "value"'); // 2-space indent
+      expect(writeCall).toContain('  "nested": {');
     });
 
     it('should work without optional data parameter', async () => {
       const mockData = { result: 'success' };
       
       (mockCallCloudFunction as jest.Mock).mockResolvedValue(mockData);
-      (Share.share as jest.Mock).mockResolvedValue({});
+      (Sharing.shareAsync as jest.Mock).mockResolvedValue(undefined);
+      (Sharing.isAvailableAsync as jest.Mock).mockResolvedValue(true);
 
       const result = await exportAndShare('noParamsFunction', 'output.json');
 
