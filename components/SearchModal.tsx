@@ -22,6 +22,7 @@ import { ModalHeader } from './modals/ModalHeader';
 interface SearchModalProps {
   visible: boolean;
   conversationId: string;
+  messageCount?: number; // Total messages in conversation
   onClose: () => void;
   onSelectMessage: (messageId: string) => void;
 }
@@ -29,6 +30,7 @@ interface SearchModalProps {
 export function SearchModal({
   visible,
   conversationId,
+  messageCount = 0,
   onClose,
   onSelectMessage,
 }: SearchModalProps) {
@@ -42,6 +44,12 @@ export function SearchModal({
   const handleSearch = async () => {
     if (!query.trim()) {
       setError('Please enter a search query');
+      return;
+    }
+
+    // Warn user if conversation is too small for semantic search
+    if (messageCount < 10) {
+      setError('Smart Search works best on conversations with 10+ messages. For small chats, just scroll to find what you need.');
       return;
     }
 

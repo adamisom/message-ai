@@ -1388,6 +1388,7 @@ export default function ChatScreen() {
       <SearchModal
         visible={modals.isOpen('search')}
         conversationId={conversationId as string}
+        messageCount={messages.length}
         onClose={() => modals.close()}
         onSelectMessage={handleJumpToMessage}
       />
