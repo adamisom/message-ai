@@ -8,7 +8,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ScrollView,
     StyleSheet,
@@ -58,6 +58,7 @@ export default function ProfileScreen() {
   const [invitations, setInvitations] = useState<UnifiedInvitation[]>([]);
   const [spamStatus, setSpamStatus] = useState<SpamStatus | null>(null);
   const [showSpamWarning, setShowSpamWarning] = useState(true);
+  const [showSlowLoadingMessage, setShowSlowLoadingMessage] = useState(false);
   
   // Load pending invitations (workspace + group chat + DM)
   const loadInvitations = useCallback(async () => {
@@ -79,6 +80,22 @@ export default function ProfileScreen() {
       console.error('Failed to load spam status:', error);
     }
   }, []);
+  
+  // Show slow loading message after 1.5 seconds
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    
+    if (!user || isRefreshing) {
+      setShowSlowLoadingMessage(false);
+      timer = setTimeout(() => {
+        setShowSlowLoadingMessage(true);
+      }, 1500);
+    }
+    
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [user, isRefreshing]);
   
   // Refresh user data when screen is focused
   useFocusEffect(
@@ -140,6 +157,11 @@ export default function ProfileScreen() {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.loadingText}>Loading profile...</Text>
+        {showSlowLoadingMessage && (
+          <Text style={styles.slowLoadingText}>
+            Still loading, just a few seconds...
+          </Text>
+        )}
       </View>
     );
   }
@@ -615,6 +637,11 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: Colors.textMedium,
+  },
+  slowLoadingText: {
+    fontSize: 13,
+    color: Colors.textLight,
+    marginTop: 8,
   },
   headerSection: {
     alignItems: 'center',
