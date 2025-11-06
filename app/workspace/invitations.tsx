@@ -85,14 +85,9 @@ export default function InvitationsScreen() {
         Alerts.success(`You've joined ${invitation.name}`);
       } else {
         // DM invitation
-        const result = await acceptDirectMessageInvitation(invitation.id);
+        await acceptDirectMessageInvitation(invitation.id);
         await loadInvitations(); // Refresh immediately so invitation disappears
-        Alerts.confirm(
-          'Success!',
-          `You can now message ${invitation.name}`,
-          () => router.push(`/chat/${result.conversationId}` as any),
-          { confirmText: 'Open Chat', cancelText: 'Later' }
-        );
+        Alerts.success(`You can now message ${invitation.name}`);
       }
     } catch (error: any) {
       console.error('Accept invitation error:', error);
