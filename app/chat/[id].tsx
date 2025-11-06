@@ -17,7 +17,7 @@ import {
   startAfter,
   updateDoc
 } from 'firebase/firestore';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AIFeaturesMenu } from '../../components/AIFeaturesMenu';
 import { ActionItemsModal } from '../../components/ActionItemsModal';
@@ -918,34 +918,97 @@ export default function ChatScreen() {
     return undefined;
   };
 
-  const getReadStatus = (message: Message): '✓' | '✓✓' | null => {
-    // Only show status for own messages
-    if (message.senderId !== user?.uid || !conversation) return null;
+  // Phase 3: Read details for group chats (shows WHO has read)
+  interface ReadDetails {
+    readBy: { uid: string; displayName: string }[];
+    unreadBy: { uid: string; displayName: string }[];
+  }
 
-    if (conversation.type === 'direct') {
-      // Direct chat: simple ✓ or ✓✓
-      const otherUserId = conversation.participants.find(id => id !== user.uid);
-      if (!otherUserId) return '✓';
+  // Pre-compute read status for all messages to improve performance
+  // Memoized Maps are only recalculated when dependencies change
+  const readStatusMap = useMemo(() => {
+    if (!conversation || !user?.uid) return new Map<string, '✓' | '✓✓' | null>();
+    
+    const map = new Map<string, '✓' | '✓✓' | null>();
+    
+    messages.forEach(message => {
+      // Only calculate for own messages
+      if (message.senderId !== user.uid) {
+        map.set(message.id, null);
+        return;
+      }
 
-      const lastRead = conversation.lastRead?.[otherUserId];
-      if (!lastRead) return '✓'; // Not read yet
+      if (conversation.type === 'direct') {
+        const otherUserId = conversation.participants.find(id => id !== user.uid);
+        if (!otherUserId) {
+          map.set(message.id, '✓');
+          return;
+        }
 
-      // Find the last read message
-      const lastReadMsg = messages.find(m => m.id === lastRead);
-      if (!lastReadMsg) return '✓';
+        const lastRead = conversation.lastRead?.[otherUserId];
+        if (!lastRead) {
+          map.set(message.id, '✓');
+          return;
+        }
 
-      // Compare timestamps using normalized extraction
-      const messageTime = getMessageTime(message);
-      const lastReadTime = getMessageTime(lastReadMsg);
+        const lastReadMsg = messages.find(m => m.id === lastRead);
+        if (!lastReadMsg) {
+          map.set(message.id, '✓');
+          return;
+        }
 
-      return messageTime && lastReadTime && messageTime <= lastReadTime ? '✓✓' : '✓';
-    } else {
-      // Group chat: show ✓✓ if all members have read
-      const otherParticipants = conversation.participants.filter(id => id !== user.uid);
-      let readCount = 0;
+        const messageTime = getMessageTime(message);
+        const lastReadTime = getMessageTime(lastReadMsg);
+        map.set(message.id, messageTime && lastReadTime && messageTime <= lastReadTime ? '✓✓' : '✓');
+      } else {
+        // Group chat
+        const otherParticipants = conversation.participants.filter(id => id !== user.uid);
+        let readCount = 0;
+
+        otherParticipants.forEach(participantId => {
+          const lastRead = conversation.lastRead?.[participantId];
+          if (lastRead) {
+            const lastReadMsg = messages.find(m => m.id === lastRead);
+            if (lastReadMsg) {
+              const messageTime = getMessageTime(message);
+              const lastReadTime = getMessageTime(lastReadMsg);
+              if (messageTime && lastReadTime && messageTime <= lastReadTime) {
+                readCount++;
+              }
+            }
+          }
+        });
+
+        map.set(message.id, readCount === otherParticipants.length && otherParticipants.length > 0 ? '✓✓' : '✓');
+      }
+    });
+    
+    return map;
+  }, [messages, conversation, user?.uid]);
+
+  const readDetailsMap = useMemo(() => {
+    if (!conversation || conversation.type !== 'group' || !user?.uid) {
+      return new Map<string, ReadDetails | null>();
+    }
+    
+    const map = new Map<string, ReadDetails | null>();
+    const otherParticipants = conversation.participants.filter(id => id !== user.uid);
+    
+    messages.forEach(message => {
+      // Only for own messages in group chats
+      if (message.senderId !== user.uid) {
+        map.set(message.id, null);
+        return;
+      }
+
+      const readBy: { uid: string; displayName: string }[] = [];
+      const unreadBy: { uid: string; displayName: string }[] = [];
 
       otherParticipants.forEach(participantId => {
+        const participantDetails = conversation.participantDetails[participantId];
+        const displayName = participantDetails?.displayName || 'Unknown';
         const lastRead = conversation.lastRead?.[participantId];
+        
         if (lastRead) {
           const lastReadMsg = messages.find(m => m.id === lastRead);
           if (lastReadMsg) {
@@ -953,61 +1016,32 @@ export default function ChatScreen() {
             const lastReadTime = getMessageTime(lastReadMsg);
 
             if (messageTime && lastReadTime && messageTime <= lastReadTime) {
-              readCount++;
+              readBy.push({ uid: participantId, displayName });
+            } else {
+              unreadBy.push({ uid: participantId, displayName });
             }
-          }
-        }
-      });
-
-      // Show ✓✓ only if there are other participants AND all have read
-      if (otherParticipants.length === 0) return '✓'; // No other active participants yet
-      return readCount === otherParticipants.length ? '✓✓' : '✓';
-    }
-  };
-
-  // Phase 3: Read details for group chats (shows WHO has read)
-  interface ReadDetails {
-    readBy: { uid: string; displayName: string }[];
-    unreadBy: { uid: string; displayName: string }[];
-  }
-
-  const getReadDetails = (message: Message): ReadDetails | null => {
-    // Only for group chats and own messages
-    if (!conversation || conversation.type !== 'group' || message.senderId !== user?.uid) {
-      return null;
-    }
-
-    const otherParticipants = conversation.participants.filter(id => id !== user.uid);
-    const readBy: { uid: string; displayName: string }[] = [];
-    const unreadBy: { uid: string; displayName: string }[] = [];
-
-    otherParticipants.forEach(participantId => {
-      const participantDetails = conversation.participantDetails[participantId];
-      const displayName = participantDetails?.displayName || 'Unknown';
-
-      const lastRead = conversation.lastRead?.[participantId];
-      
-      if (lastRead) {
-        const lastReadMsg = messages.find(m => m.id === lastRead);
-        if (lastReadMsg) {
-          const messageTime = getMessageTime(message);
-          const lastReadTime = getMessageTime(lastReadMsg);
-
-          if (messageTime && lastReadTime && messageTime <= lastReadTime) {
-            readBy.push({ uid: participantId, displayName });
           } else {
             unreadBy.push({ uid: participantId, displayName });
           }
         } else {
           unreadBy.push({ uid: participantId, displayName });
         }
-      } else {
-        unreadBy.push({ uid: participantId, displayName });
-      }
-    });
+      });
 
-    return { readBy, unreadBy };
-  };
+      map.set(message.id, { readBy, unreadBy });
+    });
+    
+    return map;
+  }, [messages, conversation, user?.uid]);
+
+  // Optimized getters that use pre-computed Maps
+  const getReadStatusOptimized = useCallback((message: Message): '✓' | '✓✓' | null => {
+    return readStatusMap.get(message.id) ?? null;
+  }, [readStatusMap]);
+
+  const getReadDetailsOptimized = useCallback((message: Message): ReadDetails | null => {
+    return readDetailsMap.get(message.id) ?? null;
+  }, [readDetailsMap]);
 
   // Sub-Phase 7: Workspace Admin Handlers
   const handleMessageLongPress = (message: Message) => {
@@ -1274,8 +1308,8 @@ export default function ChatScreen() {
         messages={messages}
         currentUserId={user?.uid || ''}
         conversationType={conversation.type}
-        getReadStatus={getReadStatus}
-        getReadDetails={getReadDetails}
+        getReadStatus={getReadStatusOptimized}
+        getReadDetails={getReadDetailsOptimized}
         highlightedMessageId={highlightedMessageId}
         onLoadMore={loadMoreMessages}
         onRetryMessage={handleRetryMessage}
