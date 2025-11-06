@@ -26,6 +26,7 @@ import { useAuthStore } from '../../store/authStore';
 import { Alerts } from '../../utils/alerts';
 import { Colors } from '../../utils/colors';
 import { getUserPermissions } from '../../utils/userPermissions';
+import { formatPhoneNumberDisplay } from '../../utils/phoneFormat';
 import { UnifiedInvitation } from '../../types';
 
 // UnifiedInvitation type is now in types/index.ts
@@ -43,16 +44,6 @@ function getInitials(displayName: string): string {
   } else {
     return words[0][0].toUpperCase();
   }
-}
-
-/**
- * Format phone number for display
- * Input: "1234567890" -> Output: "(123) 456-7890"
- */
-function formatPhoneNumber(phoneNumber: string): string {
-  if (!phoneNumber || phoneNumber.length !== 10) return phoneNumber;
-  
-  return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6)}`;
 }
 
 export default function ProfileScreen() {
@@ -374,7 +365,7 @@ export default function ProfileScreen() {
         
         {/* Phone Number */}
         <Text style={styles.phoneNumber}>
-          {user.phoneNumber ? formatPhoneNumber(user.phoneNumber) : 'No phone number'}
+          {user.phoneNumber ? formatPhoneNumberDisplay(user.phoneNumber) : 'No phone number'}
         </Text>
         
         {/* Email */}
