@@ -13,11 +13,18 @@ import { callCloudFunction } from './cloudFunctions';
  * Called when trying to message a user with dmPrivacySetting: 'private'
  */
 export async function createDirectMessageInvitation(recipientId: string): Promise<{
-  invitationId: string;
+  conversationExists?: boolean;
+  conversationId?: string;
+  invitationId?: string;
   recipientName: string;
 }> {
   try {
-    const result = await callCloudFunction<{ invitationId: string; recipientName: string }>(
+    const result = await callCloudFunction<{ 
+      conversationExists?: boolean;
+      conversationId?: string;
+      invitationId?: string; 
+      recipientName: string;
+    }>(
       'createDirectMessageInvitation',
       { recipientId }
     );

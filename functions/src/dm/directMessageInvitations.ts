@@ -85,10 +85,13 @@ export const createDirectMessageInvitation = functions.https.onCall(async (data,
   const existingConvDoc = await db.collection('conversations').doc(conversationId).get();
   
   if (existingConvDoc.exists) {
-    throw new functions.https.HttpsError(
-      'already-exists',
-      'Conversation already exists with this user'
-    );
+    // Not an error - return the existing conversation ID so client can navigate to it
+    console.log(`✅ [createDMInvitation] Conversation already exists: ${conversationId}`);
+    return {
+      conversationExists: true,
+      conversationId,
+      recipientName: recipient.displayName,
+    };
   }
 
   // 8. Create invitation
@@ -109,6 +112,7 @@ export const createDirectMessageInvitation = functions.https.onCall(async (data,
   console.log(`✉️ [createDMInvitation] Created invitation ${invitationRef.id} from ${inviter.email} to ${recipient.email}`);
 
   return {
+    conversationExists: false,
     invitationId: invitationRef.id,
     recipientName: recipient.displayName,
   };

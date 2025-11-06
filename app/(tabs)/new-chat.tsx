@@ -179,6 +179,18 @@ export default function NewChat() {
           
           try {
             const result = await createDirectMessageInvitation(recipient.uid);
+            
+            // Check if conversation already exists (not an error, just navigate to it)
+            if (result.conversationExists && result.conversationId) {
+              console.log('✅ [NewChat] Conversation already exists, navigating to it');
+              Alerts.success(
+                `You already have a conversation with ${result.recipientName}! Let's take you there.`,
+                () => router.push(`/chat/${result.conversationId}` as any)
+              );
+              return;
+            }
+            
+            // Invitation created successfully
             setValidUsers([]); // Clear selected users after successful invitation
             Alerts.success(
               `Your message request has been sent to ${result.recipientName}. They can accept or decline it from their invitations.`,
@@ -186,18 +198,17 @@ export default function NewChat() {
             );
             return;
           } catch (inviteError: any) {
-            // Handle specific error cases
+            // Handle error cases
             if (inviteError.message?.includes('already have a pending invitation')) {
               Alerts.error('You already have a pending invitation to this user');
-              return;
-            } else if (inviteError.message?.includes('Conversation already exists')) {
-              Alerts.error('You can already message this user');
               return;
             } else if (inviteError.message?.includes('banned for spam')) {
               Alerts.error('You are temporarily unable to send invitations');
               return;
             }
-            throw inviteError; // Re-throw other errors
+            // Log and re-throw unexpected errors
+            console.error('❌ [NewChat] Unexpected error creating DM invitation:', inviteError);
+            throw inviteError;
           }
         }
         
